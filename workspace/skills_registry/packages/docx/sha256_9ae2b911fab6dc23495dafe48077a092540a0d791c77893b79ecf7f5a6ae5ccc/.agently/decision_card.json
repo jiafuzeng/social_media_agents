@@ -1,0 +1,9 @@
+{
+  "checksum": "9ae2b911fab6dc23495dafe48077a092540a0d791c77893b79ecf7f5a6ae5ccc",
+  "description": "当用户要求生成 Word、DOCX 或普通文档时使用；交付物必须是真实可打开的 .docx 文件。",
+  "guidance_excerpt": "# DOCX 文件生成\n\n1. 从用户要求中提取标题和需要写入的内容。\n2. 使用宿主提供的 DOCX 生成器创建真实文件。\n3. 生成后检查压缩包中存在 `word/document.xml`。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "keywords": [],
+  "name": "docx",
+  "resource_summary": [],
+  "skill_id": "docx"
+}

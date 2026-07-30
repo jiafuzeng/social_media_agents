@@ -1,0 +1,31 @@
+{
+  "canonical_ref": "skill:xlsx",
+  "description": "当用户要求生成 Excel、XLSX、电子表格或工作簿时使用；交付物必须是真实可打开的 .xlsx 文件。",
+  "frontmatter": {
+    "description": "当用户要求生成 Excel、XLSX、电子表格或工作簿时使用；交付物必须是真实可打开的 .xlsx 文件。",
+    "name": "xlsx"
+  },
+  "installed_path": "/Users/gg/study/social_media_agent/workspace/skills_registry/packages/xlsx/sha256_606b2188a015a00359a0a78c474658e7cdcd56a9356a0e44e308f9a407e85c74",
+  "instruction_body": "# XLSX 文件生成\n\n1. 把标题、字段和内容组织成清晰的工作表。\n2. 使用宿主提供的 XLSX 生成器创建真实文件。\n3. 生成后重新打开工作簿，确认不存在损坏。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "name": "xlsx",
+  "resources": [
+    {
+      "executable": false,
+      "kind": "instruction",
+      "media_type": null,
+      "metadata": {},
+      "path": "SKILL.md",
+      "sha256": "5b7c7673ceb27ff51da81543a9747428b7c1c0224427d3fcb198182bd605db42",
+      "size": 457
+    }
+  ],
+  "revision": "sha256:606b2188a015a00359a0a78c474658e7cdcd56a9356a0e44e308f9a407e85c74",
+  "revision_ref": "skill:xlsx@sha256:606b2188a015a00359a0a78c474658e7cdcd56a9356a0e44e308f9a407e85c74",
+  "schema_version": "agently.skill_library.package.v1",
+  "scope": "explicit",
+  "skill_id": "xlsx",
+  "source": "/Users/gg/study/social_media_agent/skills/xlsx",
+  "source_provenance": {},
+  "trust": "trusted",
+  "version": "0.1.0"
+}

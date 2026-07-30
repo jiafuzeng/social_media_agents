@@ -1,0 +1,18 @@
+{
+  "pythonVersion": "3.11",
+  "venvPath": "/Users/gg/miniconda3/envs",
+  "venv": "agent-zh",
+  "typeCheckingMode": "standard",
+  "include": [
+    "integrated_agent",
+    "tests",
+    "run_server.py",
+    "run_im_assistant.py",
+    "run_file_skill_demo.py",
+    "load_test.py"
+  ],
+  "exclude": [
+    "workspace",
+    "logs"
+  ]
+}

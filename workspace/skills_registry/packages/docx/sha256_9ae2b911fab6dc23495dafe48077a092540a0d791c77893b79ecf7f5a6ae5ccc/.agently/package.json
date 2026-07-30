@@ -1,0 +1,31 @@
+{
+  "canonical_ref": "skill:docx",
+  "description": "当用户要求生成 Word、DOCX 或普通文档时使用；交付物必须是真实可打开的 .docx 文件。",
+  "frontmatter": {
+    "description": "当用户要求生成 Word、DOCX 或普通文档时使用；交付物必须是真实可打开的 .docx 文件。",
+    "name": "docx"
+  },
+  "installed_path": "/Users/gg/study/social_media_agent/workspace/skills_registry/packages/docx/sha256_9ae2b911fab6dc23495dafe48077a092540a0d791c77893b79ecf7f5a6ae5ccc",
+  "instruction_body": "# DOCX 文件生成\n\n1. 从用户要求中提取标题和需要写入的内容。\n2. 使用宿主提供的 DOCX 生成器创建真实文件。\n3. 生成后检查压缩包中存在 `word/document.xml`。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "name": "docx",
+  "resources": [
+    {
+      "executable": false,
+      "kind": "instruction",
+      "media_type": null,
+      "metadata": {},
+      "path": "SKILL.md",
+      "sha256": "f48078291da4ec2918c6e577969b5b87a03efb4a876c9e9ece5599b1daa4a419",
+      "size": 444
+    }
+  ],
+  "revision": "sha256:9ae2b911fab6dc23495dafe48077a092540a0d791c77893b79ecf7f5a6ae5ccc",
+  "revision_ref": "skill:docx@sha256:9ae2b911fab6dc23495dafe48077a092540a0d791c77893b79ecf7f5a6ae5ccc",
+  "schema_version": "agently.skill_library.package.v1",
+  "scope": "explicit",
+  "skill_id": "docx",
+  "source": "/Users/gg/study/social_media_agent/skills/docx",
+  "source_provenance": {},
+  "trust": "trusted",
+  "version": "0.1.0"
+}

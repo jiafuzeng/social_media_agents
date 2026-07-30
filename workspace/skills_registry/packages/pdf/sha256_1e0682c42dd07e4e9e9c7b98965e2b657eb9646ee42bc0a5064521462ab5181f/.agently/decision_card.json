@@ -1,0 +1,9 @@
+{
+  "checksum": "1e0682c42dd07e4e9e9c7b98965e2b657eb9646ee42bc0a5064521462ab5181f",
+  "description": "当用户明确要求生成 PDF 时使用；交付物必须是真实可打开且支持中文显示的 .pdf 文件。",
+  "guidance_excerpt": "# PDF 文件生成\n\n1. 从用户要求中提取标题和需要写入的内容。\n2. 使用宿主提供的 PDF 生成器创建真实文件。\n3. 生成后检查文件头是 `%PDF-`。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "keywords": [],
+  "name": "pdf",
+  "resource_summary": [],
+  "skill_id": "pdf"
+}

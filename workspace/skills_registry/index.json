@@ -1,0 +1,34 @@
+{
+  "packs": {},
+  "schema_version": "agently.skill_library.index.v1",
+  "skills": {
+    "docx": {
+      "canonical_ref": "skill:docx",
+      "current": "sha256:9ae2b911fab6dc23495dafe48077a092540a0d791c77893b79ecf7f5a6ae5ccc",
+      "revisions": [
+        "sha256:9ae2b911fab6dc23495dafe48077a092540a0d791c77893b79ecf7f5a6ae5ccc"
+      ]
+    },
+    "pdf": {
+      "canonical_ref": "skill:pdf",
+      "current": "sha256:1e0682c42dd07e4e9e9c7b98965e2b657eb9646ee42bc0a5064521462ab5181f",
+      "revisions": [
+        "sha256:1e0682c42dd07e4e9e9c7b98965e2b657eb9646ee42bc0a5064521462ab5181f"
+      ]
+    },
+    "pptx": {
+      "canonical_ref": "skill:pptx",
+      "current": "sha256:9701f5507b5435e1967359e4a58aee0fc7f2c1f7499ce0d6e8421ca69c9a7de1",
+      "revisions": [
+        "sha256:9701f5507b5435e1967359e4a58aee0fc7f2c1f7499ce0d6e8421ca69c9a7de1"
+      ]
+    },
+    "xlsx": {
+      "canonical_ref": "skill:xlsx",
+      "current": "sha256:606b2188a015a00359a0a78c474658e7cdcd56a9356a0e44e308f9a407e85c74",
+      "revisions": [
+        "sha256:606b2188a015a00359a0a78c474658e7cdcd56a9356a0e44e308f9a407e85c74"
+      ]
+    }
+  }
+}

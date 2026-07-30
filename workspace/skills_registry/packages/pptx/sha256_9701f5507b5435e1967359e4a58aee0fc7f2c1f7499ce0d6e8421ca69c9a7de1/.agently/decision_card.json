@@ -1,0 +1,9 @@
+{
+  "checksum": "9701f5507b5435e1967359e4a58aee0fc7f2c1f7499ce0d6e8421ca69c9a7de1",
+  "description": "当用户要求生成 PPT、PPTX、幻灯片或演示文稿时使用；交付物必须是真实可打开的 .pptx 文件。",
+  "guidance_excerpt": "# PPTX 文件生成\n\n1. 使用标题页说明主题，其余页面按章节展开。\n2. 使用宿主提供的 PPTX 生成器创建真实文件。\n3. 生成后检查压缩包中存在 `ppt/presentation.xml`。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "keywords": [],
+  "name": "pptx",
+  "resource_summary": [],
+  "skill_id": "pptx"
+}

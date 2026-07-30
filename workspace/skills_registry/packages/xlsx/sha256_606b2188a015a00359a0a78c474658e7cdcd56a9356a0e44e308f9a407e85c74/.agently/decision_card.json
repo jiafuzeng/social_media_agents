@@ -1,0 +1,9 @@
+{
+  "checksum": "606b2188a015a00359a0a78c474658e7cdcd56a9356a0e44e308f9a407e85c74",
+  "description": "当用户要求生成 Excel、XLSX、电子表格或工作簿时使用；交付物必须是真实可打开的 .xlsx 文件。",
+  "guidance_excerpt": "# XLSX 文件生成\n\n1. 把标题、字段和内容组织成清晰的工作表。\n2. 使用宿主提供的 XLSX 生成器创建真实文件。\n3. 生成后重新打开工作簿，确认不存在损坏。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "keywords": [],
+  "name": "xlsx",
+  "resource_summary": [],
+  "skill_id": "xlsx"
+}

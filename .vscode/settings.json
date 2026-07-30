@@ -1,0 +1,7 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python.defaultInterpreterPath": "/Users/gg/miniconda3/envs/agent-zh/bin/python",
+    "python.analysis.extraPaths": [],
+    "python.analysis.typeCheckingMode": "standard"
+}

@@ -1,0 +1,31 @@
+{
+  "canonical_ref": "skill:pdf",
+  "description": "当用户明确要求生成 PDF 时使用；交付物必须是真实可打开且支持中文显示的 .pdf 文件。",
+  "frontmatter": {
+    "description": "当用户明确要求生成 PDF 时使用；交付物必须是真实可打开且支持中文显示的 .pdf 文件。",
+    "name": "pdf"
+  },
+  "installed_path": "/Users/gg/study/social_media_agent/workspace/skills_registry/packages/pdf/sha256_1e0682c42dd07e4e9e9c7b98965e2b657eb9646ee42bc0a5064521462ab5181f",
+  "instruction_body": "# PDF 文件生成\n\n1. 从用户要求中提取标题和需要写入的内容。\n2. 使用宿主提供的 PDF 生成器创建真实文件。\n3. 生成后检查文件头是 `%PDF-`。\n4. 同时返回简短说明和可下载产物，不要只返回一个服务器本地路径。",
+  "name": "pdf",
+  "resources": [
+    {
+      "executable": false,
+      "kind": "instruction",
+      "media_type": null,
+      "metadata": {},
+      "path": "SKILL.md",
+      "sha256": "e11982dc523f34fb38836cc53566ed9ac332b8d9b50c935de30faa9cb8a9a170",
+      "size": 426
+    }
+  ],
+  "revision": "sha256:1e0682c42dd07e4e9e9c7b98965e2b657eb9646ee42bc0a5064521462ab5181f",
+  "revision_ref": "skill:pdf@sha256:1e0682c42dd07e4e9e9c7b98965e2b657eb9646ee42bc0a5064521462ab5181f",
+  "schema_version": "agently.skill_library.package.v1",
+  "scope": "explicit",
+  "skill_id": "pdf",
+  "source": "/Users/gg/study/social_media_agent/skills/pdf",
+  "source_provenance": {},
+  "trust": "trusted",
+  "version": "0.1.0"
+}
