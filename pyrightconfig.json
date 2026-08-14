@@ -1,7 +1,5 @@
 {
-  "pythonVersion": "3.11",
-  "venvPath": "/Users/gg/miniconda3/envs",
-  "venv": "agent-zh",
+  "pythonVersion": "3.10",
   "typeCheckingMode": "standard",
   "include": [
     "integrated_agent",

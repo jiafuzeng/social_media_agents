@@ -1,10 +1,6 @@
-"""问数项目的 TriggerFlow 拓扑与单次运行入口。
+"""问数项目的 TriggerFlow 拓扑与单次运行入口。"""
 
-拓扑：rewrite → for_each(generate_sql) → for_each(execute_sql)
-      → normalize → compose_final_answer。
-子问题阶段并发上限由 concurrency 控制。
-"""
-
+import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,6 +8,7 @@ from agently import TriggerFlow
 
 from ..trace_log import (
     TraceLog,
+    bounded,
     register_framework_hook,
     save_run,
     unregister_framework_hook,
@@ -49,10 +46,7 @@ async def run_question(
     output_directory: Path,
     max_concurrency: int = 4,
 ) -> dict[str, Any]:
-    """运行一次完整问数 Flow，并保存结果与 Trace。
-
-    任一分支 SQL/查询失败 → status=partial；最终答案失败 → failed。
-    """
+    """运行一次完整问数 Flow，并保存结果与 Trace。"""
 
     if not question.strip():
         raise ValueError("question must not be empty")
@@ -80,11 +74,19 @@ async def run_question(
     try:
         await execution.async_start({"question": question})
         state = await execution.async_close()
+    except BaseException:
+        output_directory.mkdir(parents=True, exist_ok=True)
+        events = [bounded(event) for event in trace.events]
+        (output_directory / "events.jsonl").write_text(
+            "\n".join(json.dumps(event, ensure_ascii=False) for event in events)
+            + ("\n" if events else ""),
+            encoding="utf-8",
+        )
+        raise
     finally:
         unregister_framework_hook(hook_name)
 
     rewrite = cast(dict[str, Any], state["rewrite"])
-    # 按改写阶段的子问题顺序重排各阶段输出，保证证据顺序稳定
     order = {
         str(item["subquestion_id"]): index
         for index, item in enumerate(rewrite["subquestions"])

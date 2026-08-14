@@ -1,9 +1,3 @@
-"""Agently 通用 Agent 运行时。
-
-挂载 Search/Browse、文档 Skills、TaskWorkspace 与沙盒；
-流式输出统一为 GatewayEvent。搜索与文档生成均归属本运行时，不是独立路由。
-"""
-
 from __future__ import annotations
 
 import json
@@ -31,8 +25,6 @@ SandboxMode = Literal["auto", "docker", "trusted_local"]
 
 
 class AgentlyAgentRuntime:
-    """通用 Agent:附件走文转换,文本走 Skill 决策或通用对话。"""
-
     def __init__(
         self,
         *,
@@ -58,7 +50,6 @@ class AgentlyAgentRuntime:
         self.sandbox: SandboxMode = sandbox
         self.document_action = DocumentArtifactAction(artifact_store)
         self.skill_library = SkillLibrary(self.registry_root)
-        # 启动时安装文档 Skills，后续只允许模型在这些 revision 中选择
         self.skill_revision_refs = tuple(
             self.skill_library.install(
                 skills_root / skill_id,
@@ -89,7 +80,6 @@ class AgentlyAgentRuntime:
         )
 
     def _build_agent(self, session_id: str) -> Any:
-        """为会话构建带 Workspace / Actions / 沙盒的 Agent 实例。"""
         if self._uses_default_agent_factory:
             load_model_settings()
         agent = self.agent_factory(
@@ -187,7 +177,6 @@ class AgentlyAgentRuntime:
         self,
         request: GatewayRequest,
     ) -> AsyncIterator[GatewayEvent]:
-        """入口：有附件则做文件转换，否则走 Agent 执行路径。"""
         yield GatewayEvent(
             "run.created",
             {
@@ -217,7 +206,6 @@ class AgentlyAgentRuntime:
         self,
         request: GatewayRequest,
     ) -> AsyncIterator[GatewayEvent]:
-        """确定性文件处理路径（xlsx/docx→markdown，md→pdf）。"""
         for attachment in request.attachments:
             yield GatewayEvent(
                 "status.update",
@@ -253,7 +241,6 @@ class AgentlyAgentRuntime:
         self,
         request: GatewayRequest,
     ) -> AsyncIterator[GatewayEvent]:
-        """先让模型决定是否选用文档 Skill，再分流执行。"""
         agent = self._build_agent(request.session_id)
         skill_plan = cast(
             dict[str, Any],
@@ -283,7 +270,6 @@ class AgentlyAgentRuntime:
         agent: Any,
         request: GatewayRequest,
     ) -> AsyncIterator[GatewayEvent]:
-        """通用任务：自主调用 Search/Browse/沙盒，流式吐出 reply delta。"""
         execution = (
             agent.create_execution()
             .input(request.text)
@@ -327,11 +313,9 @@ class AgentlyAgentRuntime:
         request: GatewayRequest,
         selected: list[dict[str, Any]],
     ) -> AsyncIterator[GatewayEvent]:
-        """文档任务：模型只规划结构化内容，宿主 Action 负责写文件与发布。"""
         if len(selected) != 1:
             raise ValueError("一次文档任务必须恰好选择一个文档 Skill")
         revision_ref = str(selected[0].get("revision_ref", ""))
-        # 宿主重新 resolve，防止模型伪造未安装的 revision
         package = self.skill_library.resolve(revision_ref)
         skill_id = self.document_action.validate_skill_id(package.skill_id)
         yield GatewayEvent(

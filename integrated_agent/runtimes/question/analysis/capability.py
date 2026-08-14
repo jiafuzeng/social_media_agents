@@ -1,5 +1,3 @@
-"""问数分析能力门面：对接五阶段 TriggerFlow 并落盘 Trace。"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,8 +10,6 @@ RunQuestion = Callable[..., Awaitable[dict[str, Any]]]
 
 
 class QuestionAnalysisCapability:
-    """对 Worker 暴露的分析接口；默认委托 runner.run_question。"""
-
     def __init__(
         self,
         *,
@@ -29,7 +25,6 @@ class QuestionAnalysisCapability:
         task_id: str,
         question: str,
     ) -> dict[str, Any]:
-        """执行一次问数，Trace 写入 logs_root/task_id，并附带 trace_ref。"""
         output_directory = self.logs_root / task_id
         run = await self.runner(
             question,

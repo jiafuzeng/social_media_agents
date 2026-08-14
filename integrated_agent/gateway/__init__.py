@@ -1,5 +1,3 @@
-"""Gateway 公共契约与统一入口导出。"""
-
 from .contracts import (
     AgentRuntime,
     GatewayAttachment,
@@ -19,3 +17,4 @@ __all__ = [
     "IntentModel",
     "RouteDecision",
 ]
+

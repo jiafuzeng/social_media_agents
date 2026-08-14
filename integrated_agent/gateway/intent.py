@@ -1,8 +1,3 @@
-"""Gateway 意图路由：在 agent / question 两张卡片中做语义选择。
-
-不允许自动选择 Codex；Codex 只能通过 /agent codex 显式切换。
-"""
-
 from __future__ import annotations
 
 from agently import Agently
@@ -13,8 +8,6 @@ from .contracts import RouteDecision
 
 
 class DeepSeekIntentModel:
-    """基于 DeepSeek 的运行时意图分类器。"""
-
     def __init__(self) -> None:
         load_model_settings()
 
@@ -24,7 +17,6 @@ class DeepSeekIntentModel:
         text: str,
         offered: list[dict[str, str]],
     ) -> RouteDecision:
-        """只允许返回 offered_runtimes 中的 runtime_key。"""
         result = await (
             Agently.create_agent("gateway-intent-router")
             .input({"message": text})
@@ -33,7 +25,7 @@ class DeepSeekIntentModel:
                 [
                     "只在 offered_runtimes 中选择一个 runtime_key。",
                     "需要企业经营数据库计算、指标查询或经营分析时选 question。",
-                    "其他通用任务选 agent,包括搜索、文件生成、Skills、Actions 和沙盒计算。",
+                    "其他通用任务选 agent，包括搜索、文件生成、Skills、Actions 和沙盒计算。",
                     "不得选择未提供的外部代码智能体。",
                 ]
             )
@@ -50,3 +42,4 @@ class DeepSeekIntentModel:
             .async_start()
         )
         return RouteDecision.model_validate(result)
+

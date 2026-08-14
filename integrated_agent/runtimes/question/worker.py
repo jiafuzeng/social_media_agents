@@ -1,9 +1,3 @@
-"""问数 TriggerFlow Worker：分析 → 发布答案/图表。
-
-拓扑：analyze_question → publish_answer。
-依赖通过 runtime_resources 注入，避免 Flow 直接耦合 HTTP。
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,8 +13,6 @@ from .stores import InMemoryEventStore
 
 @dataclass
 class WorkerDependencies:
-    """Worker 运行时依赖：分析能力 + 事件总线。"""
-
     question_analysis: QuestionAnalysisCapability
     events: InMemoryEventStore
 
@@ -42,7 +34,6 @@ async def _stage(
     stage: str,
     **values: Any,
 ) -> None:
-    """向 SSE 订阅者发布阶段开始/完成事件。"""
     request = _request(data)
     await _deps(data).events.publish(
         request.task_id,
@@ -56,7 +47,6 @@ question_flow = TriggerFlow(name="enterprise-question-service")
 
 @question_flow.chunk
 async def analyze_question(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """调用五阶段问数流水线，并逐条发布 evidence.ready。"""
     request = TaskRequest.model_validate(data.input)
     await data.async_set_state("request", request.model_dump(mode="json"), emit=False)
     await _deps(data).events.publish(request.task_id, "task.accepted")
@@ -88,7 +78,6 @@ async def analyze_question(data: TriggerFlowRuntimeData) -> dict[str, Any]:
 
 @question_flow.chunk
 async def publish_answer(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """把分析 run 组装为 TaskResult，并发布 chart/answer 事件。"""
     request = _request(data)
     await _stage(data, "stage.started", "publish_answer")
     run = cast(dict[str, Any], data.get_state("question_analysis_run"))
@@ -151,8 +140,6 @@ question_flow.to(analyze_question).to(publish_answer)
 
 
 class QuestionWorkflowWorker:
-    """把单次 TaskRequest 跑完 question_flow 并返回 TaskResult。"""
-
     def __init__(self, dependencies: WorkerDependencies) -> None:
         self.dependencies = dependencies
 

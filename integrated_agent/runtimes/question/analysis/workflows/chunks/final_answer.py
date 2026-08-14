@@ -20,7 +20,6 @@ def _append_missing_gross_profit(
     question: str,
     evidence: list[dict[str, Any]],
 ) -> None:
-    """若用户问了毛利但答案漏写，从证据中宿主侧补一条核对 claim。"""
     if "毛利" not in question or "毛利率" not in question:
         return
     answer_text = str(answer.get("answer", ""))
@@ -71,7 +70,6 @@ def _append_missing_gross_profit(
 
 
 async def compose_final_answer(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """仅依据本次 evidence 生成最终答案，并可选走一轮审查提示。"""
     evidence = cast(list[dict[str, Any]], list(data.input))
     trace = cast(TraceLog, data.require_resource("trace"))
 
@@ -91,8 +89,7 @@ async def compose_final_answer(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                     ),
                 },
             )
-            .create_execution()
-            .async_start()
+            .request.async_get_data()
         )
         draft_answer = dict(result)
         try:
@@ -109,8 +106,7 @@ async def compose_final_answer(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                         ],
                     },
                 )
-                .create_execution()
-                .async_start()
+                .request.async_get_data()
             )
             answer = dict(reviewed)
         except BaseException:

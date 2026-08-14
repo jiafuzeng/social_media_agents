@@ -16,7 +16,6 @@ PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts/generate_sql.yaml"
 
 
 def _semantic_sql_issues(subquestion: dict[str, Any], sql: str) -> list[str]:
-    """宿主侧语义预检：比率不得 ×100、必需指标别名必须出现在 SQL 中。"""
     required_metrics = {
         str(metric) for metric in subquestion.get("required_metrics", [])
     }
@@ -47,7 +46,6 @@ def _semantic_sql_issues(subquestion: dict[str, Any], sql: str) -> list[str]:
 
 
 async def generate_sql(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """为单个子问题生成 SQL；预检失败时最多自动修复一轮。"""
     subquestion = cast(dict[str, Any], data.input)
     subquestion_id = str(subquestion["subquestion_id"])
     catalog = cast(dict[str, Any], data.require_resource("catalog"))
@@ -68,8 +66,7 @@ async def generate_sql(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                         "repair": repair,
                     },
                 )
-                .create_execution()
-                .async_start()
+                .request.async_get_data()
             )
             model_output = dict(result)
             if model_output.get("subquestion_id") != subquestion_id:

@@ -5,10 +5,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime, timezone
 import json
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
 from agently import Agently, RuntimeEvent
+
+
+logger = logging.getLogger(__name__)
 
 
 TraceLayer = Literal["business", "framework"]
@@ -292,6 +296,22 @@ def _record_framework_event(trace: TraceLog, event: RuntimeEvent) -> None:
             or run.response_id
             or run.run_id
         )
+        if event.event_type == "model.parse_failed":
+            facts["parse_error"] = payload.get("parse_error")
+            facts["response_text"] = payload.get("result")
+            logger.warning(
+                "model.parse_failed parse_error=%s text=%r",
+                payload.get("parse_error"),
+                str(payload.get("result") or "")[:1000],
+            )
+        elif event.event_type == "model.retrying":
+            facts["retry_reason"] = payload.get("retry_reason")
+            facts["response_text"] = payload.get("response_text")
+            logger.warning(
+                "model.retrying reason=%s text=%r",
+                payload.get("retry_reason"),
+                str(payload.get("response_text") or "")[:1000],
+            )
     else:
         subject_id = run.execution_id or run.run_id
         flow_name = run.meta.get("flow_name")

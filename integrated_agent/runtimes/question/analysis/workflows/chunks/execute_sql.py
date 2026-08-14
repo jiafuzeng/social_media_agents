@@ -11,7 +11,6 @@ from ...utils.database import execute_sql as run_sql
 
 
 async def execute_sql(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """在只读 SQLite 上执行已预检的 SQL，结果写入 result_directory。"""
     task = cast(dict[str, Any], data.input)
     trace = cast(TraceLog, data.require_resource("trace"))
     result = await asyncio.to_thread(

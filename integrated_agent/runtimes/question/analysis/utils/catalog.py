@@ -148,7 +148,7 @@ def _connect_readonly(database_path: Path) -> sqlite3.Connection:
 
 
 def load_catalog(database_path: Path) -> dict[str, Any]:
-    """从 SQLite 读取元数据、表结构与指标字典，组装完整 Catalog。"""
+    """从当前 SQLite 快照生产宿主保存的完整业务 Catalog。"""
 
     with _connect_readonly(database_path) as connection:
         all_table_names = [
@@ -234,7 +234,7 @@ def load_catalog(database_path: Path) -> dict[str, Any]:
 
 
 def build_rewrite_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
-    """裁剪为改写阶段提示词所需的轻量 Catalog。"""
+    """为问题理解提供完整但紧凑的业务能力视图。"""
 
     metadata = catalog["metadata"]
     datasets = [

@@ -1,8 +1,3 @@
-"""从问数证据自动生成有限数量的图表规格。
-
-优先年度对比柱状图，其次多行对比；最多 MAX_CHARTS 张，金额默认换算为万元。
-"""
-
 from __future__ import annotations
 
 import re
@@ -16,7 +11,6 @@ MAX_CHARTS = 3
 MAX_CATEGORIES = 12
 MAX_SERIES = 4
 
-# 常见指标列 → 中文展示名
 LABELS = {
     "paid_gmv_cents": "支付 GMV",
     "net_revenue_cents": "净营收",
@@ -32,7 +26,6 @@ LABELS = {
 
 
 def _label(column: str) -> str:
-    """去掉年份后缀后映射中文标签。"""
     normalized = re.sub(r"_(20\d{2})$", "", column)
     if normalized in LABELS:
         return LABELS[normalized]
@@ -49,7 +42,6 @@ def _unit(kind: str) -> str:
 
 
 def _scale(value: Any, kind: str) -> float | None:
-    """按语义缩放数值：分→万元，比率→百分数。"""
     if not isinstance(value, (int, float)):
         return None
     numeric = float(value)
@@ -61,7 +53,6 @@ def _scale(value: Any, kind: str) -> float | None:
 
 
 def _split_year_column(column: str) -> tuple[str, str] | None:
-    """解析列名中的年份，支持 metric_2024 或 metric_2024_cents 等形式。"""
     year_at_end = re.fullmatch(r"(.+)_(20\d{2})", column)
     if year_at_end is not None:
         return year_at_end.group(1), year_at_end.group(2)
@@ -81,7 +72,6 @@ def _year_comparison(
     *,
     chart_index: int,
 ) -> list[ChartSpec]:
-    """单行宽表中的多年度指标 → 分组柱状图。"""
     rows = list(evidence.get("rows_preview", []))
     if not rows:
         return []
@@ -93,7 +83,6 @@ def _year_comparison(
         if year_column is None:
             continue
         base, year = year_column
-        # 跳过差分/同比衍生列，避免与原值混在一张图
         if base.startswith(("delta_", "yoy_", "growth_")):
             continue
         kind = str(dict(semantics.get(column, {})).get("kind", "plain"))
@@ -137,7 +126,6 @@ def _row_comparison(
     *,
     chart_index: int,
 ) -> list[ChartSpec]:
-    """多行结果：选一个非数值维度作类别，度量列作序列。"""
     rows = [dict(row) for row in list(evidence.get("rows_preview", []))]
     if len(rows) < 2:
         return []
@@ -192,7 +180,6 @@ def _row_comparison(
 
 
 def build_charts(evidence: list[dict[str, Any]]) -> list[ChartSpec]:
-    """遍历证据列表，按优先级生成至多 MAX_CHARTS 张图。"""
     charts: list[ChartSpec] = []
     for item in evidence:
         charts.extend(_year_comparison(item, chart_index=len(charts)))

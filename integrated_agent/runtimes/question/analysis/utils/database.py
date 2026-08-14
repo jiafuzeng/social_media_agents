@@ -30,7 +30,6 @@ CTE_NAME = re.compile(r"(?:\bWITH|,)\s*([A-Za-z_][\w]*)\s+AS\s*\(", re.IGNORECAS
 
 
 def _connect_readonly(database_path: Path) -> sqlite3.Connection:
-    """以 URI 只读模式打开 SQLite，避免写操作误伤数据集。"""
     path = database_path.resolve()
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -38,13 +37,11 @@ def _connect_readonly(database_path: Path) -> sqlite3.Connection:
 
 
 def _sql_fingerprint(sql: str) -> str:
-    """规范化空白后计算 SHA-256，用作查询指纹。"""
     normalized = " ".join(sql.strip().rstrip(";").split())
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def _sql_issues(sql: str, known_tables: set[str]) -> list[str]:
-    """静态预检：单语句、只读、禁止危险关键字、表白名单。"""
     normalized = sql.strip()
     if not normalized:
         return ["SQL is empty"]

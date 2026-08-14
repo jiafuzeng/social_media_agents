@@ -206,28 +206,31 @@ def to_rewrite_result(draft: RewriteDraft) -> dict[str, Any]:
 
 
 async def rewrite_question(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
-    """调用改写 Agent，产出 requirements/targets，并返回可并行的 subquestions。"""
     payload = cast(dict[str, Any], data.input)
     question = str(payload["question"])
     catalog = cast(dict[str, Any], data.require_resource("rewrite_catalog"))
     trace = cast(TraceLog, data.require_resource("trace"))
 
+    agent = Agently.create_agent(name="lesson24-v2-rewrite")
+    agent.load_yaml_prompt(
+        PROMPT_PATH,
+        mappings={
+            "question": question,
+            "catalog": catalog,
+        },
+    )
+    model_result = agent.request.get_result()
     try:
-        result = await (
-            Agently.create_agent(name="lesson24-v2-rewrite")
-            .load_yaml_prompt(
-                PROMPT_PATH,
-                mappings={
-                    "question": question,
-                    "catalog": catalog,
-                },
-            )
-            .create_execution()
-            .async_start()
-        )
+        result = await model_result.async_get_data()
         rewrite = to_rewrite_result(RewriteDraft.model_validate(dict(result)))
         subquestions = cast(list[dict[str, Any]], rewrite["subquestions"])
     except BaseException as exc:
+        response_text = ""
+        try:
+            response_text = str(await model_result.async_get_text() or "")
+        except Exception:
+            extra = getattr(model_result, "full_result_data", {}) or {}
+            response_text = str(extra.get("text_result") or "")
         trace.log(
             layer="business",
             event_type="business.question.rewritten",
@@ -235,6 +238,7 @@ async def rewrite_question(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]
             subject_id=trace.task_id,
             input={"question": question},
             error=exc,
+            facts={"response_text": response_text[:4000]},
         )
         raise
 

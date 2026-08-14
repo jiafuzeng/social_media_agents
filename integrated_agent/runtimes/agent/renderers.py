@@ -1,5 +1,3 @@
-"""把结构化章节渲染为 docx / xlsx / pdf / pptx 字节，并做格式校验。"""
-
 from __future__ import annotations
 
 from io import BytesIO
@@ -38,7 +36,6 @@ def render_document(
     title: str,
     sections: list[tuple[str, list[str]]],
 ) -> bytes:
-    """按 skill_id 选择渲染器，校验通过后返回文件 bytes。"""
     renderers = {
         "docx": _render_docx,
         "xlsx": _render_xlsx,
@@ -54,7 +51,6 @@ def render_document(
 
 
 def validate_document(skill_id: str, content: bytes) -> None:
-    """校验产物魔数 / OOXML 必需成员，防止空壳文件被发布。"""
     if skill_id == "pdf":
         if not content.startswith(b"%PDF-"):
             raise ValueError("PDF 产物格式校验失败")

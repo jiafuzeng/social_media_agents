@@ -1,8 +1,3 @@
-"""文档 Skill 的宿主 Action：渲染 → Workspace 校验 → 发布制品。
-
-模型只返回结构化章节；真正写文件与 SHA-256 校验由本模块完成。
-"""
-
 from __future__ import annotations
 
 import json
@@ -23,8 +18,6 @@ DOCUMENT_SKILL_IDS = ("docx", "xlsx", "pdf", "pptx")
 
 
 class DocumentArtifactAction:
-    """create_document_file Action 的实现与结果回读。"""
-
     def __init__(self, artifact_store: ArtifactStore) -> None:
         self.artifact_store = artifact_store
 
@@ -76,7 +69,6 @@ class DocumentArtifactAction:
         title: str,
         sections_json: str,
     ) -> dict[str, object]:
-        """写入 TaskWorkspace，回读校验后再发布到 ArtifactStore。"""
         skill_id = self.validate_skill_id(skill_id)
         if len(sections_json.encode("utf-8")) > 64_000:
             raise ValueError("模型生成的文档结构超过 64KB 上限")

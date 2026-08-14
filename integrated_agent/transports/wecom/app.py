@@ -1,8 +1,3 @@
-"""企业微信入站适配：把文本/文件消息转为 GatewayRequest。
-
-会话 ID 优先用 chatid,其次 userid:/agent 命令直接走 Gateway 显式切换。
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -20,8 +15,6 @@ from .presenter import WeComEventPresenter
 
 
 class WeComAssistant:
-    """企业微信 Bot:认证、收消息、转 Gateway、由 Presenter 回传。"""
-
     def __init__(
         self,
         *,
@@ -40,7 +33,6 @@ class WeComAssistant:
 
     @staticmethod
     def session_id(frame: dict[str, Any]) -> str:
-        """从企微 frame 推导 Gateway 会话键。"""
         body = frame.get("body", {})
         return str(
             body.get("chatid")
@@ -52,7 +44,6 @@ class WeComAssistant:
         print("企业微信综合智能助理已认证，默认使用自动路由。")
 
     async def on_text(self, frame: dict[str, Any]) -> None:
-        """处理文本：命令切换或交给 Gateway 流式处理。"""
         body = frame.get("body", {})
         text = (body.get("text", {}) or {}).get("content", "").strip()
         if not text:
@@ -79,7 +70,6 @@ class WeComAssistant:
         )
 
     async def on_file(self, frame: dict[str, Any]) -> None:
-        """下载企微文件、落盘到 workspace,再作为附件强制走 agent。"""
         body = frame.get("body", {})
         file_info = body.get("file", {}) or {}
         download_url = str(file_info.get("url", ""))
@@ -136,5 +126,5 @@ class WeComAssistant:
         )
 
     def run(self) -> None:
-        """阻塞运行 WebSocket 客户端事件循环。"""
         self.client.run()
+

@@ -1,9 +1,3 @@
-"""有界队列 + Worker 池的问数任务服务。
-
-队列满时立即抛出 ServiceBusyError（映射为 HTTP 503）；
-每个任务最终进入 completed 或 failed。
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -16,20 +10,14 @@ from .stores import InMemoryEventStore, InMemoryTaskStore
 
 
 class TaskWorker(Protocol):
-    """执行复杂问数工作流的 Worker 协议。"""
-
     async def execute_complex_task(self, request: TaskRequest) -> TaskResult: ...
 
 
 class ServiceBusyError(RuntimeError):
-    """任务队列已满，客户端应稍后重试。"""
-
     pass
 
 
 class QuestionTaskService:
-    """受理任务、调度 Worker，并维护任务状态与事件流。"""
-
     def __init__(
         self,
         *,
@@ -55,13 +43,11 @@ class QuestionTaskService:
 
     @property
     def ready(self) -> bool:
-        """所有 Worker 协程均已启动且未退出。"""
         return len(self._runners) == self.worker_count and all(
             not runner.done() for runner in self._runners
         )
 
     async def start(self) -> None:
-        """启动固定数量的 Worker 循环。"""
         if self.ready:
             return
         self._runners = [
@@ -73,7 +59,6 @@ class QuestionTaskService:
         ]
 
     async def stop(self) -> None:
-        """取消全部 Worker 并等待其退出。"""
         runners, self._runners = self._runners, []
         for runner in runners:
             runner.cancel()
@@ -82,11 +67,9 @@ class QuestionTaskService:
                 await runner
 
     async def join(self) -> None:
-        """等待队列中已入队任务全部处理完毕。"""
         await self._queue.join()
 
     async def submit(self, command: TaskCreate) -> TaskAccepted:
-        """创建任务并非阻塞入队；队列满则删除记录并报忙。"""
         task_id = uuid4().hex
         request = TaskRequest(
             task_id=task_id,
@@ -117,7 +100,6 @@ class QuestionTaskService:
         return await self.tasks.get(task_id)
 
     async def _run(self, worker_index: int) -> None:
-        """单个 Worker：取任务 → 执行 → 发布完成/失败事件。"""
         while True:
             request = await self._queue.get()
             try:

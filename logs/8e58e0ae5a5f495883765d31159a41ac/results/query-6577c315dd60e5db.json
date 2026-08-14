@@ -1,0 +1,35 @@
+{
+  "query_id": "query-6577c315dd60e5db",
+  "data_snapshot_id": "lesson23-analysis-b7ad59fddab30331",
+  "columns": [
+    "year",
+    "campaign_name",
+    "paid_gmv_cents",
+    "base_paid_gmv_cents",
+    "growth_amount_cents",
+    "growth_rate",
+    "contribution_rate"
+  ],
+  "row_count": 2,
+  "truncated": false,
+  "rows": [
+    {
+      "year": "2025",
+      "campaign_name": "618",
+      "paid_gmv_cents": 293023204,
+      "base_paid_gmv_cents": null,
+      "growth_amount_cents": null,
+      "growth_rate": null,
+      "contribution_rate": null
+    },
+    {
+      "year": "2024",
+      "campaign_name": "618",
+      "paid_gmv_cents": null,
+      "base_paid_gmv_cents": 249805977,
+      "growth_amount_cents": null,
+      "growth_rate": null,
+      "contribution_rate": null
+    }
+  ]
+}

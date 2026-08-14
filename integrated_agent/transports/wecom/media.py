@@ -1,5 +1,3 @@
-"""企业微信媒体上传：分片 init / chunk / finish，并发送原生文件消息。"""
-
 from __future__ import annotations
 
 import asyncio
@@ -21,20 +19,15 @@ MAX_FILE_SIZE = 20 * 1024 * 1024
 
 @dataclass(frozen=True)
 class UploadedMedia:
-    """上传完成后企业微信返回的 media 句柄。"""
-
     media_id: str
     media_type: str
 
 
 class WeComMediaClient:
-    """把本地文件上传为企微 media，并可直接发到会话。"""
-
     def __init__(self, client: WSClient) -> None:
         self.client = client
 
     async def upload_file(self, path: Path) -> UploadedMedia:
-        """分片上传本地文件；空文件或超过 20MB 直接拒绝。"""
         content = path.read_bytes()
         if not content:
             raise ValueError("不能向企业微信上传空文件")
@@ -80,7 +73,6 @@ class WeComMediaClient:
         )
 
     async def send_file(self, chat_id: str, path: Path) -> UploadedMedia:
-        """上传后以原生 file 消息投递到指定会话。"""
         media = await self.upload_file(path)
         await self.client.send_message(
             chat_id,
@@ -98,7 +90,6 @@ class WeComMediaClient:
         chunk_index: int,
         chunk: bytes,
     ) -> None:
-        """单分片上传，最多重试 3 次。"""
         last_error: Exception | None = None
         for attempt in range(3):
             try:
@@ -124,7 +115,6 @@ class WeComMediaClient:
         command: str,
         body: dict[str, Any],
     ) -> dict[str, Any]:
-        """向企微 Bot 发送一条协议命令并返回结果 frame。"""
         frame = {"headers": {"req_id": generate_req_id(command)}}
         result = await self.client.reply(frame, body, command)
         return dict(result)

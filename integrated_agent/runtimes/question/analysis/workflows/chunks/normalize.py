@@ -9,7 +9,6 @@ from ...utils.catalog import format_evidence_value, infer_column_semantics
 
 
 async def normalize_results(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
-    """过滤成功查询，附上列语义与展示值，形成可引用 evidence 列表。"""
     query_results = cast(list[dict[str, Any]], list(data.input))
     trace = cast(TraceLog, data.require_resource("trace"))
     rewrite = cast(dict[str, Any], data.get_state("rewrite"))

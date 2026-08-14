@@ -1,8 +1,3 @@
-"""问数 Service Runtime：把远端 HTTP/SSE 翻译为 GatewayEvent。
-
-供企业微信 Gateway 侧调用独立问数进程；消费到稳定终态后结束。
-"""
-
 from __future__ import annotations
 
 import json
@@ -15,8 +10,6 @@ from integrated_agent.gateway import GatewayEvent, GatewayRequest
 
 
 class QuestionServiceRuntime:
-    """作为 Gateway 的 question 运行时，代理远端问数服务。"""
-
     def __init__(
         self,
         base_url: str,
@@ -30,7 +23,6 @@ class QuestionServiceRuntime:
         self,
         request: GatewayRequest,
     ) -> AsyncIterator[GatewayEvent]:
-        """提交任务并订阅 SSE，映射为统一 Gateway 事件。"""
         async with httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
@@ -61,7 +53,6 @@ class QuestionServiceRuntime:
                 stream.raise_for_status()
                 event_type = ""
                 data_lines: list[str] = []
-                # 手动解析 SSE：按空行分隔事件
                 async for line in stream.aiter_lines():
                     if line.startswith("event:"):
                         event_type = line.removeprefix("event:").strip()
@@ -96,7 +87,6 @@ class QuestionServiceRuntime:
                             yield GatewayEvent("run.failed", data)
                             return
                         elif event_type == "task.completed":
-                            # 兜底：若未收到 answer.ready，从快照补拉答案
                             if not answer_sent:
                                 snapshot = (
                                     await client.get(
@@ -118,3 +108,4 @@ class QuestionServiceRuntime:
                             return
                         event_type = ""
                         data_lines = []
+

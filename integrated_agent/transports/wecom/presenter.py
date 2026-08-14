@@ -1,9 +1,3 @@
-"""把 GatewayEvent 流渲染为企业微信流式文本 + 终态文件消息。
-
-中间帧约每 250ms 节流一次；final 帧只发送一次。
-制品优先用原生文件消息回传，失败时用 markdown 说明错误。
-"""
-
 from __future__ import annotations
 
 import time
@@ -20,8 +14,6 @@ from .media import WeComMediaClient
 
 
 class WeComEventPresenter:
-    """消费 Gateway 事件并驱动企微 reply_stream / 文件投递。"""
-
     def __init__(
         self,
         *,
@@ -40,7 +32,6 @@ class WeComEventPresenter:
         *,
         session_id: str,
     ) -> None:
-        """流式回传文本，结束后按序发送已收集的制品文件。"""
         stream_id = generate_req_id("agent")
         cumulative = ""
         status = ""
@@ -86,7 +77,6 @@ class WeComEventPresenter:
                     "\n\n处理失败："
                     f"{event.data.get('message', 'unknown')}"
                 )
-            # 节流：避免每个 delta 都打企微接口
             now = time.monotonic()
             if now - last_sent_at >= 0.25:
                 await self.client.reply_stream(
@@ -96,7 +86,6 @@ class WeComEventPresenter:
                     False,
                 )
                 last_sent_at = now
-        # final=True 只发一次，去掉流式光标
         await self.client.reply_stream(
             frame,
             stream_id,
@@ -126,7 +115,6 @@ class WeComEventPresenter:
         *,
         filename: str,
     ) -> Path | None:
-        """优先用事件内本地 path，否则按 artifact_id 从仓库解析。"""
         raw_path = str(event.data.get("path", ""))
         if raw_path:
             path = Path(raw_path)
@@ -134,3 +122,4 @@ class WeComEventPresenter:
         artifact_id = str(event.data.get("artifact_id", ""))
         artifact = self.artifact_store.resolve(artifact_id, filename)
         return artifact.path if artifact is not None else None
+
