@@ -18,7 +18,7 @@
 | # | 议题 | 建议 | 备选 | 请评审确认 |
 |---|---|---|---|---|
 | D1 | 是否新增 Runtime `matrix` | 是。有独立任务生命周期、队列和稳定拓扑 | 挂到 Agent Action |  |
-| D2 | 双 API 是否共用一套 Flow | 是。`/api/create` 与 `/api/reply` 只是入站适配 | 两套 TriggerFlow |  |
+| D2 | 双 API 是否共用一套 Flow | 否。产品方案已拍板：`COMPOSE_FLOW` 与 `REPLY_FLOW` 分图。共享 TaskService / Gate / RetrieveCases | 一张图 + `scenario` 开关 | 已定 |
 | D3 | P0 是否上向量检索 | 否。`RetrieveCases` 节点在，实现可返回 empty 或关键词过滤夹具 | P0 上 BM25+向量 |  |
 | D4 | 降级是否允许 Review 回抬 | 否。skip/template 不可被 Review 改成可发正文 | Review 可推翻 Gate |  |
 | D5 | 问数 stores 是否先抽取 | 否。先复制，Result 同构再抽 | 立刻抽通用 TaskService |  |
@@ -55,9 +55,10 @@ runtimes/matrix/analysis → 不依赖 HTTP、企业微信、Gateway、question.
 | `analysis/snapshots.py` | 短 key 投影、snapshot_id | 意图路由 |
 | `analysis/constraints.py` | AC、字数、引用、降级算子 | 该不该回 |
 | `analysis/retrieval.py` | RetrieveCases 契约 | 硬词表、放行 |
-| `analysis/workflows/main_flow.py` | TriggerFlow 定义与 close | HTTP |
-| `chunks/{brief,draft,review}.py` | 三个可观察阶段 | 发送 |
-| `transports/http/matrix_api.py` | 双 API + `/v1/matrix/tasks` | 第二套 Flow |
+| `analysis/workflows/compose_flow.py` | 创作 TriggerFlow 与 close | 回复节点 |
+| `analysis/workflows/reply_flow.py` | 回复 TriggerFlow 与 close | 趋势节点 |
+| `chunks/compose|reply/{brief,draft,review}.py` | 各三条可观察阶段 | 发送 |
+| `transports/http/matrix_api.py` | HTTP Transport → GatewayRequest | 直连队列 |
 | `data/matrix/` | 演示快照与案例夹具 | 运行时状态 |
 
 改动面（现有文件，评审需同意）：
@@ -81,12 +82,12 @@ runtimes/matrix/analysis → 不依赖 HTTP、企业微信、Gateway、question.
 ```text
 MatrixTaskCreate
   text: str, min_length=1
-  scenario: compose | reply | auto = auto
+  scenario: compose | reply              # 禁止 auto；由入口写入或调用方显式传
   platform_keys: list[str] = []          # 空则用账号默认平台
   account_key: str = "default"
   brand_key: str = "default"
-  need_trends: bool = false              # 仅 compose 有意义
-  thread_key: str | null = null
+  need_trends: bool = false              # 仅 compose；reply 忽略
+  thread_key: str | null = null          # compose 携带 → 422
   comments: list[CommentIn] | null = null
   requester: str = "course-user"
   channel: str = "web"
@@ -98,9 +99,9 @@ CommentIn
   author_display: str | null = null      # 不得含 UID
 ```
 
-`/api/create` 默认 `scenario=compose`。`/api/reply` 默认 `scenario=reply`，且必须有 `thread_key` 或 `comments`。`/v1/matrix/tasks` 传完整 Create。
+HTTP Transport 把路径写成 `GatewayRequest`（`runtime_key` + `scenario`）后交给 `AgentGateway`，不直连 TaskService。`/api/create` → matrix + compose；`/api/reply` → matrix + reply（须有 `thread_key` 或 `comments`）；`/v1/matrix/tasks` 须显式 `scenario=compose|reply`。
 
-Gateway：`text` 原样进入；若匹配 `thread:<key>` 则填充 `thread_key`。附件不进 matrix。
+企业微信：`text` 原样进入 Gateway；匹配 `thread:<key>` 则 `scenario=reply`，否则落到 matrix 时为 compose。附件不进 matrix。Brief 不做场景分类。
 
 ### 3.2 快照（execution resources）
 
@@ -121,15 +122,14 @@ Snapshot
 ### 3.3 Brief 输出
 
 ```text
-BriefDraft
+ComposeBriefOut / ReplyBriefOut
   normalized_brief: str
-  scenario: compose | reply | mixed
   requirements: [{requirement_id, description}]
-  work_items: [WorkItem]
+  work_items: [WorkItem]                 # 无 scenario；场景由 Flow 决定
 
 WorkItem
   work_item_id: str
-  kind: compose_post | reply_comment
+  kind: compose_post | reply_comment     # 必须与所在 Flow 一致
   requirement_ids: [str]
   platform_key: str
   source_comment_key: str | null
@@ -146,7 +146,7 @@ WorkItem
 DraftModelOut
   work_item_id: str                      # 不得被模型改掉
   stance_assessment: str                 # 有界，same-response
-  reply_decision: reply | acknowledge | escalate | skip | null
+  reply_decision: reply | acknowledge | skip | null
   claim_types: [str]
   risk_flags: [str]
   draft_text: str
@@ -155,7 +155,7 @@ DraftModelOut
   proposed_degrade: pass | rewrite_safe | template_fallback | skip | null
 ```
 
-`kind=compose_post` 时 `reply_decision` 必须为 null。`kind=reply_comment` 时必填。`skip` ⇒ `draft_text` 为空串。
+ComposeDraft 不得输出 `reply_decision`。ReplyDraft 必填 `reply_decision`。`skip` ⇒ `draft_text` 为空串。两套 schema 分文件，不靠 null 兼用。
 
 ### 3.5 Gate 结果
 
@@ -166,7 +166,7 @@ GatedDraft
   degrade_trace: [{op, issues[], attempt}]
   text: str
   rationale: str
-  decision: reply | acknowledge | escalate | skip | publishable
+  decision: reply | acknowledge | skip | publishable
   evidence_ids: [str]
   status: ready | degraded | skipped | failed
   issues: [str]
@@ -185,7 +185,7 @@ ReviewOut
 MatrixTaskResult
   task_id, snapshot_id, trace_ref
   status: completed | partial
-  task_type: compose_post | reply_comment | mixed
+  task_type: compose_post | reply_comment   # 由 Flow 决定，禁止 mixed
   summary: str
   drafts: [GatedDraft]                   # Review 后终态
   evidence: [{ref_id, title, ruling}]
@@ -203,16 +203,22 @@ MatrixTaskResult
 ## 4. TriggerFlow 与状态
 
 ```text
-CONTENT_FLOW
-  brief
-  → for_each(retrieve_and_draft, concurrency=4)
-  → review
+COMPOSE_FLOW
+  [fetch_trends]
+  → compose_brief
+  → for_each(retrieve_and_compose_draft, concurrency=4)
+  → compose_review
+
+REPLY_FLOW
+  reply_brief
+  → for_each(retrieve_and_reply_draft, concurrency=4)
+  → reply_review
 ```
 
-`retrieve_and_draft` 是一个 Chunk，内部顺序：RetrieveCases → Draft ModelRequest → ConstraintGate（必要时 rewrite_safe 一次）→ 返回 GatedDraft。  
-不把 Gate 画成模型节点。不把 retrieve 并进 Brief 请求。
+`retrieve_and_*_draft` 是 Chunk，内部顺序：RetrieveCases → 对应 Draft ModelRequest → ConstraintGate（必要时 rewrite_safe 一次）→ 返回 GatedDraft。  
+不把 Gate 画成模型节点。不把 retrieve 并进 Brief。不用 `when(scenario)` 把两张图焊回一张。
 
-P0 `need_trends=true`：在 `run_content()` 前奏用夹具或空列表，不接真实抓取；失败记 limitation，不失败整单。
+P0 `need_trends=true`：仅 `COMPOSE_FLOW` 前奏用夹具或空列表；失败记 limitation，不失败整单。`REPLY_FLOW` 无此节点。
 
 ### 4.1 execution state
 
@@ -270,13 +276,14 @@ P1 才替换为 BM25/向量；接口不变。
 
 | 方法 | 路径 | 行为 |
 |---|---|---|
-| POST | `/api/create` | 202，默认 compose |
-| POST | `/api/reply` | 202，默认 reply；缺评论则 422 |
-| POST | `/v1/matrix/tasks` | 202，完整 Create |
+| POST | `/api/create` | HTTP Transport → Gateway，`runtime=matrix` `scenario=compose` |
+| POST | `/api/reply` | 同上，`scenario=reply`；缺评论则 422 |
+| POST | `/v1/matrix/tasks` | 同上；`scenario` 非 compose/reply 则 422 |
+| POST | `/v1/tasks` | HTTP Transport → Gateway，`runtime=question` |
 | GET | `/v1/matrix/tasks/{id}` | TaskSnapshot |
 | GET | `/v1/matrix/tasks/{id}/events` | SSE，协议对齐问数 |
 
-问数 `/v1/tasks` 保持不变。matrix 使用独立 `MatrixTaskService` 实例与独立队列。
+公开 POST 一律经 `AgentGateway`。TaskService 的受理与 SSE 仅供 Runtime 内部调用。matrix 使用独立 `MatrixTaskService` 实例与独立队列。
 
 ### 5.2 SSE 事件（稳定名，禁止暴露 TriggerFlow 私有对象）
 
@@ -367,7 +374,8 @@ S4 真模型（不阻塞合入）：X 预热一题；`thread:demo-1` 一题。�
 | 四层事后约束 | 变成生成后过滤；RAG 校验会漏拦 |
 | 检索基座喂给约束层 | 违禁词必须完备扫描 |
 | Skill 映射意图 | 抢模型语义所有权 |
-| 爆款/人设与路径一一绑定 | 人设两条都要；爆款只进创作 |
+| 爆款/人设与路径一一绑定 | 人设两条都要；爆款只进创作 Flow |
+| 一套 Flow + Brief 做 scenario/auto 分类 | 产品方案已拆开；入口绑定拓扑 |
 | 通用 TaskService 先抽象 | 没有第二消费者证明 |
 | instant 发送 | 草稿是临时值 |
 
@@ -387,13 +395,13 @@ S4 真模型（不阻塞合入）：X 预热一题；`thread:demo-1` 一题。�
 开放问题（请评审口头定）：
 
 1. `max_chars`：X 按字符还是按加权长度？P0 建议按 Python `len(text)`，文档标明。
-2. `escalate` 在 P0 的 Draft 枚举里是否露出？建议露出但 Gate 映射为 skip，避免模型空转。
+2. 是否保留 `escalate` 枚举？否。不露出；若模型写出则 Gate 映射为 skip。全程无人工审批。
 3. 矩阵默认平台列表：仅 `x-twitter`，还是 P0 就加 `weibo` 空壳？建议只锁 X，第二平台 P1。
 
 ---
 
 ## 11. 建议评审结论稿
 
-> 原则通过 MatrixCopilot P0 工程方案。新增 `matrix` Runtime，双 API 共用一套 TriggerFlow。约束层为注入 + ConstraintGate，RAG 仅作 Brief 之后的证据节点。P0 不发送、不上向量检索、不抽通用任务框架。合入以 T01–T15 全绿为门禁；S4 真模型不阻塞。D1–D6 按建议执行。开放问题 1–3 按上文建议默认。
+> 原则通过 MatrixCopilot P0 工程方案。新增 `matrix` Runtime，双 API 绑定两套 TriggerFlow（`COMPOSE_FLOW` / `REPLY_FLOW`），共享 TaskService、ConstraintGate 与 RetrieveCases。约束层为注入 + Gate，RAG 仅作各自 Brief 之后的证据节点。P0 不发送、不上向量检索、Brief 不做场景分类。合入以 T01–T15 全绿为门禁；S4 真模型不阻塞。D2 按产品方案已定执行，其余 D1/D3–D6 按建议执行。开放问题 1–3 按上文建议默认。
 
 评审记录：日期 / 参与人 / 异议 / 后续 action，会后补进本节。
