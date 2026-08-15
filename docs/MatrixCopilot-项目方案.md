@@ -51,18 +51,24 @@ MatrixCopilot 把创作单或回复单编译成**带证据、带评理、过硬�
 本仓库已有统一 `AgentGateway`，以及 `agent` / `question` / `codex` 三个 Runtime。MatrixCopilot 作为第四个 Runtime 并列问数，不穿过通用 Agent 工具环。
 
 ```mermaid
-flowchart LR
-    IM["企业微信"] --> GW["AgentGateway"]
-    OPS["运营 HTTP"] --> API["/api/create /api/reply"]
-    GW -->|"auto / matrix"| MR["Matrix Runtime"]
-    GW -->|"auto / question"| QR["问数 Runtime"]
-    GW -->|"auto / agent"| AR["通用 Agent"]
-    API --> Q["有界队列"]
-    MR --> Q
-    Q --> TF["TriggerFlow"]
-    TF --> SSE["稳定 SSE"]
-    SSE --> GW
+flowchart TB
+    subgraph WECOM["企业微信"]
+        direction LR
+        IM["企业微信"] --> GW["AgentGateway"]
+        GW --> AR["agent"] --> ACT["Actions / Skills / 沙盒"]
+        GW --> QR["question"] --> QAPI["/v1/tasks"] --> QQ["队列"] --> QF["TriggerFlow"] --> QSSE["SSE"]
+        GW --> MR["matrix"] --> MAPI["/api/create /api/reply"] --> MQ["队列"] --> MF["TriggerFlow"] --> MSSE["SSE"]
+        GW --> CR["codex"] --> ACP["ACP 会话"]
+    end
+
+    subgraph HTTPL["HTTP"]
+        direction LR
+        HTTP["HTTP"] --> QAPI
+        HTTP --> MAPI
+    end
 ```
+
+两条并列入站。上线：企业微信经 Gateway 分流到四个 Runtime。下线：HTTP 不经 Gateway，直接打问数与 matrix 的 API，与 Runtime 汇合后走各自队列。`codex` 须显式切换；附件仍钉 `agent`。
 
 对照问数的同构与必须改掉的点：
 
