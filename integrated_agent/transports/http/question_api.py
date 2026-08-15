@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any, Protocol
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
@@ -36,28 +37,47 @@ def event_to_sse(event: TaskEvent) -> str:
     )
 
 
+class _Startable(Protocol):
+    async def start(self) -> None: ...
+
+    async def stop(self) -> None: ...
+
+
 def create_question_api(
     service: QuestionTaskService,
     *,
     static_root: Path,
     artifacts_root: Path,
+    extra_startables: Sequence[_Startable] | None = None,
+    extra_mount: Callable[[FastAPI], Any] | None = None,
 ) -> FastAPI:
     artifact_store = ArtifactStore(artifacts_root)
+    extras = list(extra_startables or [])
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await service.start()
+        for item in extras:
+            await item.start()
         try:
             yield
         finally:
+            for item in reversed(extras):
+                await item.stop()
             await service.stop()
 
     app = FastAPI(title="问数智能体流式服务", version="1.0.0", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=static_root), name="static")
+    if extra_mount is not None:
+        extra_mount(app)
 
     @app.get("/", response_class=FileResponse)
     async def index() -> FileResponse:
         return FileResponse(static_root / "index.html")
+
+    @app.get("/matrix", response_class=FileResponse)
+    async def matrix_index() -> FileResponse:
+        return FileResponse(static_root / "matrix.html")
 
     @app.get("/health")
     async def health() -> dict[str, str]:

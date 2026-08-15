@@ -1,0 +1,54 @@
+.execution:
+  input:
+    text: ${text}
+  info:
+    snapshot: ${info}
+  instruct:
+    - 只做回复拆解，不要判断这是创作还是回复，不要输出 scenario。
+    - requirements 写运营目标，不要复述本页 instruct。
+    - 为 info.snapshot.comments 中每一条评论生成 work_item，kind 必须是 reply_comment，source_comment_key 必须是已签发的 comment_key。
+    - 每个 requirement 必须被引用；claim_types 只能从 info.snapshot.offered_claim_types 选取，不要把 template_key 写进去。
+    - 不写回复正文。
+  output:
+    $format: json
+    normalized_brief:
+      $type: str
+      $ensure: not_null
+    requirements:
+      $type:
+        - requirement_id:
+            $type: str
+            $ensure: not_null
+          description:
+            $type: str
+            $ensure: not_null
+      $ensure: not_null
+    work_items:
+      $type:
+        - work_item_id:
+            $type: str
+            $ensure: not_null
+          kind:
+            $type: str
+            $desc: 必须是 reply_comment
+            $ensure: not_null
+          requirement_ids:
+            $type:
+              - $type: str
+            $ensure: not_null
+          platform_key:
+            $type: str
+            $ensure: not_null
+          source_comment_key:
+            $type: str
+            $ensure: not_null
+          goal:
+            $type: str
+            $ensure: not_null
+          talking_points:
+            $type:
+              - $type: str
+          claim_types:
+            $type:
+              - $type: str
+      $ensure: not_null

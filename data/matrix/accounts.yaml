@@ -1,0 +1,18 @@
+accounts:
+  default:
+    account_key: default
+    display_name: Matrix Demo
+    voice_summary: 克制、可核验、不承诺收益或疗效；官方口吻但不扮演平台或公权力。
+    brand_key: default
+    default_platform_keys:
+      - x-twitter
+
+brands:
+  default:
+    brand_key: default
+    forbidden_topics:
+      - 虚假疗效
+      - 保本收益
+      - 未披露付费推广
+    template_keys:
+      - neutral-disclaimer

@@ -14,6 +14,7 @@ from integrated_agent.runtimes.agent import (
     AgentlyAgentRuntime,
     WorkspaceFileService,
 )
+from integrated_agent.runtimes.matrix.client import MatrixServiceRuntime
 from integrated_agent.runtimes.question.client import QuestionServiceRuntime
 from integrated_agent.storage import ArtifactStore
 from integrated_agent.transports.wecom import (
@@ -47,6 +48,10 @@ def build_im_assistant(root: Path = ROOT) -> WeComAssistant:
         "QUESTION_SERVICE_URL",
         "http://127.0.0.1:8000",
     )
+    matrix_service_url = os.environ.get(
+        "MATRIX_SERVICE_URL",
+        question_service_url,
+    )
     artifact_base_url = os.environ.get(
         "ARTIFACT_BASE_URL",
         question_service_url,
@@ -78,6 +83,7 @@ def build_im_assistant(root: Path = ROOT) -> WeComAssistant:
         runtimes={
             "agent": native_agent,
             "question": QuestionServiceRuntime(question_service_url),
+            "matrix": MatrixServiceRuntime(matrix_service_url),
             "codex": AcpAgentRuntime(),
         },
     )

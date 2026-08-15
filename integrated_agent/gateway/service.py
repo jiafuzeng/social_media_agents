@@ -14,6 +14,7 @@ class AgentGateway:
     AUTO_RUNTIMES = {
         "agent": "通用任务，包括搜索、Skills、Actions、文件处理与沙盒计算",
         "question": "查询企业经营数据库、计算指标或分析经营表现",
+        "matrix": "写推文、多平台草稿、回复评论与评理",
     }
 
     def __init__(
@@ -41,7 +42,7 @@ class AgentGateway:
             current = self.current_runtime(session_id)
             return (
                 f"当前运行时：{current}。"
-                "用法：/agent auto | agent | question | codex"
+                "用法：/agent auto | agent | question | matrix | codex"
             )
         if requested != "auto" and requested not in self.runtimes:
             raise ValueError(f"unknown runtime: {requested}")

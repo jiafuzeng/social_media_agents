@@ -299,6 +299,7 @@ async def test_message_to_skill_action_and_download_is_end_to_end(
         runtimes={
             "agent": agent_runtime,
             "question": UnusedRuntime(),
+            "matrix": UnusedRuntime(),
         },
     )
 

@@ -50,6 +50,8 @@ def test_web_api_accepts_task_and_replays_stable_events(tmp_path: Path) -> None:
     with TestClient(app) as client:
         assert client.get("/").status_code == 200
         assert "问数智能体流式服务" in client.get("/").text
+        assert client.get("/matrix").status_code == 200
+        assert "MatrixCopilot 矩阵草稿" in client.get("/matrix").text
         accepted = client.post(
             "/v1/tasks",
             json={"question": "分析 2025 年 618 经营增长质量"},

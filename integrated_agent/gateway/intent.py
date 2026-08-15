@@ -24,6 +24,7 @@ class DeepSeekIntentModel:
             .instruct(
                 [
                     "只在 offered_runtimes 中选择一个 runtime_key。",
+                    "需要写推文、多平台社媒草稿、回复评论或评理时选 matrix。",
                     "需要企业经营数据库计算、指标查询或经营分析时选 question。",
                     "其他通用任务选 agent，包括搜索、文件生成、Skills、Actions 和沙盒计算。",
                     "不得选择未提供的外部代码智能体。",

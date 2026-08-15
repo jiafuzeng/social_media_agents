@@ -1,0 +1,9 @@
+platforms:
+  x-twitter:
+    platform_key: x-twitter
+    max_chars: 280
+    mention_rules: 不@未授权账号；一条一个主张。
+  weibo:
+    platform_key: weibo
+    max_chars: 140
+    mention_rules: 不@未授权账号；不堆叠抽奖与疗效。

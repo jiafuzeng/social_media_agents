@@ -1,0 +1,9 @@
+templates:
+  - template_key: neutral-disclaimer
+    text: 以上信息不构成投资或医疗建议，请以官方渠道与产品说明为准。
+    claim_types:
+      - guaranteed_return
+      - efficacy
+      - medical
+      - crypto_promotion
+      - superlative

@@ -23,13 +23,14 @@ integrated_agent_service/
 │   ├── runtimes/
 │   │   ├── agent/               # Agently Agent + Actions + Skills + Sandbox
 │   │   ├── question/            # 问数任务服务、TriggerFlow 和分析流程
+│   │   ├── matrix/              # 社媒矩阵草稿、两套 TriggerFlow 与硬门
 │   │   └── acp/                 # Codex ACP client 与 session runtime
 │   ├── storage/                 # 对外发布的制品
 │   ├── transports/
-│   │   ├── http/                # 问数 HTTP/SSE
+│   │   ├── http/                # 问数与矩阵 HTTP/SSE
 │   │   └── wecom/               # 企业微信消息和文件
 │   └── bootstrap/               # 两个可部署进程的依赖组装
-├── data/                        # 问数演示数据库
+├── data/                        # 问数演示数据库与矩阵夹具
 ├── skills/                      # 文档 Skill 包
 ├── static/                      # 简易 SSE Web 客户端
 ├── tests/                       # 单元、集成和端到端契约
@@ -97,7 +98,8 @@ python run_server.py
 默认地址：
 
 ```text
-http://127.0.0.1:8000/
+http://127.0.0.1:8000/          # 问数
+http://127.0.0.1:8000/matrix    # 矩阵草稿
 ```
 
 检查服务：
@@ -112,9 +114,15 @@ curl http://127.0.0.1:8000/ready
 ```text
 GET  /health
 GET  /ready
+GET  /matrix
 POST /v1/tasks
 GET  /v1/tasks/{task_id}
 GET  /v1/tasks/{task_id}/events
+POST /api/create
+POST /api/reply
+POST /v1/matrix/tasks
+GET  /v1/matrix/tasks/{task_id}
+GET  /v1/matrix/tasks/{task_id}/events
 GET  /v1/artifacts/{artifact_id}/{filename}
 ```
 
@@ -132,15 +140,17 @@ python run_im_assistant.py
 /agent auto
 /agent agent
 /agent question
+/agent matrix
 /agent codex
 ```
 
-`auto` 模式只在下面两个安全候选中做语义选择：
+`auto` 模式只在下面三个安全候选中做语义选择：
 
 - `agent`：搜索、Skills、Actions、文件和沙盒任务。
 - `question`：企业经营数据库问数。
+- `matrix`：写推文、多平台草稿、回复评论与评理。
 
-Codex 必须由用户明确切换。
+Codex 必须由用户明确切换。企业微信可用 `thread:demo-1` 绑定回复 Flow。
 
 ### 5. 调整沙盒策略
 
@@ -191,7 +201,7 @@ pyright --pythonpath "$(command -v python)"
 pytest -q
 ```
 
-测试覆盖 Gateway 安全候选、附件归一、问数终态、SSE、背压、图表、Skill → Action → Workspace → Artifact 链路、ACP 会话隔离和企业微信文件协议。
+测试覆盖 Gateway 安全候选（含 matrix）、附件归一、问数终态、矩阵草稿包、SSE、背压、图表、Skill → Action → Workspace → Artifact 链路、ACP 会话隔离和企业微信文件协议。
 
 ## 迁移到自己的项目
 

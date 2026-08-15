@@ -1,0 +1,53 @@
+.execution:
+  input:
+    text: ${text}
+  info:
+    snapshot: ${info}
+  instruct:
+    - 只做创作拆解，不要判断这是创作还是回复，不要输出 scenario。
+    - 为 info.snapshot.platforms 中每一个 platform_key 生成一条 work_item，kind 必须是 compose_post。
+    - claim_types 只能从 info.snapshot.offered_claim_types 选取，例如 format；不要把 template_key、品牌名或人设词写进去。
+    - 每个 requirement 必须被至少一条 work_item 引用；platform_key 只能使用已提供平台。
+    - talking_points 保持矩阵口径一致，按平台只改形态不改主张。
+    - 不写正文，不引用评论，不要设置 source_comment_key。
+  output:
+    $format: json
+    normalized_brief:
+      $type: str
+      $desc: 保留主题与矩阵要求的改写
+      $ensure: not_null
+    requirements:
+      $type:
+        - requirement_id:
+            $type: str
+            $ensure: not_null
+          description:
+            $type: str
+            $ensure: not_null
+      $ensure: not_null
+    work_items:
+      $type:
+        - work_item_id:
+            $type: str
+            $ensure: not_null
+          kind:
+            $type: str
+            $desc: 必须是 compose_post
+            $ensure: not_null
+          requirement_ids:
+            $type:
+              - $type: str
+            $ensure: not_null
+          platform_key:
+            $type: str
+            $ensure: not_null
+          goal:
+            $type: str
+            $ensure: not_null
+          talking_points:
+            $type:
+              - $type: str
+          claim_types:
+            $type:
+              - $type: str
+      $ensure: not_null

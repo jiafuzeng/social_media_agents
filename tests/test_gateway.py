@@ -73,6 +73,7 @@ async def test_auto_route_offers_execution_runtimes_not_agent_features() -> None
         runtimes={
             "agent": FakeRuntime("agent"),
             "question": FakeRuntime("question"),
+            "matrix": FakeRuntime("matrix"),
             "codex": FakeRuntime("codex"),
         },
     )
@@ -106,7 +107,11 @@ async def test_auto_route_offers_execution_runtimes_not_agent_features() -> None
     assert gateway.current_runtime("s1") == "auto"
     assert all(
         {item["runtime_key"] for item in offered}
-        == {"agent", "question"}
+        == {"agent", "question", "matrix"}
+        for offered in intent_model.offered_history
+    )
+    assert all(
+        "codex" not in {item["runtime_key"] for item in offered}
         for offered in intent_model.offered_history
     )
 
@@ -123,6 +128,7 @@ async def test_attachment_is_host_routed_to_native_agent_runtime(
         runtimes={
             "agent": FakeRuntime("agent"),
             "question": FakeRuntime("question"),
+            "matrix": FakeRuntime("matrix"),
         },
     )
     events = [
@@ -153,6 +159,7 @@ async def test_codex_requires_explicit_switch_and_state_is_per_session() -> None
         runtimes={
             "agent": FakeRuntime("agent"),
             "question": FakeRuntime("question"),
+            "matrix": FakeRuntime("matrix"),
             "codex": FakeRuntime("codex"),
         },
     )
@@ -201,4 +208,57 @@ async def test_acp_sessions_are_isolated_by_gateway_session() -> None:
 
     await runtime.close()
     assert all(item.closed for item in created)
+
+
+@pytest.mark.asyncio
+async def test_t14_auto_offered_includes_matrix_not_codex() -> None:
+    intent_model = ScriptedIntentModel(["matrix"])
+    gateway = AgentGateway(
+        intent_model=intent_model,
+        runtimes={
+            "agent": FakeRuntime("agent"),
+            "question": FakeRuntime("question"),
+            "matrix": FakeRuntime("matrix"),
+            "codex": FakeRuntime("codex"),
+        },
+    )
+    events = [
+        event
+        async for event in gateway.stream(
+            GatewayRequest("给 X 写一条预热推文", "s-matrix")
+        )
+    ]
+    assert events[0].data == {"runtime_key": "matrix", "mode": "auto"}
+    offered_keys = {item["runtime_key"] for item in intent_model.offered_history[0]}
+    assert offered_keys == {"agent", "question", "matrix"}
+    assert "codex" not in offered_keys
+
+
+@pytest.mark.asyncio
+async def test_t15_attachment_does_not_enter_matrix(tmp_path: Path) -> None:
+    source = tmp_path / "brief.md"
+    source.write_text("# brief", encoding="utf-8")
+    intent_model = ScriptedIntentModel(["matrix"])
+    gateway = AgentGateway(
+        intent_model=intent_model,
+        runtimes={
+            "agent": FakeRuntime("agent"),
+            "question": FakeRuntime("question"),
+            "matrix": FakeRuntime("matrix"),
+        },
+    )
+    events = [
+        event
+        async for event in gateway.stream(
+            GatewayRequest(
+                "写一条推文",
+                "s-attach",
+                attachments=(GatewayAttachment(source, source.name),),
+            )
+        )
+    ]
+    assert events[0].data["runtime_key"] == "agent"
+    assert events[0].data["mode"] == "attachment"
+    assert events[1].data["delta"].startswith("agent:")
+    assert intent_model.offered_history == []
 

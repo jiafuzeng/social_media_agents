@@ -1,0 +1,39 @@
+.execution:
+  input:
+    work_item: ${work_item}
+    repair: ${repair}
+  info:
+    context: ${info}
+  instruct:
+    - 先裁 reply、acknowledge 或 skip，再写正文。人身攻击、仇恨或无法核实的诱导默认 skip。
+    - skip 时 draft_text 必须是空串。不得输出 escalate。
+    - 证据只能引用 info.context.offered_refs 的 ref_id；不得承诺稳赚或治愈。
+    - 正文长度不得超过 info.context.max_chars。
+  output:
+    $format: json
+    work_item_id:
+      $type: str
+      $ensure: not_null
+    stance_assessment:
+      $type: str
+      $ensure: not_null
+    reply_decision:
+      $type: str
+      $desc: reply、acknowledge 或 skip
+      $ensure: not_null
+    claim_types:
+      $type:
+        - $type: str
+    risk_flags:
+      $type:
+        - $type: str
+    draft_text:
+      $type: str
+    rationale:
+      $type: str
+      $ensure: not_null
+    evidence_ids:
+      $type:
+        - $type: str
+    proposed_degrade:
+      $type: str

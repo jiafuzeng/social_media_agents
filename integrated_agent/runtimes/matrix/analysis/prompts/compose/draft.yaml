@@ -1,0 +1,37 @@
+.execution:
+  input:
+    work_item: ${work_item}
+    repair: ${repair}
+  info:
+    context: ${info}
+  instruct:
+    - 为这一条平台稿写正文和评理，不要输出 reply_decision。
+    - 不得承诺稳赚、治愈、保本或未授权最高级；证据只能引用 info.context.offered_refs 的 ref_id。
+    - 正文长度不得超过 info.context.max_chars。
+    - skip 时正文必须空串。若 repair.issues 含 over_limit，删减卖点直到不超限。
+    - 评理必须说明依据和未写的内容。
+  output:
+    $format: json
+    work_item_id:
+      $type: str
+      $ensure: not_null
+    stance_assessment:
+      $type: str
+      $ensure: not_null
+    claim_types:
+      $type:
+        - $type: str
+    risk_flags:
+      $type:
+        - $type: str
+    draft_text:
+      $type: str
+    rationale:
+      $type: str
+      $ensure: not_null
+    evidence_ids:
+      $type:
+        - $type: str
+    proposed_degrade:
+      $type: str
+      $desc: pass、rewrite_safe、template_fallback、skip 或空
