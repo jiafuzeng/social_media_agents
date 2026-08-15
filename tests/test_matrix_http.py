@@ -21,7 +21,7 @@ from integrated_agent.runtimes.question.worker import (
     QuestionWorkflowWorker,
     WorkerDependencies,
 )
-from integrated_agent.transports.http import create_matrix_api, create_question_api, mount_matrix_routes
+from integrated_agent.transports.http import create_http_app, create_matrix_api
 from tests.fakes import fake_question_runner
 
 
@@ -104,12 +104,12 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path) -> None:
         events=events,
     )
     matrix = _matrix_service(tmp_path)
-    app = create_question_api(
-        question,
-        static_root=Path(__file__).parents[1] / "static",
+    static_root = Path(__file__).parents[1] / "static"
+    app = create_http_app(
+        question_service=question,
+        matrix_service=matrix,
+        static_root=static_root,
         artifacts_root=tmp_path / "artifacts",
-        extra_startables=[matrix],
-        extra_mount=lambda application: mount_matrix_routes(application, matrix),
     )
     with TestClient(app) as client:
         accepted = client.post(

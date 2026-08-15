@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Callable, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, Protocol
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 
 from integrated_agent.runtimes.question.models import (
     TaskAccepted,
@@ -37,59 +34,20 @@ def event_to_sse(event: TaskEvent) -> str:
     )
 
 
-class _Startable(Protocol):
-    async def start(self) -> None: ...
-
-    async def stop(self) -> None: ...
-
-
-def create_question_api(
+def build_question_router(
     service: QuestionTaskService,
     *,
     static_root: Path,
     artifacts_root: Path,
-    extra_startables: Sequence[_Startable] | None = None,
-    extra_mount: Callable[[FastAPI], Any] | None = None,
-) -> FastAPI:
+) -> APIRouter:
     artifact_store = ArtifactStore(artifacts_root)
-    extras = list(extra_startables or [])
+    router = APIRouter(tags=["question"])
 
-    @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        await service.start()
-        for item in extras:
-            await item.start()
-        try:
-            yield
-        finally:
-            for item in reversed(extras):
-                await item.stop()
-            await service.stop()
-
-    app = FastAPI(title="问数智能体流式服务", version="1.0.0", lifespan=lifespan)
-    app.mount("/static", StaticFiles(directory=static_root), name="static")
-    if extra_mount is not None:
-        extra_mount(app)
-
-    @app.get("/", response_class=FileResponse)
+    @router.get("/", response_class=FileResponse)
     async def index() -> FileResponse:
         return FileResponse(static_root / "index.html")
 
-    @app.get("/matrix", response_class=FileResponse)
-    async def matrix_index() -> FileResponse:
-        return FileResponse(static_root / "matrix.html")
-
-    @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
-
-    @app.get("/ready")
-    async def ready() -> dict[str, str]:
-        if not service.ready:
-            raise HTTPException(status_code=503, detail="worker is not ready")
-        return {"status": "ready"}
-
-    @app.get("/v1/artifacts/{artifact_id}/{filename}")
+    @router.get("/v1/artifacts/{artifact_id}/{filename}")
     async def download_artifact(
         artifact_id: str,
         filename: str,
@@ -103,7 +61,7 @@ def create_question_api(
             filename=artifact.filename,
         )
 
-    @app.post("/v1/tasks", response_model=TaskAccepted, status_code=202)
+    @router.post("/v1/tasks", response_model=TaskAccepted, status_code=202)
     async def create_task(command: TaskCreate) -> TaskAccepted:
         try:
             return await service.submit(command)
@@ -114,14 +72,14 @@ def create_question_api(
                 headers={"Retry-After": "1"},
             ) from exc
 
-    @app.get("/v1/tasks/{task_id}", response_model=TaskSnapshot)
+    @router.get("/v1/tasks/{task_id}", response_model=TaskSnapshot)
     async def get_task(task_id: str) -> TaskSnapshot:
         snapshot = await service.get(task_id)
         if snapshot is None:
             raise HTTPException(status_code=404, detail="task not found")
         return snapshot
 
-    @app.get("/v1/tasks/{task_id}/events")
+    @router.get("/v1/tasks/{task_id}/events")
     async def stream_events(
         task_id: str,
         after: int = Query(default=0, ge=0),
@@ -157,4 +115,4 @@ def create_question_api(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    return app
+    return router

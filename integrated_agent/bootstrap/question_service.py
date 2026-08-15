@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
-
-from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.runtimes.question.analysis import (
     QuestionAnalysisCapability,
 )
@@ -17,7 +14,6 @@ from integrated_agent.runtimes.question.worker import (
     QuestionWorkflowWorker,
     WorkerDependencies,
 )
-from integrated_agent.transports.http import create_question_api, mount_matrix_routes
 
 
 ROOT = Path(__file__).parents[2]
@@ -28,7 +24,7 @@ def build_question_service(root: Path = ROOT) -> QuestionTaskService:
     worker = QuestionWorkflowWorker(
         WorkerDependencies(
             question_analysis=QuestionAnalysisCapability(
-                logs_root=root / "logs"
+                logs_root=root / "logs/question",
             ),
             events=events,
         )
@@ -39,15 +35,4 @@ def build_question_service(root: Path = ROOT) -> QuestionTaskService:
         events=events,
         worker_count=4,
         queue_capacity=32,
-    )
-
-
-def create_production_app() -> FastAPI:
-    matrix_service = build_matrix_service()
-    return create_question_api(
-        build_question_service(),
-        static_root=ROOT / "static",
-        artifacts_root=ROOT / "workspace/artifacts",
-        extra_startables=[matrix_service],
-        extra_mount=lambda app: mount_matrix_routes(app, matrix_service),
     )

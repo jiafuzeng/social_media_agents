@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import Field, model_validator
 
 from integrated_agent.runtimes.matrix.models import (
@@ -74,33 +74,45 @@ async def _submit(service: MatrixTaskService, command: MatrixTaskCreate) -> Task
         ) from exc
 
 
-def mount_matrix_routes(app: FastAPI, service: MatrixTaskService) -> None:
-    @app.post("/api/create", response_model=TaskAccepted, status_code=202)
+def build_matrix_router(
+    service: MatrixTaskService,
+    *,
+    static_root: Path | None = None,
+) -> APIRouter:
+    router = APIRouter(tags=["matrix"])
+
+    if static_root is not None:
+
+        @router.get("/matrix", response_class=FileResponse)
+        async def matrix_index() -> FileResponse:
+            return FileResponse(static_root / "matrix.html")
+
+    @router.post("/api/create", response_model=TaskAccepted, status_code=202)
     async def create_compose(command: ComposeHttpIn) -> TaskAccepted:
         return await _submit(
             service,
             MatrixTaskCreate(scenario="compose", **command.model_dump()),
         )
 
-    @app.post("/api/reply", response_model=TaskAccepted, status_code=202)
+    @router.post("/api/reply", response_model=TaskAccepted, status_code=202)
     async def create_reply(command: ReplyHttpIn) -> TaskAccepted:
         return await _submit(
             service,
             MatrixTaskCreate(scenario="reply", **command.model_dump()),
         )
 
-    @app.post("/v1/matrix/tasks", response_model=TaskAccepted, status_code=202)
+    @router.post("/v1/matrix/tasks", response_model=TaskAccepted, status_code=202)
     async def create_matrix_task(command: MatrixTaskCreate) -> TaskAccepted:
         return await _submit(service, command)
 
-    @app.get("/v1/matrix/tasks/{task_id}", response_model=TaskSnapshot)
+    @router.get("/v1/matrix/tasks/{task_id}", response_model=TaskSnapshot)
     async def get_matrix_task(task_id: str) -> TaskSnapshot:
         snapshot = await service.get(task_id)
         if snapshot is None:
             raise HTTPException(status_code=404, detail="task not found")
         return snapshot
 
-    @app.get("/v1/matrix/tasks/{task_id}/events")
+    @router.get("/v1/matrix/tasks/{task_id}/events")
     async def stream_matrix_events(
         task_id: str,
         after: int = Query(default=0, ge=0),
@@ -136,16 +148,4 @@ def mount_matrix_routes(app: FastAPI, service: MatrixTaskService) -> None:
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-
-def create_matrix_api(service: MatrixTaskService) -> FastAPI:
-    @asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        await service.start()
-        try:
-            yield
-        finally:
-            await service.stop()
-
-    app = FastAPI(title="MatrixCopilot 草稿服务", version="1.0.0", lifespan=lifespan)
-    mount_matrix_routes(app, service)
-    return app
+    return router
