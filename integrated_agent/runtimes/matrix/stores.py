@@ -8,6 +8,8 @@ from .models import MatrixTaskResult, TaskEvent, TaskSnapshot
 
 
 class InMemoryTaskStore:
+    """任务快照内存表。HTTP GET /tasks/{id} 读这里，不读 TriggerFlow 内部状态。"""
+
     def __init__(self) -> None:
         self._records: dict[str, TaskSnapshot] = {}
         self._lock = asyncio.Lock()
@@ -38,6 +40,7 @@ class InMemoryTaskStore:
         return await self._replace(task_id, status="failed", error=error)
 
     async def _replace(self, task_id: str, **updates: Any) -> TaskSnapshot:
+        # 快照整体替换，避免并发下读到半更新字段。
         async with self._lock:
             current = self._records.get(task_id)
             if current is None:
@@ -48,8 +51,11 @@ class InMemoryTaskStore:
 
 
 class InMemoryEventStore:
+    """稳定 SSE 事件流。sequence 从 1 递增，客户端用 after 断点续传。"""
+
     def __init__(self) -> None:
         self._events: dict[str, list[TaskEvent]] = defaultdict(list)
+        # 条件变量：发布事件时 notify_all，SSE 在 wait_for_change 里等到新序号再继续。
         self._condition = asyncio.Condition()
 
     async def publish(
@@ -70,6 +76,7 @@ class InMemoryEventStore:
             return event
 
     def list_for(self, task_id: str) -> list[TaskEvent]:
+        # 复制一份，避免调用方在迭代时被后续 publish 改到同一列表。
         return list(self._events.get(task_id, []))
 
     async def wait_for_change(

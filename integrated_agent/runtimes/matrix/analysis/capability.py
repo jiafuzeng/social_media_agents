@@ -1,40 +1,35 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
+from integrated_agent.config import load_model_settings
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
 
-from .agently_model import AgentlyMatrixModel
 from .workflows.compose_flow import run_compose
 from .workflows.reply_flow import run_reply
 
 
-RunMatrix = Callable[..., Awaitable[dict[str, Any]]]
-
-
 class MatrixAnalysisCapability:
+    """矩阵分析入口：绑定日志目录和快照数据，按任务跑完一套 Flow。"""
+
     def __init__(
         self,
         *,
         logs_root: Path,
         data_root: Path,
-        model: Any | None = None,
-        runner: RunMatrix | None = None,
     ) -> None:
-        self.logs_root = logs_root
-        self.data_root = data_root
-        self.model = model if model is not None else AgentlyMatrixModel()
-        self.runner = runner or run_matrix
+        self.logs_root = logs_root  # 每单 Trace：logs_root / task_id
+        self.data_root = data_root  # 账号、平台、模板、案例夹具
 
     async def analyze(self, request: MatrixTaskRequest) -> dict[str, Any]:
         output_directory = self.logs_root / request.task_id
-        run = await self.runner(
+        run = await run_matrix(
             request,
             data_root=self.data_root,
             output_directory=output_directory,
-            model=self.model,
         )
+        # Worker / SSE 用这条 URI 回指本单 run.json，不把 Trace 对象带出分析层。
         run["trace_ref"] = (output_directory / "run.json").resolve().as_uri()
         return run
 
@@ -44,20 +39,20 @@ async def run_matrix(
     *,
     data_root: Path,
     output_directory: Path,
-    model: Any,
 ) -> dict[str, Any]:
+    """按入口已绑定的 scenario 分发；compose 与 reply 是两张独立 TriggerFlow。"""
+
+    load_model_settings()
     if request.scenario == "compose":
         return await run_compose(
             request,
             data_root=data_root,
             output_directory=output_directory,
-            model=model,
         )
     return await run_reply(
         request,
         data_root=data_root,
         output_directory=output_directory,
-        model=model,
     )
 
 

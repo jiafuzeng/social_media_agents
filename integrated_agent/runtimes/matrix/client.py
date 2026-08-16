@@ -10,10 +10,13 @@ import httpx
 from integrated_agent.gateway import GatewayEvent, GatewayRequest
 
 
+# 企业微信里用「thread:demo-1 回评」进入回复 Flow；否则默认创作。
 THREAD_RE = re.compile(r"^thread:([A-Za-z0-9._-]+)(?:\s+(.*))?$", re.DOTALL)
 
 
 class MatrixServiceRuntime:
+    """Gateway 侧的 matrix 运行时：把远端 HTTP/SSE 翻译成 GatewayEvent，不解释 Flow 内部对象。"""
+
     def __init__(self, base_url: str, *, timeout: float = 180.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -64,6 +67,7 @@ class MatrixServiceRuntime:
                         if event_type == "task.failed":
                             return
                         if event_type == "task.completed":
+                            # SSE 漏了 package.ready 时，用任务快照里的 summary 补一条正文。
                             if not package_sent:
                                 snapshot = (
                                     await client.get(str(accepted["task_url"]))
@@ -89,6 +93,8 @@ class MatrixServiceRuntime:
 
 
 def _task_body(request: GatewayRequest) -> dict[str, Any]:
+    """GatewayRequest → MatrixTaskCreate。这里绑定 scenario，禁止把 auto 交给 HTTP。"""
+
     match = THREAD_RE.match(request.text.strip())
     if match:
         thread_key = match.group(1)
@@ -115,6 +121,8 @@ def _map_event(
     accepted: dict[str, Any],
     package_sent: bool,
 ) -> list[GatewayEvent]:
+    """矩阵稳定事件 → IM 能消费的 GatewayEvent。package.ready 只映射一次正文。"""
+
     del accepted
     if event_type in {"stage.started", "stage.completed", "work_item.ready"}:
         return [

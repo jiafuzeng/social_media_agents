@@ -1,43 +1,14 @@
 from __future__ import annotations
 
-from typing import Protocol
-
 from integrated_agent.runtimes.matrix.models import (
-    ComposeBriefOut,
+    BriefOut,
     ComposeDraftOut,
-    ReplyBriefOut,
     ReplyDraftOut,
     Requirement,
     ReviewItemVerdict,
     ReviewOut,
     WorkItem,
 )
-
-
-class MatrixLanguageModel(Protocol):
-    async def compose_brief(self, *, text: str, info: dict) -> ComposeBriefOut: ...
-
-    async def compose_draft(
-        self,
-        *,
-        work_item: dict,
-        info: dict,
-        repair: dict | None = None,
-    ) -> ComposeDraftOut: ...
-
-    async def compose_review(self, *, package: dict, info: dict) -> ReviewOut: ...
-
-    async def reply_brief(self, *, text: str, info: dict) -> ReplyBriefOut: ...
-
-    async def reply_draft(
-        self,
-        *,
-        work_item: dict,
-        info: dict,
-        repair: dict | None = None,
-    ) -> ReplyDraftOut: ...
-
-    async def reply_review(self, *, package: dict, info: dict) -> ReviewOut: ...
 
 
 _ATTACK_MARKERS = ("滚", "骗子", "白痴", "去死")
@@ -52,14 +23,12 @@ class ScriptedMatrixModel:
         draft_text_overrides: dict[str, str] | None = None,
         evidence_overrides: dict[str, list[str]] | None = None,
         review_lift_skip: bool = False,
-        omit_requirement: bool = False,
     ) -> None:
         self.draft_text_overrides = draft_text_overrides or {}
         self.evidence_overrides = evidence_overrides or {}
         self.review_lift_skip = review_lift_skip
-        self.omit_requirement = omit_requirement
 
-    async def compose_brief(self, *, text: str, info: dict) -> ComposeBriefOut:
+    async def compose_brief(self, *, text: str, info: dict) -> BriefOut:
         platforms = list(info.get("platforms") or [])
         req_id = "r-compose"
         items: list[WorkItem] = []
@@ -68,7 +37,7 @@ class ScriptedMatrixModel:
                 WorkItem(
                     work_item_id=f"w{index}",
                     kind="compose_post",
-                    requirement_ids=[] if self.omit_requirement else [req_id],
+                    requirement_ids=[req_id],
                     platform_key=str(platform["platform_key"]),
                     source_comment_key=None,
                     goal="写出可核验的预热稿",
@@ -79,7 +48,7 @@ class ScriptedMatrixModel:
         requirements = [
             Requirement(requirement_id=req_id, description=text)
         ]
-        return ComposeBriefOut(
+        return BriefOut(
             normalized_brief=text.strip(),
             requirements=requirements,
             work_items=items,
@@ -131,7 +100,7 @@ class ScriptedMatrixModel:
             limitations=list(package.get("limitations") or []),
         )
 
-    async def reply_brief(self, *, text: str, info: dict) -> ReplyBriefOut:
+    async def reply_brief(self, *, text: str, info: dict) -> BriefOut:
         comments = list(info.get("comments") or [])
         platform_key = str(
             (info.get("platforms") or [{}])[0].get("platform_key") or "x-twitter"
@@ -153,7 +122,7 @@ class ScriptedMatrixModel:
                     claim_types=claim_types,
                 )
             )
-        return ReplyBriefOut(
+        return BriefOut(
             normalized_brief=text.strip() or "回复样例线程",
             requirements=[
                 Requirement(requirement_id=req_id, description="逐条评理并起草")

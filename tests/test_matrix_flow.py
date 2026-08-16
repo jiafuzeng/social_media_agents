@@ -7,13 +7,15 @@ from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixMod
 from integrated_agent.runtimes.matrix.analysis.workflows.compose_flow import run_compose
 from integrated_agent.runtimes.matrix.analysis.workflows.reply_flow import run_reply
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
+from tests.fakes import install_scripted_ask
 
 
 DATA_ROOT = PROJECT_ROOT / "data/matrix"
 
 
 @pytest.mark.asyncio
-async def test_t07_two_platform_compose_yields_two_drafts(tmp_path) -> None:
+async def test_t07_two_platform_compose_yields_two_drafts(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     run = await run_compose(
         MatrixTaskRequest(
             task_id="t07",
@@ -23,7 +25,6 @@ async def test_t07_two_platform_compose_yields_two_drafts(tmp_path) -> None:
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t07",
-        model=ScriptedMatrixModel(),
     )
     assert len(run["drafts"]) == 2
     assert {item["platform_key"] for item in run["drafts"]} == {"x-twitter", "weibo"}
@@ -31,7 +32,8 @@ async def test_t07_two_platform_compose_yields_two_drafts(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_t08_attack_comment_is_skipped_empty(tmp_path) -> None:
+async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     run = await run_reply(
         MatrixTaskRequest(
             task_id="t08",
@@ -41,7 +43,6 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path) -> None:
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t08",
-        model=ScriptedMatrixModel(),
     )
     skipped = [item for item in run["drafts"] if item["degrade_op"] == "skip"]
     assert len(run["drafts"]) == 3
@@ -51,7 +52,10 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_t09_one_gate_failure_keeps_successful_item(tmp_path) -> None:
+async def test_t09_one_gate_failure_keeps_successful_item(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(
+        monkeypatch, ScriptedMatrixModel(evidence_overrides={"w1": ["no-such-ref"]})
+    )
     run = await run_compose(
         MatrixTaskRequest(
             task_id="t09",
@@ -61,7 +65,6 @@ async def test_t09_one_gate_failure_keeps_successful_item(tmp_path) -> None:
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t09",
-        model=ScriptedMatrixModel(evidence_overrides={"w1": ["no-such-ref"]}),
     )
     assert run["status"] == "partial"
     statuses = {item["status"] for item in run["drafts"]}
@@ -70,7 +73,10 @@ async def test_t09_one_gate_failure_keeps_successful_item(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_t10_review_cannot_lift_skip(tmp_path) -> None:
+async def test_t10_review_cannot_lift_skip(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(
+        monkeypatch, ScriptedMatrixModel(review_lift_skip=True)
+    )
     run = await run_reply(
         MatrixTaskRequest(
             task_id="t10",
@@ -80,7 +86,6 @@ async def test_t10_review_cannot_lift_skip(tmp_path) -> None:
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t10",
-        model=ScriptedMatrixModel(review_lift_skip=True),
     )
     skipped = [item for item in run["drafts"] if item["decision"] == "skip"]
     assert skipped

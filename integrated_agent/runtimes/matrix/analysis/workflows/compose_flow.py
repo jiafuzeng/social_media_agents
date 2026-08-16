@@ -8,7 +8,7 @@ from agently import TriggerFlow
 
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
 
-from ..snapshots import SnapshotError, bind_snapshot
+from ..snapshots import bind_snapshot
 from ..trace_log import TraceLog, save_run
 from .chunks.compose.pipeline import (
     compose_brief,
@@ -36,7 +36,6 @@ async def run_compose(
     *,
     data_root: Path,
     output_directory: Path,
-    model: Any,
     max_concurrency: int = 4,
 ) -> dict[str, Any]:
     snapshot = bind_snapshot(
@@ -50,7 +49,6 @@ async def run_compose(
         concurrency=max_concurrency,
         runtime_resources={
             "snapshot": snapshot,
-            "model": model,
             "data_root": data_root,
         },
         auto_close=False,
@@ -99,4 +97,4 @@ def _unique_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return unique
 
 
-__all__ = ["COMPOSE_FLOW", "PIPELINE_VERSION", "SnapshotError", "run_compose"]
+__all__ = ["COMPOSE_FLOW", "PIPELINE_VERSION", "run_compose"]

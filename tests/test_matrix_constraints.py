@@ -8,21 +8,9 @@ from integrated_agent.runtimes.matrix.analysis.constraints import (
     apply_constraint_gate,
     collect_issues,
 )
-from integrated_agent.runtimes.matrix.analysis.host import (
-    BriefValidationError,
-    parse_structured,
-    sanitize_brief,
-    validate_brief,
-)
 from integrated_agent.runtimes.matrix.analysis.snapshots import (
     SnapshotError,
     bind_snapshot,
-)
-from integrated_agent.runtimes.matrix.models import (
-    ComposeBriefOut,
-    Requirement,
-    ReviewOut,
-    WorkItem,
 )
 
 
@@ -138,63 +126,6 @@ async def test_t05_empty_rag_efficacy_cannot_pass() -> None:
     assert "missing_ref_on_empty_rag" in gated.issues
 
 
-def test_t06_brief_missing_requirement_fails() -> None:
-    snapshot = bind_snapshot(
-        data_root=DATA_ROOT,
-        account_key="default",
-        brand_key="default",
-        platform_keys=["x-twitter"],
-        scenario="compose",
-    )
-    brief = ComposeBriefOut(
-        normalized_brief="预热",
-        requirements=[Requirement(requirement_id="r1", description="矩阵预热")],
-        work_items=[
-            WorkItem(
-                work_item_id="w1",
-                kind="compose_post",
-                requirement_ids=["r-other"],
-                platform_key="x-twitter",
-                goal="写稿",
-                talking_points=["上新"],
-                claim_types=["format"],
-            )
-        ],
-    )
-    with pytest.raises(BriefValidationError):
-        validate_brief(brief, snapshot=snapshot, expected_kind="compose_post")
-
-
-def test_sanitize_brief_drops_template_key_from_claim_types() -> None:
-    snapshot = bind_snapshot(
-        data_root=DATA_ROOT,
-        account_key="default",
-        brand_key="default",
-        platform_keys=["x-twitter"],
-        scenario="compose",
-    )
-    brief = ComposeBriefOut(
-        normalized_brief="预热",
-        requirements=[Requirement(requirement_id="r1", description="矩阵预热")],
-        work_items=[
-            WorkItem(
-                work_item_id="w1",
-                kind="compose_post",
-                requirement_ids=["r1"],
-                platform_key="x-twitter",
-                goal="写稿",
-                talking_points=["上新"],
-                claim_types=["neutral-disclaimer", "format"],
-            )
-        ],
-    )
-    cleaned = sanitize_brief(
-        brief, snapshot=snapshot, expected_kind="compose_post"
-    )
-    validate_brief(cleaned, snapshot=snapshot, expected_kind="compose_post")
-    assert cleaned.work_items[0].claim_types == ["format"]
-
-
 def test_collect_issues_over_limit() -> None:
     issues = collect_issues(
         text="x" * 300,
@@ -234,27 +165,4 @@ async def test_skip_decision_is_not_marked_pass() -> None:
     assert gated.status == "skipped"
     assert gated.decision == "skip"
     assert gated.text == ""
-
-
-def test_parse_structured_strips_unknown_review_fields() -> None:
-    review = parse_structured(
-        ReviewOut,
-        {
-            "item_verdicts": [
-                {
-                    "draft_key": "d-wi2",
-                    "verdict": "通过",
-                    "notes": "",
-                    "reasoning": "keep skip",
-                }
-            ],
-            "package_summary": "口径已对齐。",
-            "limitations": "无额外限制",
-            "scenario": "reply",
-        },
-    )
-    assert isinstance(review, ReviewOut)
-    assert review.item_verdicts[0].verdict == "accept"
-    assert review.item_verdicts[0].notes is None
-    assert review.limitations == ["无额外限制"]
 

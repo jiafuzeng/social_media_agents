@@ -2,25 +2,20 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from agently import TriggerFlowRuntimeData
+from agently import Agently, TriggerFlowRuntimeData
 
 from integrated_agent.runtimes.matrix.models import (
+    BriefOut,
     GatedDraft,
     MatrixTaskRequest,
+    ReplyDraftOut,
     ReviewOut,
     WorkItem,
 )
 
 from ....constraints import AhoCorasickMatcher, apply_constraint_gate
-from ....drafting import retrieve_and_gate_draft
-from ....host import (
-    BriefValidationError,
-    apply_review,
-    rollup_status,
-    sanitize_brief,
-    validate_brief,
-)
-from ....snapshots import Snapshot
+from ....drafting import apply_review, retrieve_and_gate_draft, rollup_status
+from ....snapshots import OFFERED_CLAIM_TYPES, Snapshot
 from ....trace_log import TraceLog
 
 
@@ -49,22 +44,62 @@ async def reply_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
 async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     request = MatrixTaskRequest.model_validate(data.get_state("request"))
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    model = data.require_resource("model")
     trace = cast(TraceLog, data.require_resource("trace"))
     info = {
         "platforms": [item.model_dump(mode="json") for item in snapshot.platforms],
         "brand": snapshot.brand.model_dump(mode="json"),
         "account": snapshot.account.model_dump(mode="json"),
         "comments": [item.model_dump(mode="json") for item in snapshot.comments],
-        "offered_claim_types": sorted(snapshot.offered_claim_types()),
+        "offered_claim_types": sorted(OFFERED_CLAIM_TYPES),
     }
     try:
-        brief = await model.reply_brief(text=request.text, info=info)
-        brief = sanitize_brief(
-            brief, snapshot=snapshot, expected_kind="reply_comment"
+        result = await (
+            Agently.create_agent(name="matrix-reply-brief")
+            .input({"text": request.text})
+            .info({"snapshot": info})
+            .instruct(
+                [
+                    "只做回复拆解，不要判断这是创作还是回复，不要输出 scenario。",
+                    "requirements 写运营目标，不要复述本页 instruct。",
+                    "为 info.snapshot.comments 中每一条评论生成 work_item，kind 必须是 reply_comment，source_comment_key 必须是已签发的 comment_key。",
+                    "每个 requirement 必须被引用；claim_types 只能从 info.snapshot.offered_claim_types 选取，不要把 template_key 写进去。",
+                    "不写回复正文。",
+                ]
+            )
+            .output(
+                {
+                    "normalized_brief": (str, "not_null"),
+                    "requirements": (
+                        [
+                            {
+                                "requirement_id": (str, "not_null"),
+                                "description": (str, "not_null"),
+                            }
+                        ],
+                        "not_null",
+                    ),
+                    "work_items": (
+                        [
+                            {
+                                "work_item_id": (str, "not_null"),
+                                "kind": (str, "必须是 reply_comment", "not_null"),
+                                "requirement_ids": ([str], "not_null"),
+                                "platform_key": (str, "not_null"),
+                                "source_comment_key": (str, "not_null"),
+                                "goal": (str, "not_null"),
+                                "talking_points": [str],
+                                "claim_types": [str],
+                            }
+                        ],
+                        "not_null",
+                    ),
+                },
+                format="json",
+            )
+            .async_start()
         )
-        validate_brief(brief, snapshot=snapshot, expected_kind="reply_comment")
-    except (BriefValidationError, Exception) as exc:
+        brief = BriefOut.model_validate(result)
+    except Exception as exc:
         await data.async_set_state("final_failed", True, emit=False)
         trace.log(
             layer="business",
@@ -97,11 +132,47 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
         ),
         None,
     )
+    async def reply_draft(
+        *,
+        work_item: dict,
+        info: dict,
+        repair: dict | None = None,
+    ) -> ReplyDraftOut:
+        result = await (
+            Agently.create_agent(name="matrix-reply-draft")
+            .input({"work_item": work_item, "repair": repair or {}})
+            .info({"context": info})
+            .instruct(
+                [
+                    "先裁 reply、acknowledge 或 skip，再写正文。人身攻击、仇恨或无法核实的诱导默认 skip。",
+                    "skip 时 draft_text 必须是空串。不得输出 escalate。",
+                    "证据只能引用 info.context.offered_refs 的 ref_id；不得承诺稳赚或治愈。",
+                    "正文长度不得超过 info.context.max_chars。",
+                ]
+            )
+            .output(
+                {
+                    "work_item_id": (str, "not_null"),
+                    "stance_assessment": (str, "not_null"),
+                    "reply_decision": (str, "reply、acknowledge 或 skip", "not_null"),
+                    "claim_types": [str],
+                    "risk_flags": [str],
+                    "draft_text": str,
+                    "rationale": (str, "not_null"),
+                    "evidence_ids": [str],
+                    "proposed_degrade": str,
+                },
+                format="json",
+            )
+            .async_start()
+        )
+        return ReplyDraftOut.model_validate(result)
+
     gated, cards = await retrieve_and_gate_draft(
         work_item=work_item,
         snapshot=snapshot,
         data_root=data.require_resource("data_root"),
-        model=data.require_resource("model"),
+        draft_once=reply_draft,
         trace=cast(TraceLog, data.require_resource("trace")),
         kind="reply_comment",
         comment=comment,
@@ -114,7 +185,6 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
 
 async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    model = data.require_resource("model")
     trace = cast(TraceLog, data.require_resource("trace"))
     drafts = [
         GatedDraft.model_validate(item)
@@ -122,15 +192,45 @@ async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     ]
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     try:
-        review = await model.reply_review(
-            package={
-                "brief": data.get_state("brief"),
-                "drafts": [item.model_dump(mode="json") for item in drafts],
-                "limitations": limitations,
-            },
-            info={"snapshot_id": snapshot.snapshot_id},
+        result = await (
+            Agently.create_agent(name="matrix-reply-review")
+            .input(
+                {
+                    "package": {
+                        "brief": data.get_state("brief"),
+                        "drafts": [item.model_dump(mode="json") for item in drafts],
+                        "limitations": limitations,
+                    }
+                }
+            )
+            .info({"snapshot": {"snapshot_id": snapshot.snapshot_id}})
+            .instruct(
+                [
+                    "只输出 item_verdicts、package_summary、limitations，不要额外字段。",
+                    "对齐官方语气，只能评审已有 draft_key。",
+                    "verdict 只能是 accept、revise 或 reject。",
+                    "不得把 skip 改回可发回复，也不得放宽 template_fallback。",
+                    "攻击项必须保持空正文。",
+                ]
+            )
+            .output(
+                {
+                    "item_verdicts": [
+                        {
+                            "draft_key": (str, "not_null"),
+                            "verdict": (str, "not_null"),
+                            "revised_text": str,
+                            "notes": str,
+                        }
+                    ],
+                    "package_summary": (str, "not_null"),
+                    "limitations": [str],
+                },
+                format="json",
+            )
+            .async_start()
         )
-        review = ReviewOut.model_validate(review.model_dump(mode="json"))
+        review = ReviewOut.model_validate(result)
     except Exception as exc:
         trace.log(
             layer="business",

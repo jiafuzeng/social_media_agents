@@ -96,25 +96,12 @@ class Snapshot(BaseModel):
     comments: list[CommentCard] = Field(default_factory=list)
     templates: list[TemplateCard] = Field(default_factory=list)
     trend_cards: list[TrendCard] = Field(default_factory=list)
-    thread_platform_key: str | None = None
 
     def platform(self, platform_key: str) -> PlatformCard:
         for item in self.platforms:
             if item.platform_key == platform_key:
                 return item
         raise SnapshotError(f"unknown platform_key: {platform_key}")
-
-    def offered_platform_keys(self) -> set[str]:
-        return {item.platform_key for item in self.platforms}
-
-    def offered_comment_keys(self) -> set[str]:
-        return {item.comment_key for item in self.comments}
-
-    def offered_claim_types(self) -> set[str]:
-        return set(OFFERED_CLAIM_TYPES)
-
-    def offered_template_keys(self) -> set[str]:
-        return {item.template_key for item in self.templates}
 
 
 def _load_yaml(path: Path) -> Any:
@@ -298,5 +285,5 @@ def bind_snapshot(
         comments=comment_cards,
         templates=templates,
         trend_cards=[],
-        thread_platform_key=thread_platform_key,
     )
+

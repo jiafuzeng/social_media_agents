@@ -31,16 +31,30 @@ class CommentIn(DomainModel):
 
 
 class MatrixTaskCreate(DomainModel):
-    text: str = Field(min_length=1)
-    scenario: Scenario
-    platform_keys: list[str] = Field(default_factory=list)
-    account_key: str = "default"
-    brand_key: str = "default"
-    need_trends: bool = False
-    thread_key: str | None = None
-    comments: list[CommentIn] | None = None
-    requester: str = "course-user"
-    channel: str = "web"
+    """矩阵任务入站契约。Web 与 Gateway 最终都落成此对象；禁止 extra 字段，禁止 scenario=auto。"""
+
+    text: str = Field(min_length=1, description="用户原话：创作是主题/口径，回复是运营指令")
+    scenario: Scenario = Field(description="入口绑定的流程，compose 或 reply，决定跑哪张 Flow")
+    platform_keys: list[str] = Field(
+        default_factory=list,
+        description="出稿平台短键；空则用账号默认平台，未知 key 绑快照时 fail-closed",
+    )
+    account_key: str = Field(default="default", description="矩阵账号：声量与默认平台")
+    brand_key: str = Field(default="default", description="品牌人设、禁区与核准模板")
+    need_trends: bool = Field(
+        default=False,
+        description="是否先抓热帖再写；仅 compose 有效，reply 携带则忽略",
+    )
+    thread_key: str | None = Field(
+        default=None,
+        description="回复线程夹具 id；仅 reply，compose 携带则 422",
+    )
+    comments: list[CommentIn] | None = Field(
+        default=None,
+        description="直接提交的评论；与 thread_key 二选一即可走回复，compose 携带则 422",
+    )
+    requester: str = Field(default="course-user", description="提交者，仅审计/日志，不参与拆解")
+    channel: str = Field(default="web", description="来源通道 web 或 gateway，不改流程")
 
     @model_validator(mode="after")
     def bind_entry_invariants(self) -> "MatrixTaskCreate":
@@ -159,14 +173,6 @@ class BriefOut(DomainModel):
     work_items: list[WorkItem] = Field(min_length=1)
 
 
-class ComposeBriefOut(BriefOut):
-    pass
-
-
-class ReplyBriefOut(BriefOut):
-    pass
-
-
 def _map_degrade(value: str | None) -> DegradeOp | None:
     if value is None:
         return None
@@ -268,3 +274,4 @@ class ReviewOut(DomainModel):
     def require_summary(cls, value: object) -> object:
         text = str(value or "").strip()
         return text or "草稿包已完成口径复核。"
+

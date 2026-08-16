@@ -22,19 +22,19 @@ from integrated_agent.runtimes.question.worker import (
     WorkerDependencies,
 )
 from integrated_agent.transports.http import create_http_app, create_matrix_api
-from tests.fakes import fake_question_runner
+from tests.fakes import fake_question_runner, install_scripted_ask
 
 
-def _matrix_service(tmp_path: Path, **kwargs) -> MatrixTaskService:
+def _matrix_service(monkeypatch, **kwargs) -> MatrixTaskService:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     return build_matrix_service(
         PROJECT_ROOT,
-        model=ScriptedMatrixModel(),
         **kwargs,
     )
 
 
-def test_t11_create_returns_202_and_one_package_ready(tmp_path: Path) -> None:
-    service = _matrix_service(tmp_path)
+def test_t11_create_returns_202_and_one_package_ready(tmp_path: Path, monkeypatch) -> None:
+    service = _matrix_service(monkeypatch)
     app = create_matrix_api(service)
     with TestClient(app) as client:
         accepted = client.post(
@@ -88,7 +88,7 @@ def test_t12_queue_full_returns_503(tmp_path: Path) -> None:
         assert third.headers["retry-after"] == "1"
 
 
-def test_t13_question_tasks_still_accepted(tmp_path: Path) -> None:
+def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
     events = InMemoryEventStore()
     question = QuestionTaskService(
         worker=QuestionWorkflowWorker(
@@ -103,7 +103,7 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path) -> None:
         tasks=InMemoryTaskStore(),
         events=events,
     )
-    matrix = _matrix_service(tmp_path)
+    matrix = _matrix_service(monkeypatch)
     static_root = Path(__file__).parents[1] / "static"
     app = create_http_app(
         question_service=question,
@@ -123,8 +123,8 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path) -> None:
         assert auto.status_code == 422
 
 
-def test_reply_without_comments_is_422(tmp_path: Path) -> None:
-    app = create_matrix_api(_matrix_service(tmp_path))
+def test_reply_without_comments_is_422(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
     with TestClient(app) as client:
         rejected = client.post("/api/reply", json={"text": "回评"})
         assert rejected.status_code == 422

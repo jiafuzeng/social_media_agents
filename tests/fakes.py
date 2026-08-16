@@ -66,3 +66,87 @@ async def fake_question_runner(
             }
         ],
     }
+
+
+def install_scripted_ask(monkeypatch, model) -> None:
+    """把 chunk 里的 Agently.create_agent 接到 ScriptedMatrixModel，避免测试打真实模型。"""
+
+    class FakeAgent:
+        def __init__(self, name: str) -> None:
+            self._name = name
+            self._input: Any = None
+            self._info: Any = None
+
+        def input(self, data):
+            self._input = data
+            return self
+
+        def info(self, data):
+            self._info = data
+            return self
+
+        def instruct(self, instruct):
+            del instruct
+            return self
+
+        def output(self, schema, format="json"):
+            del schema, format
+            return self
+
+        async def async_start(self):
+            input_data = self._input or {}
+            info = self._info or {}
+            snapshot = info.get("snapshot") if isinstance(info, dict) else info
+            context = info.get("context") if isinstance(info, dict) else info
+            name = self._name
+            if name == "matrix-compose-brief":
+                return await model.compose_brief(
+                    text=input_data["text"], info=snapshot
+                )
+            if name == "matrix-compose-draft":
+                return await model.compose_draft(
+                    work_item=input_data["work_item"],
+                    info=context,
+                    repair=input_data.get("repair") or None,
+                )
+            if name == "matrix-compose-review":
+                return await model.compose_review(
+                    package=input_data["package"], info=snapshot
+                )
+            if name == "matrix-reply-brief":
+                return await model.reply_brief(
+                    text=input_data["text"], info=snapshot
+                )
+            if name == "matrix-reply-draft":
+                return await model.reply_draft(
+                    work_item=input_data["work_item"],
+                    info=context,
+                    repair=input_data.get("repair") or None,
+                )
+            if name == "matrix-reply-review":
+                return await model.reply_review(
+                    package=input_data["package"], info=snapshot
+                )
+            raise AssertionError(f"unexpected Agently agent name: {name}")
+
+    def fake_create_agent(*args, **kwargs):
+        name = kwargs.get("name")
+        if not name:
+            for item in args:
+                if isinstance(item, str):
+                    name = item
+                    break
+        return FakeAgent(str(name or ""))
+
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.analysis.capability.load_model_settings",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.analysis.workflows.chunks.compose.pipeline.Agently.create_agent",
+        fake_create_agent,
+    )
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.analysis.workflows.chunks.reply.pipeline.Agently.create_agent",
+        fake_create_agent,
+    )
