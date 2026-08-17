@@ -15,7 +15,12 @@ from integrated_agent.runtimes.matrix.models import (
 
 from ....constraints import AhoCorasickMatcher, apply_constraint_gate
 from ....drafting import apply_review, retrieve_and_gate_draft, rollup_status
-from ....snapshots import OFFERED_CLAIM_TYPES, Snapshot
+from ....snapshots import (
+    OFFERED_CLAIM_TYPES,
+    TWITTER_PLATFORM_KEY,
+    Snapshot,
+    merged_forbidden_topics,
+)
 from ....trace_log import TraceLog
 
 
@@ -46,8 +51,9 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
     info = {
-        "platforms": [item.model_dump(mode="json") for item in snapshot.platforms],
-        "brand": snapshot.brand.model_dump(mode="json"),
+        "platform": snapshot.platform.model_dump(mode="json"),
+        "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
+        "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
         "account": snapshot.account.model_dump(mode="json"),
         "comments": [item.model_dump(mode="json") for item in snapshot.comments],
         "offered_claim_types": sorted(OFFERED_CLAIM_TYPES),
@@ -61,7 +67,8 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
                 [
                     "只做回复拆解，不要判断这是创作还是回复，不要输出 scenario。",
                     "requirements 写运营目标，不要复述本页 instruct。",
-                    "为 info.snapshot.comments 中每一条评论生成 work_item，kind 必须是 reply_comment，source_comment_key 必须是已签发的 comment_key。",
+                    "拆解必须符合 info.snapshot.account 的人设与 reply_stance；回复也服务于口碑和涨粉，但不为互动而放松 skip。",
+                    f"为 info.snapshot.comments 中每一条评论生成 work_item，kind 必须是 reply_comment，source_comment_key 必须是已签发的 comment_key，platform_key 必须是 {TWITTER_PLATFORM_KEY}。",
                     "每个 requirement 必须被引用；claim_types 只能从 info.snapshot.offered_claim_types 选取，不要把 template_key 写进去。",
                     "不写回复正文。",
                 ]
@@ -145,6 +152,7 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
             .instruct(
                 [
                     "先裁 reply、acknowledge 或 skip，再写正文。人身攻击、仇恨或无法核实的诱导默认 skip。",
+                    "用 info.context.account 的声量与 reply_stance 回复，优先可被围观的帮助和关注引导，不要换成别的身份。",
                     "skip 时 draft_text 必须是空串。不得输出 escalate。",
                     "证据只能引用 info.context.offered_refs 的 ref_id；不得承诺稳赚或治愈。",
                     "正文长度不得超过 info.context.max_chars。",
@@ -243,7 +251,7 @@ async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     matcher = AhoCorasickMatcher(snapshot.policy.terms)
 
     async def re_gate(current: GatedDraft, revised_text: str) -> GatedDraft:
-        platform = snapshot.platform(current.platform_key)
+        platform = snapshot.platform
         return await apply_constraint_gate(
             work_item_id=current.draft_key.removeprefix("d-"),
             kind=current.kind,

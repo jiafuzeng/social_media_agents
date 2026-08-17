@@ -14,21 +14,57 @@ DATA_ROOT = PROJECT_ROOT / "data/matrix"
 
 
 @pytest.mark.asyncio
-async def test_t07_two_platform_compose_yields_two_drafts(tmp_path, monkeypatch) -> None:
+async def test_t07_compose_yields_one_twitter_draft(tmp_path, monkeypatch) -> None:
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     run = await run_compose(
         MatrixTaskRequest(
             task_id="t07",
             text="为秋季上新写预热稿",
             scenario="compose",
-            platform_keys=["x-twitter", "weibo"],
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t07",
     )
-    assert len(run["drafts"]) == 2
-    assert {item["platform_key"] for item in run["drafts"]} == {"x-twitter", "weibo"}
+    assert len(run["drafts"]) == 1
+    assert run["drafts"][0]["platform_key"] == "x-twitter"
     assert run["task_type"] == "compose_post"
+
+
+@pytest.mark.asyncio
+async def test_compose_caps_work_items_at_platform_max_posts(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(
+        monkeypatch, ScriptedMatrixModel(compose_work_item_count=11)
+    )
+    run = await run_compose(
+        MatrixTaskRequest(
+            task_id="t07-cap",
+            text="为秋季上新写一组预热推文",
+            scenario="compose",
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "t07-cap",
+    )
+    assert len(run["drafts"]) == 10
+    assert "truncated_to_max_posts:10" in run["limitations"]
+
+
+@pytest.mark.asyncio
+async def test_compose_honors_requested_post_count(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(
+        monkeypatch, ScriptedMatrixModel(compose_work_item_count=8)
+    )
+    run = await run_compose(
+        MatrixTaskRequest(
+            task_id="t07-count",
+            text="为秋季上新写一组预热推文",
+            scenario="compose",
+            post_count=3,
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "t07-count",
+    )
+    assert len(run["drafts"]) == 3
+    assert "truncated_to_max_posts:3" in run["limitations"]
 
 
 @pytest.mark.asyncio
@@ -54,14 +90,14 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> Non
 @pytest.mark.asyncio
 async def test_t09_one_gate_failure_keeps_successful_item(tmp_path, monkeypatch) -> None:
     install_scripted_ask(
-        monkeypatch, ScriptedMatrixModel(evidence_overrides={"w1": ["no-such-ref"]})
+        monkeypatch, ScriptedMatrixModel(evidence_overrides={"rw1": ["no-such-ref"]})
     )
-    run = await run_compose(
+    run = await run_reply(
         MatrixTaskRequest(
             task_id="t09",
-            text="两平台预热",
-            scenario="compose",
-            platform_keys=["x-twitter", "weibo"],
+            text="处理 demo 线程",
+            scenario="reply",
+            thread_key="demo-1",
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t09",

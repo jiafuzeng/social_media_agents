@@ -14,7 +14,7 @@ from integrated_agent.runtimes.matrix.models import (
 
 from .constraints import AhoCorasickMatcher, apply_constraint_gate
 from .retrieval import RetrieveQuery, retrieve_cases
-from .snapshots import Snapshot
+from .snapshots import Snapshot, merged_forbidden_topics
 from .trace_log import TraceLog
 
 
@@ -66,11 +66,12 @@ async def retrieve_and_gate_draft(
         )
         return skipped, []
 
-    platform = snapshot.platform(work_item.platform_key)
+    platform = snapshot.platform
     matcher = AhoCorasickMatcher(snapshot.policy.terms)
     info = {
         "account": snapshot.account.model_dump(mode="json"),
-        "brand": snapshot.brand.model_dump(mode="json"),
+        "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
+        "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
         "max_chars": platform.max_chars,
         "mention_rules": platform.mention_rules,
         "offered_refs": cards,

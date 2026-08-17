@@ -21,13 +21,20 @@ header > p:last-child { max-width: 680px; color: #526b66; line-height: 1.7; }
 .field-row, .check { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .field-label { font-size: 13px; font-weight: 700; color: #526b66; }
 .hint { margin: 0; color: #728782; font-size: 13px; line-height: 1.6; }
-textarea, input[type="text"], #threadKey { border: 0; resize: vertical; font: inherit; line-height: 1.7; outline: none; color: inherit; width: 100%; background: transparent; }
-#threadKey { border-bottom: 1px solid #dbe8e5; padding: 4px 0; }
+textarea, input[type="text"], input[type="number"], select, #threadKey { border: 0; resize: vertical; font: inherit; line-height: 1.7; outline: none; color: inherit; width: 100%; background: transparent; }
+#threadKey, #postCount, #accountKey { border-bottom: 1px solid #dbe8e5; padding: 4px 0; }
+#postCount { max-width: 120px; }
+#accountProfile { white-space: pre-wrap; }
 button { justify-self: end; border: 0; border-radius: 999px; padding: 12px 22px; background: #167d6a; color: white; font-weight: 700; cursor: pointer; }
 button:disabled { opacity: .55; cursor: wait; }
 button.tab { justify-self: start; background: #e8f5f1; color: #126b5b; padding: 8px 16px; }
 button.tab.active { background: #167d6a; color: #fff; }
-.panel { margin-top: 18px; }
+.editor-layout { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 16px; margin: 14px 0; }
+.editor-list { display: grid; gap: 6px; align-content: start; max-height: 420px; overflow: auto; }
+.editor-list button { justify-self: stretch; text-align: left; border-radius: 12px; padding: 8px 12px; }
+.editor-actions { justify-content: start; }
+.editor textarea, .editor input, .editor select { border-bottom: 1px solid #dbe8e5; padding: 4px 0; }
+.editor textarea { min-height: 72px; }
 #events { color: #526b66; line-height: 1.8; }
 .lede { font-size: 18px; line-height: 1.6; margin: 0 0 8px; }
 .draft-grid { display: grid; gap: 14px; margin: 16px 0 24px; }

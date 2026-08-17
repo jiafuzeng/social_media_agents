@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from integrated_agent.runtimes.matrix.analysis.snapshots import TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.models import (
     BriefOut,
     ComposeDraftOut,
@@ -23,35 +24,33 @@ class ScriptedMatrixModel:
         draft_text_overrides: dict[str, str] | None = None,
         evidence_overrides: dict[str, list[str]] | None = None,
         review_lift_skip: bool = False,
+        compose_work_item_count: int = 1,
     ) -> None:
         self.draft_text_overrides = draft_text_overrides or {}
         self.evidence_overrides = evidence_overrides or {}
         self.review_lift_skip = review_lift_skip
+        self.compose_work_item_count = compose_work_item_count
 
     async def compose_brief(self, *, text: str, info: dict) -> BriefOut:
-        platforms = list(info.get("platforms") or [])
+        del info
         req_id = "r-compose"
-        items: list[WorkItem] = []
-        for index, platform in enumerate(platforms, start=1):
-            items.append(
+        count = max(1, self.compose_work_item_count)
+        return BriefOut(
+            normalized_brief=text.strip(),
+            requirements=[Requirement(requirement_id=req_id, description=text)],
+            work_items=[
                 WorkItem(
                     work_item_id=f"w{index}",
                     kind="compose_post",
                     requirement_ids=[req_id],
-                    platform_key=str(platform["platform_key"]),
+                    platform_key=TWITTER_PLATFORM_KEY,
                     source_comment_key=None,
                     goal="写出可核验的预热稿",
                     talking_points=["上新", "官方渠道"],
                     claim_types=["format"],
                 )
-            )
-        requirements = [
-            Requirement(requirement_id=req_id, description=text)
-        ]
-        return BriefOut(
-            normalized_brief=text.strip(),
-            requirements=requirements,
-            work_items=items,
+                for index in range(1, count + 1)
+            ],
         )
 
     async def compose_draft(
@@ -102,9 +101,6 @@ class ScriptedMatrixModel:
 
     async def reply_brief(self, *, text: str, info: dict) -> BriefOut:
         comments = list(info.get("comments") or [])
-        platform_key = str(
-            (info.get("platforms") or [{}])[0].get("platform_key") or "x-twitter"
-        )
         req_id = "r-reply"
         items: list[WorkItem] = []
         for index, comment in enumerate(comments, start=1):
@@ -115,7 +111,7 @@ class ScriptedMatrixModel:
                     work_item_id=f"rw{index}",
                     kind="reply_comment",
                     requirement_ids=[req_id],
-                    platform_key=platform_key,
+                    platform_key=TWITTER_PLATFORM_KEY,
                     source_comment_key=str(comment["comment_key"]),
                     goal="判断该不该回并起草",
                     talking_points=[body[:40]],

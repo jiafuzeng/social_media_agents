@@ -11,21 +11,76 @@ from integrated_agent.runtimes.matrix.analysis.constraints import (
 from integrated_agent.runtimes.matrix.analysis.snapshots import (
     SnapshotError,
     bind_snapshot,
+    list_account_catalog,
+    merged_forbidden_topics,
 )
 
 
 DATA_ROOT = PROJECT_ROOT / "data/matrix"
 
 
-def test_t01_unknown_platform_key_fails_snapshot() -> None:
-    with pytest.raises(SnapshotError, match="unknown platform_key"):
+def test_t01_unknown_account_key_fails_snapshot() -> None:
+    with pytest.raises(SnapshotError, match="unknown account_key"):
         bind_snapshot(
             data_root=DATA_ROOT,
-            account_key="default",
-            brand_key="default",
-            platform_keys=["not-a-platform"],
+            account_key="not-an-account",
             scenario="compose",
         )
+
+
+def test_twitter_platform_caps_posts_at_ten() -> None:
+    snapshot = bind_snapshot(
+        data_root=DATA_ROOT,
+        account_key="default",
+        scenario="compose",
+    )
+    assert snapshot.platform.max_posts == 10
+    assert snapshot.platform.max_chars == 280
+    assert snapshot.account.background
+    assert snapshot.account.goals
+
+
+def test_account_catalog_has_ten_personas() -> None:
+    cards = list_account_catalog(DATA_ROOT)
+    assert len(cards) == 10
+    keys = {item.account_key for item in cards}
+    assert keys == {
+        "default",
+        "indie-hacker",
+        "community-host",
+        "science-writer",
+        "b2b-pm",
+        "neighborhood-host",
+        "career-editor",
+        "oss-devrel",
+        "civic-ngo",
+        "support-desk",
+    }
+    civic = next(item for item in cards if item.account_key == "civic-ngo")
+    assert civic.background
+    assert civic.goals
+    assert civic.must_not
+    assert civic.guardrail_keys == ["default", "civic"]
+
+
+def test_bind_merges_account_guardrails() -> None:
+    snapshot = bind_snapshot(
+        data_root=DATA_ROOT,
+        account_key="support-desk",
+        scenario="compose",
+    )
+    assert snapshot.account.display_name == "青木支持 / 口碑增长"
+    assert [item.guardrail_key for item in snapshot.guardrails] == ["default", "support"]
+    topics = merged_forbidden_topics(snapshot.guardrails)
+    assert "虚假疗效" in topics
+    assert "收集密码或验证码" in topics
+    maker = bind_snapshot(
+        data_root=DATA_ROOT,
+        account_key="indie-hacker",
+        scenario="compose",
+    )
+    assert [item.guardrail_key for item in maker.guardrails] == ["default", "maker"]
+    assert "虚构融资或客户" in merged_forbidden_topics(maker.guardrails)
 
 
 @pytest.mark.asyncio

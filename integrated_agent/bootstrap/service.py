@@ -19,4 +19,5 @@ def create_production_app() -> FastAPI:
         matrix_service=build_matrix_service(),
         static_root=ROOT / "static",
         artifacts_root=ROOT / "workspace/artifacts",
+        matrix_data_root=ROOT / "data" / "matrix",
     )

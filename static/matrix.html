@@ -6,61 +6,152 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><text y=%2252%22 font-size=%2252%22>🧩</text></svg>">
   <title>MatrixCopilot 矩阵草稿</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/matrix.css">
 </head>
-<body>
-  <main class="shell">
-    <nav class="nav" aria-label="产品切换">
-      <a href="/">问数</a>
-      <a class="active" href="/matrix">矩阵草稿</a>
-    </nav>
-    <header>
-      <p class="eyebrow">MATRIX COPILOT</p>
-      <h1>社媒矩阵草稿助手</h1>
-      <p>创作和回复走两套流程。系统返回带评理、证据和硬门降级的草稿包，P0 不发送到任何渠道。</p>
-    </header>
-    <section class="composer">
-      <div class="tabs" role="tablist">
-        <button type="button" class="tab active" data-scenario="compose" role="tab" aria-selected="true">写帖</button>
-        <button type="button" class="tab" data-scenario="reply" role="tab" aria-selected="false">回评</button>
-      </div>
-      <div id="composeForm" class="fields">
-        <textarea id="composeText" rows="4">为秋季上新写一条预热推文，口径可核验，不承诺收益或疗效。</textarea>
-        <div class="field-row">
-          <span class="field-label">平台</span>
-          <label class="check"><input type="checkbox" name="platform" value="x-twitter" checked> X / Twitter</label>
-          <label class="check"><input type="checkbox" name="platform" value="weibo"> 微博</label>
+<body class="matrix-app" data-workspace="task" data-board="home">
+  <div class="workbench">
+    <aside class="sidebar" aria-label="导航">
+      <header class="sidebar-brand">
+        <span class="rail-brand">M</span>
+        <div>
+          <strong>MatrixCopilot</strong>
+          <small>草稿工作台</small>
         </div>
-        <label class="check">
-          <input type="checkbox" id="needTrends"> 需要爆款趋势（P0 失败则记 limitation，不失败整单）
-        </label>
+      </header>
+      <nav class="sidebar-nav">
+        <button type="button" class="nav-item active" id="newTaskBtn" data-workspace="task">新建任务</button>
+        <button type="button" class="nav-item" data-workspace="catalog">专家·技能·连接器</button>
+        <a class="nav-item" href="/">问数</a>
+      </nav>
+      <section class="sidebar-block">
+        <h3>任务 <span id="taskCount">0</span></h3>
+        <div id="taskHistory" class="history-list"></div>
+      </section>
+      <footer class="sidebar-foot">
+        <span class="foot-avatar">M</span>
+        <span>Matrix</span>
+      </footer>
+    </aside>
+
+    <main class="stage">
+      <section class="thread" id="taskStage">
+        <div class="home-hero" id="homeHero">
+          <h1 class="home-title" id="stageTitle">MatrixCopilot，我帮你</h1>
+          <div class="mode-switch" id="modeTabs" role="tablist">
+            <button type="button" class="tab active" data-scenario="compose" role="tab" aria-selected="true">写帖</button>
+            <button type="button" class="tab" data-scenario="reply" role="tab" aria-selected="false">回评</button>
+          </div>
+          <div class="skill-chips" id="skillChips"></div>
+        </div>
+        <div id="progress" class="thread-log" hidden>
+          <div id="threadTurns"></div>
+          <article class="agent-turn" id="liveTurn" hidden>
+            <p class="agent-name">MatrixCopilot</p>
+            <p class="agent-meta" id="agentMeta" hidden></p>
+            <div class="thinking" id="thinking">
+              <p class="thinking-title">执行过程</p>
+              <ol id="events"></ol>
+              <p class="thinking-status" id="thinkingStatus">生成草稿中，请稍候…</p>
+            </div>
+            <section id="package" class="final-result" hidden>
+              <p id="summary" class="lede"></p>
+              <ol id="drafts" class="result-steps"></ol>
+              <p class="result-heading">证据</p>
+              <ul id="evidence" class="result-bullets"></ul>
+              <p class="result-heading">限制说明</p>
+              <ol id="limitations" class="result-steps"></ol>
+              <p id="snapshot" class="meta"></p>
+              <p id="packageMeta" class="meta"></p>
+            </section>
+          </article>
+        </div>
+        <section id="error" class="panel error" hidden></section>
+        <form id="taskForm" class="composer-dock">
+          <div class="composer-mascot" aria-hidden="true">🐱</div>
+          <div id="composeForm" class="fields">
+            <textarea id="composeText" rows="3" placeholder="今天帮你写点什么？Enter 发送，Shift+Enter 换行"></textarea>
+            <div class="dock-tools">
+              <label class="field compact">
+                <span class="field-label">条数</span>
+                <input id="postCount" type="number" min="1" max="10" step="1" value="1">
+              </label>
+              <label class="check chip-check">
+                <input type="checkbox" id="needTrends"> 爆款趋势
+              </label>
+            </div>
+          </div>
+          <div id="replyForm" class="fields" hidden>
+            <textarea id="replyText" rows="3" placeholder="交代回评任务，Enter 发送，Shift+Enter 换行"></textarea>
+            <div class="dock-tools">
+              <label class="field compact">
+                <span class="field-label">线程</span>
+                <input id="threadKey" value="demo-1" spellcheck="false">
+              </label>
+              <p class="hint">demo-1 含攻击评，应 skip 且正文为空。</p>
+            </div>
+          </div>
+          <div class="composer-toolbar">
+            <span class="plus-btn" aria-hidden="true">+</span>
+            <div class="composer-toolbar-end">
+              <label class="foot-select">
+                <span>选择人设</span>
+                <select id="accountKey"></select>
+              </label>
+              <button type="submit" id="submit" class="send-btn" aria-label="发送">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="catalog-stage" id="catalogEditor" hidden>
+        <div class="catalog-market">
+          <header class="catalog-kicker">
+            <h2>精选场景</h2>
+            <p>人设、护栏、平台、词表、模板分开管。点卡片编辑，下一单写稿会重新加载。</p>
+          </header>
+          <div class="scenario-row" id="catalogScenarios"></div>
+          <div class="catalog-toolbar">
+            <div class="tabs catalog-pills" id="catalogTabs" role="tablist">
+              <button type="button" class="tab active" data-kind="accounts">人设</button>
+              <button type="button" class="tab" data-kind="guardrails">护栏</button>
+              <button type="button" class="tab" data-kind="platforms">平台</button>
+              <button type="button" class="tab" data-kind="policy">词表</button>
+              <button type="button" class="tab" data-kind="templates">模板</button>
+            </div>
+            <div class="catalog-sort">
+              <button type="button" class="ghost" id="catalogNew">新建</button>
+              <button type="button" class="ghost" id="catalogInsert">插入</button>
+            </div>
+          </div>
+          <div id="catalogList" class="catalog-grid"></div>
+          <p id="catalogStatus" class="hint"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="catalog-modal" id="catalogDrawer" hidden>
+    <div class="catalog-backdrop" id="catalogBackdrop"></div>
+    <div class="catalog-dialog" role="dialog" aria-modal="true" aria-labelledby="catalogDrawerTitle">
+      <header class="catalog-modal-head">
+        <div class="catalog-modal-id">
+          <span class="avatar" id="catalogModalAvatar">?</span>
+          <div>
+            <h3 id="catalogDrawerTitle">编辑配置</h3>
+            <p id="catalogModalSub"></p>
+          </div>
+        </div>
+        <button type="button" class="modal-x" id="catalogDrawerClose" aria-label="关闭">×</button>
+      </header>
+      <form id="catalogForm" class="fields catalog-form"></form>
+      <div class="modal-foot">
+        <button type="button" class="tab" id="catalogDelete">删除</button>
+        <button type="button" id="catalogSave" class="modal-primary">保存配置</button>
       </div>
-      <div id="replyForm" class="fields" hidden>
-        <textarea id="replyText" rows="3">处理样例线程评论，先判断该不该回，再写草稿。</textarea>
-        <label class="field">
-          <span class="field-label">线程</span>
-          <input id="threadKey" value="demo-1" spellcheck="false">
-        </label>
-        <p class="hint">demo-1 含 3 条评论，其中 1 条攻击。攻击项应 skip 且正文为空。</p>
-      </div>
-      <button id="submit">生成草稿包</button>
-    </section>
-    <section id="progress" class="panel" hidden>
-      <h2>执行进度</h2>
-      <ol id="events"></ol>
-    </section>
-    <section id="package" class="panel" hidden>
-      <h2>草稿包</h2>
-      <p id="summary" class="lede"></p>
-      <p id="packageMeta" class="meta"></p>
-      <div id="drafts" class="draft-grid"></div>
-      <h3>证据卡片</h3>
-      <ul id="evidence"></ul>
-      <h3>限制说明</h3>
-      <ul id="limitations"></ul>
-      <p id="snapshot" class="meta"></p>
-    </section>
-    <section id="error" class="panel error" hidden></section>
-  </main>
+    </div>
+  </div>
   <script src="/static/matrix.js"></script>
+  <script src="/static/matrix-catalog.js"></script>
 </body>
 </html>

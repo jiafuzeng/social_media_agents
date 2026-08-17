@@ -24,7 +24,7 @@ COMPOSE_FLOW = TriggerFlow(name="matrix-compose-v1")
 (
     COMPOSE_FLOW.to(compose_prelude)
     .to(compose_brief)
-    .for_each(concurrency=4)
+    .for_each(concurrency=10)
     .to(retrieve_and_compose_draft)
     .end_for_each()
     .to(compose_review)
@@ -36,13 +36,11 @@ async def run_compose(
     *,
     data_root: Path,
     output_directory: Path,
-    max_concurrency: int = 4,
+    max_concurrency: int = 10,
 ) -> dict[str, Any]:
     snapshot = bind_snapshot(
         data_root=data_root,
         account_key=request.account_key,
-        brand_key=request.brand_key,
-        platform_keys=list(request.platform_keys),
         scenario="compose",
     )
     execution = COMPOSE_FLOW.create_execution(

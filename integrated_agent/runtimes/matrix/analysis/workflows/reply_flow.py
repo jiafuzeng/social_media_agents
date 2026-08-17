@@ -41,8 +41,6 @@ async def run_reply(
     snapshot = bind_snapshot(
         data_root=data_root,
         account_key=request.account_key,
-        brand_key=request.brand_key,
-        platform_keys=list(request.platform_keys),
         scenario="reply",
         thread_key=request.thread_key,
         comments=request.comments,

@@ -17,7 +17,12 @@ from integrated_agent.runtimes.matrix.models import (
 
 from ....constraints import AhoCorasickMatcher, apply_constraint_gate
 from ....drafting import apply_review, retrieve_and_gate_draft, rollup_status
-from ....snapshots import OFFERED_CLAIM_TYPES, Snapshot
+from ....snapshots import (
+    OFFERED_CLAIM_TYPES,
+    TWITTER_PLATFORM_KEY,
+    Snapshot,
+    merged_forbidden_topics,
+)
 from ....trace_log import TraceLog
 
 
@@ -45,18 +50,33 @@ async def compose_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     return payload
 
 
+def _compose_post_limit(request: MatrixTaskRequest, snapshot: Snapshot) -> int:
+    cap = snapshot.platform.max_posts
+    if request.post_count is None:
+        return cap
+    return min(request.post_count, cap)
+
+
 async def compose_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
-    """模型只拆 work_item，不判 scenario。返回列表供 for_each 扇出。"""
+    """模型按主题拆推文 work_item；条数取请求 post_count，且不超过平台 max_posts。"""
 
     request = MatrixTaskRequest.model_validate(data.get_state("request"))
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
+    max_posts = _compose_post_limit(request, snapshot)
+    count_rule = (
+        f"必须正好生成 {max_posts} 条 work_item。"
+        if request.post_count is not None
+        else f"生成 1 到 {max_posts} 条 work_item，条数由主题需要决定。"
+    )
     info = {
-        "platforms": [item.model_dump(mode="json") for item in snapshot.platforms],
-        "brand": snapshot.brand.model_dump(mode="json"),
+        "platform": snapshot.platform.model_dump(mode="json"),
+        "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
+        "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
         "account": snapshot.account.model_dump(mode="json"),
         "trend_cards": [item.model_dump(mode="json") for item in snapshot.trend_cards],
         "offered_claim_types": sorted(OFFERED_CLAIM_TYPES),
+        "post_count": max_posts,
     }
     try:
         result = await (
@@ -66,10 +86,13 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
             .instruct(
                 [
                     "只做创作拆解，不要判断这是创作还是回复，不要输出 scenario。",
-                    "为 info.snapshot.platforms 中每一个 platform_key 生成一条 work_item，kind 必须是 compose_post。",
+                    f"为 Twitter/X 生成 work_item，kind 必须是 compose_post，platform_key 必须是 {TWITTER_PLATFORM_KEY}。",
+                    count_rule,
+                    "拆解必须符合 info.snapshot.account 的人设：background、goals、must_do、must_not；目标以营销涨粉为主，同时守住该行业职责，不要换成别的身份。",
+                    "必须避开 info.snapshot.forbidden_topics，那是此人设挂载的全部护栏禁区并集。",
+                    "不得超过 info.snapshot.platform.max_posts，也不得超过 info.snapshot.post_count。",
                     "claim_types 只能从 info.snapshot.offered_claim_types 选取，例如 format；不要把 template_key、品牌名或人设词写进去。",
-                    "每个 requirement 必须被至少一条 work_item 引用；platform_key 只能使用已提供平台。",
-                    "talking_points 保持矩阵口径一致，按平台只改形态不改主张。",
+                    "每个 requirement 必须被至少一条 work_item 引用。",
                     "不写正文，不引用评论，不要设置 source_comment_key。",
                 ]
             )
@@ -105,6 +128,13 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
             .async_start()
         )
         brief = BriefOut.model_validate(result)
+        if len(brief.work_items) > max_posts:
+            brief = brief.model_copy(
+                update={"work_items": list(brief.work_items[:max_posts])}
+            )
+            limitations = list(cast(list[str], data.get_state("limitations") or []))
+            limitations.append(f"truncated_to_max_posts:{max_posts}")
+            await data.async_set_state("limitations", limitations, emit=False)
     except Exception as exc:
         await data.async_set_state("final_failed", True, emit=False)
         trace.log(
@@ -146,6 +176,8 @@ async def retrieve_and_compose_draft(data: TriggerFlowRuntimeData) -> dict[str, 
             .instruct(
                 [
                     "为这一条平台稿写正文和评理，不要输出 reply_decision。",
+                    "用 info.context.account 的声量写：voice_summary、must_do、must_not；优先服务涨粉与关注引导，同时守住行业职责；不要自称其他品牌或公权力。",
+                    "必须避开 info.context.forbidden_topics。",
                     "不得承诺稳赚、治愈、保本或未授权最高级；证据只能引用 info.context.offered_refs 的 ref_id。",
                     "正文长度不得超过 info.context.max_chars。",
                     "skip 时正文必须空串。若 repair.issues 含 over_limit，删减卖点直到不超限。",
@@ -246,7 +278,8 @@ async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     matcher = AhoCorasickMatcher(snapshot.policy.terms)
 
     async def re_gate(current: GatedDraft, revised_text: str) -> GatedDraft:
-        platform = snapshot.platform(current.platform_key)
+        """Review 改写后的正文再过硬门，禁止用修订绕过禁词、字数和证据约束。"""
+        platform = snapshot.platform
         return await apply_constraint_gate(
             work_item_id=current.draft_key.removeprefix("d-"),
             kind=current.kind,

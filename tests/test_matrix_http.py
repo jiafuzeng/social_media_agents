@@ -39,7 +39,7 @@ def test_t11_create_returns_202_and_one_package_ready(tmp_path: Path, monkeypatc
     with TestClient(app) as client:
         accepted = client.post(
             "/api/create",
-            json={"text": "为秋季上新写一条预热推文", "platform_keys": ["x-twitter"]},
+            json={"text": "为秋季上新写一条预热推文"},
         )
         assert accepted.status_code == 202
         payload = accepted.json()
@@ -118,7 +118,20 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
         )
         assert accepted.status_code == 202
         assert client.get("/matrix").status_code == 200
-        assert "写帖" in client.get("/matrix").text
+        page = client.get("/matrix").text
+        assert "写帖" in page
+        assert 'id="postCount"' in page
+        assert 'id="accountKey"' in page
+        assert 'id="submit"' in page
+        assert 'id="taskForm"' in page
+        assert 'max="10"' in page
+        assert "/static/matrix.css" in page
+        assert 'class="workbench"' in page
+        assert 'id="threadTurns"' in page
+        assert 'id="taskHistory"' in page
+        catalog = client.get("/api/accounts")
+        assert catalog.status_code == 200
+        assert len(catalog.json()["accounts"]) == 10
         auto = client.post("/v1/matrix/tasks", json={"text": "写帖", "scenario": "auto"})
         assert auto.status_code == 422
 
@@ -128,3 +141,37 @@ def test_reply_without_comments_is_422(tmp_path: Path, monkeypatch) -> None:
     with TestClient(app) as client:
         rejected = client.post("/api/reply", json={"text": "回评"})
         assert rejected.status_code == 422
+
+
+def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        too_low = client.post("/api/create", json={"text": "写帖", "post_count": 0})
+        too_high = client.post("/api/create", json={"text": "写帖", "post_count": 11})
+        assert too_low.status_code == 422
+        assert too_high.status_code == 422
+
+
+def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        rejected = client.post(
+            "/v1/matrix/tasks",
+            json={
+                "text": "回评",
+                "scenario": "reply",
+                "thread_key": "demo-1",
+                "post_count": 2,
+            },
+        )
+        assert rejected.status_code == 422
+
+
+def test_account_catalog_endpoint(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        catalog = client.get("/api/accounts")
+        assert catalog.status_code == 200
+        keys = [item["account_key"] for item in catalog.json()["accounts"]]
+        assert "indie-hacker" in keys
+        assert len(keys) == 10

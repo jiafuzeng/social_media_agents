@@ -22,6 +22,9 @@ GatedDecision = Literal["reply", "acknowledge", "skip", "publishable"]
 RetrievalState = Literal["hits", "empty", "failed"]
 TaskStatus = Literal["completed", "partial"]
 
+MIN_COMPOSE_POSTS = 1
+MAX_COMPOSE_POSTS = 10
+
 
 class CommentIn(DomainModel):
     comment_key: str | None = None
@@ -35,15 +38,16 @@ class MatrixTaskCreate(DomainModel):
 
     text: str = Field(min_length=1, description="用户原话：创作是主题/口径，回复是运营指令")
     scenario: Scenario = Field(description="入口绑定的流程，compose 或 reply，决定跑哪张 Flow")
-    platform_keys: list[str] = Field(
-        default_factory=list,
-        description="出稿平台短键；空则用账号默认平台，未知 key 绑快照时 fail-closed",
-    )
-    account_key: str = Field(default="default", description="矩阵账号：声量与默认平台")
-    brand_key: str = Field(default="default", description="品牌人设、禁区与核准模板")
+    account_key: str = Field(default="default", description="矩阵账号：声量与人设；护栏由人设配置，不单独入参")
     need_trends: bool = Field(
         default=False,
         description="是否先抓热帖再写；仅 compose 有效，reply 携带则忽略",
+    )
+    post_count: int | None = Field(
+        default=None,
+        ge=MIN_COMPOSE_POSTS,
+        le=MAX_COMPOSE_POSTS,
+        description="本次要出几条推文；仅 compose，范围 1–10。省略则由模型在平台上限内决定",
     )
     thread_key: str | None = Field(
         default=None,
@@ -61,6 +65,8 @@ class MatrixTaskCreate(DomainModel):
         if self.scenario == "compose":
             if self.thread_key is not None or self.comments is not None:
                 raise ValueError("compose must not include thread_key or comments")
+        if self.scenario == "reply" and self.post_count is not None:
+            raise ValueError("reply must not include post_count")
         return self
 
 

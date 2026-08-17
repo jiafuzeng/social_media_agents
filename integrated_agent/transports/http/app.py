@@ -20,6 +20,7 @@ def create_http_app(
     matrix_service: MatrixTaskService | None = None,
     static_root: Path | None = None,
     artifacts_root: Path | None = None,
+    matrix_data_root: Path | None = None,
 ) -> FastAPI:
     if question_service is None and matrix_service is None:
         raise ValueError("create_http_app requires question_service or matrix_service")
@@ -66,7 +67,11 @@ def create_http_app(
         )
     if matrix_service is not None:
         app.include_router(
-            build_matrix_router(matrix_service, static_root=static_root)
+            build_matrix_router(
+                matrix_service,
+                static_root=static_root,
+                data_root=matrix_data_root,
+            )
         )
     return app
 
@@ -88,5 +93,10 @@ def create_matrix_api(
     service: MatrixTaskService,
     *,
     static_root: Path | None = None,
+    data_root: Path | None = None,
 ) -> FastAPI:
-    return create_http_app(matrix_service=service, static_root=static_root)
+    return create_http_app(
+        matrix_service=service,
+        static_root=static_root,
+        matrix_data_root=data_root,
+    )
