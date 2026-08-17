@@ -116,6 +116,10 @@ def install_scripted_ask(monkeypatch, model) -> None:
             del schema, format
             return self
 
+        def activate_session(self, *, session_id: str | None = None):
+            self.session_id = session_id
+            return self
+
         async def async_start(self):
             input_data = self._input or {}
             info = self._info or {}

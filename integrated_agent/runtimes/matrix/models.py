@@ -71,6 +71,7 @@ class MatrixTaskCreate(DomainModel):
     )
     requester: str = Field(default="course-user", description="提交者，仅审计/日志，不参与拆解")
     channel: str = Field(default="web", description="来源通道 web 或 gateway，不改流程")
+    session_id: str = Field(min_length=1, description="host 对话 id，与 Agently Session.id 相同")
 
     @model_validator(mode="after")
     def bind_entry_invariants(self) -> "MatrixTaskCreate":

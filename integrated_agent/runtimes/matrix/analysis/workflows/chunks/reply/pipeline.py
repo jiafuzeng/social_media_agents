@@ -108,6 +108,7 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     try:
         result = await (
             Agently.create_agent(name="matrix-reply-brief")
+            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"text": request.text})
             .info({"snapshot": info})
             .instruct(
@@ -209,6 +210,7 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
     ) -> ReplyDraftOut:
         result = await (
             Agently.create_agent(name="matrix-reply-draft")
+            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"work_item": work_item, "repair": repair or {}})
             .info({"context": info})
             .instruct(
@@ -264,6 +266,7 @@ async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     try:
         result = await (
             Agently.create_agent(name="matrix-reply-review")
+            .activate_session(session_id=str(data.require_resource("session_id")))
             .input(
                 {
                     "package": {

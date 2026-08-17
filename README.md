@@ -24,6 +24,7 @@ integrated_agent_service/
 │   │   ├── agent/               # Agently Agent + Actions + Skills + Sandbox
 │   │   ├── question/            # 问数任务服务、TriggerFlow 和分析流程
 │   │   ├── matrix/              # 社媒矩阵草稿、两套 TriggerFlow 与硬门
+│   │   │   └── db/              # 身份库 ORM、异步仓储与 Alembic 迁移
 │   │   └── acp/                 # Codex ACP client 与 session runtime
 │   ├── storage/                 # 对外发布的制品
 │   ├── transports/
@@ -173,6 +174,56 @@ Codex 权限请求默认不自动批准。仅在受控演示环境中设置：
 
 ```text
 CODEX_AUTO_APPROVE=true
+```
+
+## 身份库与数据库操作
+
+矩阵登录用户、对话会话和用户轮次落在 SQLite：`workspace/identity/identity.sqlite`（不入库）。代码在 `integrated_agent/runtimes/matrix/db/`：
+
+```text
+db/
+├── models.py          # SQLAlchemy ORM 表与 Stored* DTO
+├── repository.py      # 异步仓储（AsyncSession + aiosqlite）
+├── alembic.ini
+└── migrations/        # Alembic 版本脚本
+```
+
+`identity.py` 只做注册登录与会话业务；读写都走异步 `IdentityRepository`。表关系：`users` 1:N `sessions`，`sessions` 1:N `session_turns`（`session_id` 外键，删除级联）。
+
+所有命令在项目根目录执行。
+
+```bash
+# 升级到最新（空库会建 users / tokens / sessions / session_turns）
+alembic upgrade head
+
+# 改完 db/models.py 后生成新版本并升级
+alembic revision --autogenerate -m "describe change"
+alembic upgrade head
+
+# 回退一步
+alembic downgrade -1
+
+# 当前版本 / 历史
+alembic current
+alembic history
+```
+
+也可以显式指定配置文件：
+
+```bash
+alembic -c integrated_agent/runtimes/matrix/db/alembic.ini upgrade head
+```
+
+库已经是运行时 `create_all` 建出来的（表都在、没有 `alembic_version`）时，先打戳再跟后续迁移，不要直接 `upgrade`：
+
+```bash
+alembic stamp head
+```
+
+换库路径：
+
+```bash
+IDENTITY_SQLITE=/abs/path/identity.sqlite alembic upgrade head
 ```
 
 ## 压力测试

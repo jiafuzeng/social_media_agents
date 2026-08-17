@@ -25,10 +25,7 @@ from integrated_agent.runtimes.matrix.models import (
     TaskEvent,
     TaskSnapshot,
 )
-from integrated_agent.runtimes.matrix.service import (
-    MatrixTaskService,
-    ServiceBusyError,
-)
+from integrated_agent.runtimes.matrix.service import MatrixTaskService
 
 
 class AccountCatalogOut(DomainModel):
@@ -50,6 +47,7 @@ class ComposeHttpIn(DomainModel):
     )
     requester: str = "course-user"
     channel: str = "web"
+    session_id: str = Field(min_length=1)
 
 
 class ReplyHttpIn(DomainModel):
@@ -63,6 +61,7 @@ class ReplyHttpIn(DomainModel):
     comments: list[CommentIn] | None = None
     requester: str = "course-user"
     channel: str = "web"
+    session_id: str = Field(min_length=1)
 
 
 def event_to_sse(event: TaskEvent) -> str:
@@ -76,17 +75,6 @@ def event_to_sse(event: TaskEvent) -> str:
         f"event: {event.event_type}\n"
         f"data: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n"
     )
-
-
-async def _submit(service: MatrixTaskService, command: MatrixTaskCreate) -> TaskAccepted:
-    try:
-        return await service.submit(command)
-    except ServiceBusyError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc),
-            headers={"Retry-After": "1"},
-        ) from exc
 
 
 def build_task_router(
@@ -108,21 +96,44 @@ def build_task_router(
 
     @router.post("/api/create", response_model=TaskAccepted, status_code=202)
     async def create_compose(command: ComposeHttpIn) -> TaskAccepted:
-        return await _submit(
-            service,
-            MatrixTaskCreate(scenario="compose", **command.model_dump()),
+        accepted = await service.submit(
+            MatrixTaskCreate(scenario="compose", **command.model_dump())
         )
+        await service.identity.append_turn(
+            command.session_id,
+            text=command.text,
+            task_id=accepted.task_id,
+            extra={
+                "scenario": "compose",
+                "account_key": command.account_key,
+                "post_count": command.post_count,
+                "need_trends": command.need_trends,
+            },
+            last_scenario="compose",
+        )
+        return accepted
 
     @router.post("/api/reply", response_model=TaskAccepted, status_code=202)
     async def create_reply(command: ReplyHttpIn) -> TaskAccepted:
-        return await _submit(
-            service,
-            MatrixTaskCreate(scenario="reply", **command.model_dump()),
+        accepted = await service.submit(
+            MatrixTaskCreate(scenario="reply", **command.model_dump())
         )
+        await service.identity.append_turn(
+            command.session_id,
+            text=command.text,
+            task_id=accepted.task_id,
+            extra={
+                "scenario": "reply",
+                "interaction_key": command.interaction_key,
+                "reply_count": command.reply_count,
+            },
+            last_scenario="reply",
+        )
+        return accepted
 
     @router.post("/v1/matrix/tasks", response_model=TaskAccepted, status_code=202)
     async def create_matrix_task(command: MatrixTaskCreate) -> TaskAccepted:
-        return await _submit(service, command)
+        return await service.submit(command)
 
     @router.get("/v1/matrix/tasks/{task_id}", response_model=TaskSnapshot)
     async def get_matrix_task(task_id: str) -> TaskSnapshot:

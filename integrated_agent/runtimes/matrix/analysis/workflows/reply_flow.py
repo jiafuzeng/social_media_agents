@@ -49,6 +49,7 @@ async def run_reply(
         runtime_resources={
             "snapshot": snapshot,
             "data_root": data_root,
+            "session_id": request.session_id,
         },
         auto_close=False,
     )

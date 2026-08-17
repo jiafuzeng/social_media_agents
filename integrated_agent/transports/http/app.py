@@ -4,10 +4,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from integrated_agent.runtimes.matrix.service import MatrixTaskService
+from integrated_agent.runtimes.matrix.service import MatrixTaskService, ServiceBusyError
 from integrated_agent.runtimes.question.service import QuestionTaskService
 
 from .matrix import build_matrix_router
@@ -42,6 +43,15 @@ def create_http_app(
                 await item.stop()
 
     app = FastAPI(title="综合智能体 HTTP 服务", version="1.0.0", lifespan=lifespan)
+
+    @app.exception_handler(ServiceBusyError)
+    async def service_busy(_request: Request, exc: ServiceBusyError) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": str(exc)},
+            headers={"Retry-After": "1"},
+        )
+
     if static_root is not None:
         app.mount("/static", StaticFiles(directory=static_root), name="static")
 

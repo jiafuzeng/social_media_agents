@@ -20,6 +20,7 @@ async def test_t07_compose_yields_one_twitter_draft(tmp_path, monkeypatch) -> No
         MatrixTaskRequest(
             task_id="t07",
             text="为秋季上新写预热稿",
+            session_id="flow-session",
             scenario="compose",
         ),
         data_root=DATA_ROOT,
@@ -39,6 +40,7 @@ async def test_compose_caps_work_items_at_platform_max_posts(tmp_path, monkeypat
         MatrixTaskRequest(
             task_id="t07-cap",
             text="为秋季上新写一组预热推文",
+            session_id="flow-session",
             scenario="compose",
         ),
         data_root=DATA_ROOT,
@@ -57,6 +59,7 @@ async def test_compose_honors_requested_post_count(tmp_path, monkeypatch) -> Non
         MatrixTaskRequest(
             task_id="t07-count",
             text="为秋季上新写一组预热推文",
+            session_id="flow-session",
             scenario="compose",
             post_count=3,
         ),
@@ -74,6 +77,7 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> Non
         MatrixTaskRequest(
             task_id="t08",
             text="处理这组评论",
+            session_id="flow-session",
             scenario="reply",
             comments=DEMO_REPLY_COMMENTS,
         ),
@@ -94,6 +98,7 @@ async def test_reply_honors_requested_reply_count(tmp_path, monkeypatch) -> None
         MatrixTaskRequest(
             task_id="t08-count",
             text="处理这组评论",
+            session_id="flow-session",
             scenario="reply",
             comments=DEMO_REPLY_COMMENTS,
             reply_count=1,
@@ -113,6 +118,7 @@ async def test_reply_without_thread_replies_to_user_text(tmp_path, monkeypatch) 
         MatrixTaskRequest(
             task_id="t08-text",
             text="成分表在哪看？有没有官方说明？",
+            session_id="flow-session",
             scenario="reply",
         ),
         data_root=DATA_ROOT,
@@ -131,6 +137,7 @@ async def test_reply_count_on_single_comment_yields_variants(tmp_path, monkeypat
         MatrixTaskRequest(
             task_id="t08-variants",
             text="成分表在哪看？有没有官方说明？",
+            session_id="flow-session",
             scenario="reply",
             reply_count=3,
         ),
@@ -151,6 +158,7 @@ async def test_t09_one_gate_failure_keeps_successful_item(tmp_path, monkeypatch)
         MatrixTaskRequest(
             task_id="t09",
             text="处理这组评论",
+            session_id="flow-session",
             scenario="reply",
             comments=DEMO_REPLY_COMMENTS,
         ),
@@ -172,6 +180,7 @@ async def test_t10_review_cannot_lift_skip(tmp_path, monkeypatch) -> None:
         MatrixTaskRequest(
             task_id="t10",
             text="处理这组评论",
+            session_id="flow-session",
             scenario="reply",
             comments=DEMO_REPLY_COMMENTS,
         ),

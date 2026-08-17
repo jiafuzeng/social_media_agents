@@ -19,7 +19,11 @@ const AUTH_ERRORS = {
   "cannot demote the last admin": "不能取消最后一个管理员",
   "admin role required": "需要管理员权限",
   "role must be admin or user": "角色只能是管理员或普通用户",
-  "user not found": "用户不存在"
+  "user not found": "用户不存在",
+  "session not found": "会话不存在",
+  "session access denied": "不能访问别人的会话",
+  "status must be active or archived": "会话状态无效",
+  "title must not be empty": "会话标题不能为空"
 };
 
 function isAdmin() {
@@ -116,6 +120,7 @@ function showAuthedUser(user) {
   if (role) role.textContent = roleLabel(user.role);
   const drawerAvatar = document.querySelector("#userDrawerAvatar");
   if (drawerAvatar) drawerAvatar.textContent = glyph;
+  window.dispatchEvent(new CustomEvent("matrix-auth-changed", { detail: { user } }));
 }
 
 function showAuthGate() {
@@ -135,6 +140,7 @@ function showAuthGate() {
   }
   if (name) name.textContent = "未登录";
   if (role) role.textContent = "本机 SQLite 账号";
+  window.dispatchEvent(new CustomEvent("matrix-auth-changed", { detail: { user: null } }));
 }
 
 async function restoreAuth() {
@@ -385,3 +391,7 @@ function bindAuth() {
 }
 
 bindAuth();
+window.matrixAuth = {
+  headers: authHeaders,
+  user: () => currentUser
+};

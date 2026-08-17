@@ -45,8 +45,12 @@ def test_t11_create_returns_202_and_one_package_ready(tmp_path: Path, monkeypatc
     app = create_matrix_api(service)
     with TestClient(app) as client:
         accepted = client.post(
-            "/api/create",
-            json={"text": "为秋季上新写一条预热推文"},
+            "/v1/matrix/tasks",
+            json={
+                "text": "为秋季上新写一条预热推文",
+                "scenario": "compose",
+                "session_id": "s1",
+            },
         )
         assert accepted.status_code == 202
         payload = accepted.json()
@@ -87,9 +91,18 @@ def test_t12_queue_full_returns_503(tmp_path: Path) -> None:
     )
     app = create_matrix_api(service)
     with TestClient(app) as client:
-        first = client.post("/api/create", json={"text": "第一单"})
-        second = client.post("/api/create", json={"text": "第二单"})
-        third = client.post("/api/create", json={"text": "第三单"})
+        first = client.post(
+            "/v1/matrix/tasks",
+            json={"text": "第一单", "scenario": "compose", "session_id": "s1"},
+        )
+        second = client.post(
+            "/v1/matrix/tasks",
+            json={"text": "第二单", "scenario": "compose", "session_id": "s1"},
+        )
+        third = client.post(
+            "/v1/matrix/tasks",
+            json={"text": "第三单", "scenario": "compose", "session_id": "s1"},
+        )
         assert first.status_code == 202
         assert second.status_code == 202
         assert third.status_code == 503
@@ -150,7 +163,9 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_reply_without_comments_issues_text_as_comment() -> None:
-    created = MatrixTaskCreate(text="成分表在哪看？", scenario="reply")
+    created = MatrixTaskCreate(
+        text="成分表在哪看？", scenario="reply", session_id="s1"
+    )
     assert created.comments is not None
     assert len(created.comments) == 1
     assert created.comments[0].text == "成分表在哪看？"
@@ -159,13 +174,22 @@ def test_reply_without_comments_issues_text_as_comment() -> None:
 
 def test_reply_rejects_thread_key() -> None:
     with pytest.raises(ValidationError):
-        MatrixTaskCreate(text="处理 demo 线程", scenario="reply", thread_key="demo-1")
+        MatrixTaskCreate(
+            text="处理 demo 线程", scenario="reply", thread_key="demo-1", session_id="s1"
+        )
 
 
 def test_reply_without_thread_stays_on_demo(tmp_path: Path, monkeypatch) -> None:
     app = create_matrix_api(_matrix_service(monkeypatch))
     with TestClient(app) as client:
-        accepted = client.post("/api/reply", json={"text": "成分表在哪看？"})
+        accepted = client.post(
+            "/v1/matrix/tasks",
+            json={
+                "text": "成分表在哪看？",
+                "scenario": "reply",
+                "session_id": "s1",
+            },
+        )
         assert accepted.status_code == 202
         payload = accepted.json()
         snapshot: dict[str, object] = {}
@@ -187,8 +211,12 @@ def test_reply_without_thread_stays_on_demo(tmp_path: Path, monkeypatch) -> None
 def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
     app = create_matrix_api(_matrix_service(monkeypatch))
     with TestClient(app) as client:
-        too_low = client.post("/api/create", json={"text": "写帖", "post_count": 0})
-        too_high = client.post("/api/create", json={"text": "写帖", "post_count": 11})
+        too_low = client.post(
+            "/api/create", json={"text": "写帖", "post_count": 0, "session_id": "s1"}
+        )
+        too_high = client.post(
+            "/api/create", json={"text": "写帖", "post_count": 11, "session_id": "s1"}
+        )
         assert too_low.status_code == 422
         assert too_high.status_code == 422
 
@@ -196,8 +224,12 @@ def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> 
 def test_reply_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
     app = create_matrix_api(_matrix_service(monkeypatch))
     with TestClient(app) as client:
-        too_low = client.post("/api/reply", json={"text": "回评", "reply_count": 0})
-        too_high = client.post("/api/reply", json={"text": "回评", "reply_count": 11})
+        too_low = client.post(
+            "/api/reply", json={"text": "回评", "reply_count": 0, "session_id": "s1"}
+        )
+        too_high = client.post(
+            "/api/reply", json={"text": "回评", "reply_count": 11, "session_id": "s1"}
+        )
         assert too_low.status_code == 422
         assert too_high.status_code == 422
 
@@ -207,7 +239,7 @@ def test_compose_must_not_include_reply_count(tmp_path: Path, monkeypatch) -> No
     with TestClient(app) as client:
         rejected = client.post(
             "/v1/matrix/tasks",
-            json={"text": "写帖", "scenario": "compose", "reply_count": 2},
+            json={"text": "写帖", "scenario": "compose", "reply_count": 2, "session_id": "s1"},
         )
         assert rejected.status_code == 422
 
@@ -221,6 +253,7 @@ def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
                 "text": "回评",
                 "scenario": "reply",
                 "post_count": 2,
+                "session_id": "s1",
             },
         )
         assert rejected.status_code == 422

@@ -81,6 +81,7 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     try:
         result = await (
             Agently.create_agent(name="matrix-compose-brief")
+            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"text": request.text})
             .info({"snapshot": info})
             .instruct(
@@ -171,6 +172,7 @@ async def retrieve_and_compose_draft(data: TriggerFlowRuntimeData) -> dict[str, 
     ) -> ComposeDraftOut:
         result = await (
             Agently.create_agent(name="matrix-compose-draft")
+            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"work_item": work_item, "repair": repair or {}})
             .info({"context": info})
             .instruct(
@@ -231,6 +233,7 @@ async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     try:
         result = await (
             Agently.create_agent(name="matrix-compose-review")
+            .activate_session(session_id=str(data.require_resource("session_id")))
             .input(
                 {
                     "package": {

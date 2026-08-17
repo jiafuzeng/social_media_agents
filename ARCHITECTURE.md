@@ -103,7 +103,8 @@ matrix analysis → 不依赖 HTTP、企业微信、Gateway 或 question.analysi
 | ConstraintGate | AC、字数、引用、降级算子 | 硬策略失败不得进入 Review 的 accept 集合 |
 | Matrix Service Runtime | 把远端 SSE 翻译成 `GatewayEvent` | `package.ready` 只映射一次 `message.delta` |
 | ACP Agent Runtime | 每个 Gateway session 对应一个 ACP client | 不同 IM 会话不共享 ACP session |
-| User / token | 注册登录；持久化走 `IdentityRepository`（默认 SQLite）；`admin`/`user` 由 IdentityStore 强制 | 不是 Agently Session，也不是人设 `account_key` |
+| User / token | 注册登录；持久化走 `IdentityRepository`（SQLAlchemy + SQLite）；`admin`/`user` 由 IdentityStore 强制 | 不是 Agently Session，也不是人设 `account_key` |
+| Matrix conversation session | 登录用户 1:N 对话；`session_id` 即 Agently Session.id；仅矩阵工作台 | 不问数、不企业微信；不是 TriggerFlow 状态 |
 | WeCom Transport | 企业微信协议、流式快照和原生文件消息 | final 帧只发送一次，制品使用原生文件消息交付 |
 
 ## Planned Node Ledger
@@ -123,7 +124,7 @@ matrix analysis → 不依赖 HTTP、企业微信、Gateway 或 question.analysi
 | execute_question | TriggerFlow | stable workflow | `TaskRequest` | answer + evidence + charts |
 | adapt_question_sse | Question runtime | protocol translation | SSE events | `GatewayEvent` |
 | admit_matrix | HTTP API | deterministic | `MatrixTaskCreate` | 202 or 503 |
-| register_user | host identity + IdentityRepository | deterministic | username + password | user、token；默认写入 `identity.sqlite` |
+| register_user | host identity + IdentityRepository | deterministic | username + password | user、token；SQLAlchemy 写入 `identity.sqlite` |
 | execute_compose | COMPOSE_FLOW | stable workflow | compose request | 草稿包 + 评理 |
 | execute_reply | REPLY_FLOW | stable workflow | reply request | 评理 + 回复草稿 |
 | adapt_matrix_sse | Matrix runtime | protocol translation | SSE events | `GatewayEvent` |
@@ -163,6 +164,6 @@ matrix analysis → 不依赖 HTTP、企业微信、Gateway 或 question.analysi
 | Bounded queue | 问数与矩阵模型过载时不能无限占用内存 |
 | Stable SSE | Web 和 IM 可以独立消费同一任务事实 |
 | Per-session ACP clients | 外部 Agent 的上下文不能跨用户串话 |
-| IdentityRepository | 用户注册/token 通过数据库接口落盘；默认 SQLite，不把密码写入 Agently RecordStore；首个用户为 admin，其后公开注册为 user，管理接口按角色鉴权 |
+| IdentityRepository | `runtimes/matrix/db`：SQLAlchemy 异步 ORM 落盘；默认 SQLite，不把密码写入 Agently RecordStore；首个用户为 admin，其后公开注册为 user，管理接口按角色鉴权 |
 | Thin bootstrap | 入口变化不会迫使业务模块重新组织 |
 

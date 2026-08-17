@@ -65,6 +65,72 @@ const selectedArchiveKeys = new Set();
 let pendingReplySources = [];
 let lastReplyJob = { comments: [], sourceKeys: [] };
 
+function sessionHeaders() {
+  return {
+    "Content-Type": "application/json",
+    ...(window.matrixAuth?.headers() || {})
+  };
+}
+
+async function sessionRequest(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...sessionHeaders(),
+      ...(options.headers || {})
+    }
+  });
+  const payload = response.status === 204 ? {} : await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = payload?.detail;
+    throw new Error(typeof detail === "string" ? detail : "会话请求失败");
+  }
+  return payload;
+}
+
+function sessionToThread(session) {
+  const turns = (session.turns || []).map(turn => ({
+    text: turn.text,
+    taskUrl: turn.task_url || "",
+    at: new Date(turn.created_at),
+    replySourceKeys: turn.extra?.reply_source_keys || [],
+    replyComments: turn.extra?.reply_comments || []
+  }));
+  const extra = session.turns?.length ? session.turns.at(-1).extra || {} : {};
+  return {
+    id: session.session_id,
+    title: session.title,
+    scenario: session.last_scenario || extra.scenario || "compose",
+    accountKey: extra.account_key,
+    interactionKey: extra.interaction_key,
+    postCount: extra.post_count,
+    needTrends: extra.need_trends,
+    turns,
+    at: new Date(session.last_active_at || session.created_at)
+  };
+}
+
+async function loadSessions() {
+  if (!window.matrixAuth?.user()) {
+    threads.length = 0;
+    activeThreadId = null;
+    renderHistory();
+    return;
+  }
+  const payload = await sessionRequest("/api/sessions");
+  const current = activeThread();
+  threads.length = 0;
+  threads.push(...(payload.sessions || []).map(sessionToThread));
+  if (current) {
+    const index = threads.findIndex(item => item.id === current.id);
+    if (index >= 0 && current.turns.length) {
+      threads[index] = { ...threads[index], ...current, title: threads[index].title };
+    }
+    if (threads.some(item => item.id === current.id)) activeThreadId = current.id;
+  }
+  renderHistory();
+}
+
 function selectedAccount() {
   const key = document.querySelector("#accountKey").value || "default";
   return accountsByKey.get(key) || { account_key: key };
@@ -1592,7 +1658,7 @@ function renderHistory() {
   );
 }
 
-function ensureThread(text) {
+async function ensureThread(text) {
   const state = composerState();
   const current = activeThread();
   if (current && (current.scenario || "compose") === state.scenario) {
@@ -1605,13 +1671,17 @@ function ensureThread(text) {
     lastThreadByScenario[state.scenario] = current.id;
     return current;
   }
-  const thread = {
-    id: crypto.randomUUID(),
-    title: text.slice(0, 28) || "未命名任务",
-    ...state,
-    turns: [{ text, taskUrl: "", at: new Date() }],
-    at: new Date()
-  };
+  const created = await sessionRequest("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      title: text.slice(0, 28) || "新会话",
+      last_scenario: state.scenario
+    })
+  });
+  const thread = sessionToThread(created);
+  Object.assign(thread, state);
+  thread.turns = [{ text, taskUrl: "", at: new Date() }];
+  thread.at = new Date();
   threads.unshift(thread);
   activeThreadId = thread.id;
   lastThreadByScenario[state.scenario] = thread.id;
@@ -1624,8 +1694,19 @@ function attachTaskUrl(taskUrl) {
 }
 
 async function openThread(id) {
-  const thread = threads.find(item => item.id === id);
+  let thread = threads.find(item => item.id === id);
   if (!thread) return;
+  try {
+    const detail = await sessionRequest(`/api/sessions/${id}`);
+    thread = sessionToThread(detail);
+    const index = threads.findIndex(item => item.id === id);
+    if (index >= 0) threads[index] = { ...threads[index], ...thread };
+    else threads.unshift(thread);
+  } catch (error) {
+    errorPanel.textContent = error.message;
+    errorPanel.hidden = false;
+    return;
+  }
   activeThreadId = id;
   lastThreadByScenario[thread.scenario || "compose"] = id;
   setWorkspace("task");
@@ -1806,6 +1887,9 @@ if (interactionSelect) {
   });
 }
 
+document.querySelector("#sessionNewBtn")?.addEventListener("click", () => {
+  startFreshTask({ forgetLast: true });
+});
 document.querySelectorAll(".nav-item[data-workspace]").forEach(btn => {
   btn.addEventListener("click", () => {
     if (btn.id === "newTaskBtn") {
@@ -1991,7 +2075,7 @@ function watchMatrixTask(accepted, { onEvent } = {}) {
 async function postMatrixTask(url, body) {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: sessionHeaders(),
     body: JSON.stringify(body)
   });
   const accepted = await response.json().catch(() => ({}));
@@ -2046,6 +2130,7 @@ function payloadForSubmit(replyComments) {
       channel: "web"
     };
     if (comments.length === 1) body.reply_count = draftCount();
+    if (activeThreadId) body.session_id = activeThreadId;
     return { url: "/api/reply", body };
   }
   return {
@@ -2055,20 +2140,19 @@ function payloadForSubmit(replyComments) {
       need_trends: document.querySelector("#needTrends").checked,
       post_count: draftCount(),
       account_key: selectedAccount().account_key,
-      channel: "web"
+      channel: "web",
+      session_id: activeThreadId
     }
   };
 }
 
-function newReplyThread(title) {
-  const thread = {
-    id: crypto.randomUUID(),
-    title,
-    ...composerState(),
-    scenario: "reply",
-    turns: [],
-    at: new Date()
-  };
+async function newReplyThread(title) {
+  const created = await sessionRequest("/api/sessions", {
+    method: "POST",
+    body: JSON.stringify({ title, last_scenario: "reply" })
+  });
+  const thread = sessionToThread(created);
+  Object.assign(thread, composerState(), { scenario: "reply", turns: [], at: new Date() });
   threads.unshift(thread);
   activeThreadId = thread.id;
   lastThreadByScenario.reply = thread.id;
@@ -2105,7 +2189,7 @@ async function submitArchiveBatch() {
   button.disabled = true;
   persistPicks();
   syncArchiveReplyBar();
-  const thread = newReplyThread(`批量回评 · ${folder.name} · ${items.length} 条`);
+  const thread = await newReplyThread(`批量回评 · ${folder.name} · ${items.length} 条`);
   renderHistory();
   syncChatHeader();
   setWorkspace("task");
@@ -2149,7 +2233,8 @@ async function submitArchiveBatch() {
             comments: [{ text: slot.item.text.trim(), role: "root" }],
             interaction_key: interactionKey,
             reply_count: replyCount,
-            channel: "web"
+            channel: "web",
+            session_id: thread.id
           });
           slot.turn.taskUrl = accepted.task_url;
           const result = await watchMatrixTask(accepted);
@@ -2224,7 +2309,7 @@ async function runMatrixJob({ displayText, comments, replySourceKeys = [] }) {
   }
   button.disabled = true;
   syncArchiveReplyBar();
-  ensureThread(text);
+  await ensureThread(text);
   const lastTurn = activeThread()?.turns.at(-1);
   const commentTexts = (comments || [])
     .map(item => String(item.text || "").trim())
@@ -2297,3 +2382,7 @@ bindArchive();
 loadAccounts();
 loadInteractions();
 syncChatHeader();
+window.addEventListener("matrix-auth-changed", () => {
+  loadSessions().catch(() => {});
+});
+loadSessions().catch(() => {});

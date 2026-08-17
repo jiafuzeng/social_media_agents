@@ -225,6 +225,11 @@ html:has(.matrix-app),
   font-size: 14px;
   color: #111827;
 }
+.session-head .ghost {
+  margin: 0;
+  height: 32px;
+  padding: 0 10px;
+}
 .session-head small,
 .chat-head small,
 .assist-head small {

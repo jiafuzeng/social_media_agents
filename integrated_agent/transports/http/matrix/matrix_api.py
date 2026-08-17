@@ -9,7 +9,12 @@ from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.analysis.catalog import MatrixCatalog
 from integrated_agent.runtimes.matrix.service import MatrixTaskService
 
-from .routes import build_auth_router, build_catalog_router, build_task_router
+from .routes import (
+    build_auth_router,
+    build_catalog_router,
+    build_session_router,
+    build_task_router,
+)
 
 
 def build_matrix_router(
@@ -22,6 +27,7 @@ def build_matrix_router(
     catalog_root = data_root or (PROJECT_ROOT / "data" / "matrix")
     catalog = MatrixCatalog(catalog_root)
     router.include_router(build_auth_router(service.identity))
+    router.include_router(build_session_router(service.identity))
     router.include_router(build_task_router(service, catalog_root=catalog_root))
     router.include_router(build_catalog_router(catalog))
 
