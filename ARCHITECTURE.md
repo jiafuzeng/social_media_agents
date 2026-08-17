@@ -105,6 +105,7 @@ matrix analysis → 不依赖 HTTP、企业微信、Gateway 或 question.analysi
 | ACP Agent Runtime | 每个 Gateway session 对应一个 ACP client | 不同 IM 会话不共享 ACP session |
 | User / token | 注册登录；持久化走 `IdentityRepository`（SQLAlchemy + SQLite）；`admin`/`user` 由 IdentityStore 强制 | 不是 Agently Session，也不是人设 `account_key` |
 | Matrix conversation session | 登录用户 1:N 对话；`session_id` 即 Agently Session.id；仅矩阵工作台 | 不问数、不企业微信；不是 TriggerFlow 状态 |
+| Matrix collection | 登录用户 1:N 收藏夹；推文与回复落 `collection_items`（`parent_item_id` 自引用） | 不问数、不企业微信；不是 localStorage 真相源 |
 | WeCom Transport | 企业微信协议、流式快照和原生文件消息 | final 帧只发送一次，制品使用原生文件消息交付 |
 
 ## Planned Node Ledger

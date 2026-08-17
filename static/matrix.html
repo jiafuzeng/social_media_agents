@@ -5,8 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><text y=%2252%22 font-size=%2252%22>🧩</text></svg>">
   <title>MatrixCopilot 矩阵草稿</title>
+  <script>
+    try {
+      if (localStorage.getItem("matrix_user_token")) {
+        document.documentElement.classList.add("matrix-auth-pending");
+      }
+    } catch (_) {}
+  </script>
   <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/matrix.css">
+  <link rel="stylesheet" href="/static/matrix.css?v=desk-split-3">
 </head>
 <body class="matrix-app auth-locked" data-workspace="task" data-board="home">
   <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
@@ -52,6 +59,14 @@
         </div>
         <div id="taskHistory" class="history-list"></div>
       </aside>
+      <div
+        class="desk-split"
+        data-desk-split="session"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整会话栏宽度"
+        tabindex="0"
+      ></div>
 
       <section class="chat-pane">
         <header class="chat-head">
@@ -110,6 +125,14 @@
           </div>
         </form>
       </section>
+      <div
+        class="desk-split"
+        data-desk-split="assist"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整助手栏宽度"
+        tabindex="0"
+      ></div>
 
       <aside class="assist-pane">
         <header class="assist-head">
@@ -312,8 +335,8 @@
       </div>
     </div>
   </div>
-  <script src="/static/matrix-auth.js"></script>
-  <script src="/static/matrix.js"></script>
-  <script src="/static/matrix-catalog.js"></script>
+  <script src="/static/matrix-auth.js?v=desk-split-3"></script>
+  <script src="/static/matrix.js?v=desk-split-3"></script>
+  <script src="/static/matrix-catalog.js?v=desk-split-3"></script>
 </body>
 </html>

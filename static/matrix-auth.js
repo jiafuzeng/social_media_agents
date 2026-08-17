@@ -22,6 +22,11 @@ const AUTH_ERRORS = {
   "user not found": "用户不存在",
   "session not found": "会话不存在",
   "session access denied": "不能访问别人的会话",
+  "collection not found": "收藏夹不存在",
+  "collection access denied": "不能访问别人的收藏夹",
+  "collection item not found": "收藏条目不存在",
+  "folder name already exists": "已有同名文件夹",
+  "folder name must not be empty": "请填写文件夹名称",
   "status must be active or archived": "会话状态无效",
   "title must not be empty": "会话标题不能为空"
 };
@@ -107,6 +112,7 @@ function toggleUserMenu() {
 
 function showAuthedUser(user) {
   currentUser = user;
+  document.documentElement.classList.remove("matrix-auth-pending");
   document.body.classList.remove("auth-locked");
   const avatar = document.querySelector("#userMenuBtn");
   const name = document.querySelector("#userMenuName");
@@ -130,6 +136,7 @@ function showAuthGate() {
   creatingUser = false;
   closeUserMenu();
   closeUserDrawer();
+  document.documentElement.classList.remove("matrix-auth-pending");
   document.body.classList.add("auth-locked");
   const avatar = document.querySelector("#userMenuBtn");
   const name = document.querySelector("#userMenuName");
@@ -393,5 +400,6 @@ function bindAuth() {
 bindAuth();
 window.matrixAuth = {
   headers: authHeaders,
-  user: () => currentUser
+  user: () => currentUser,
+  errorText: message => AUTH_ERRORS[message] || message
 };

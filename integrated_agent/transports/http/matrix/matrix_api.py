@@ -12,6 +12,7 @@ from integrated_agent.runtimes.matrix.service import MatrixTaskService
 from .routes import (
     build_auth_router,
     build_catalog_router,
+    build_collection_router,
     build_session_router,
     build_task_router,
 )
@@ -28,6 +29,7 @@ def build_matrix_router(
     catalog = MatrixCatalog(catalog_root)
     router.include_router(build_auth_router(service.identity))
     router.include_router(build_session_router(service.identity))
+    router.include_router(build_collection_router(service.identity))
     router.include_router(build_task_router(service, catalog_root=catalog_root))
     router.include_router(build_catalog_router(catalog))
 

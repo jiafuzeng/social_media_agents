@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import ForeignKey, Index, String
+from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -51,6 +51,25 @@ class StoredTurn:
     created_at: str
 
 
+@dataclass(frozen=True)
+class StoredCollection:
+    collection_id: str
+    user_id: str
+    name: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class StoredCollectionItem:
+    item_id: str
+    collection_id: str
+    parent_item_id: str | None
+    text: str
+    extra_json: str | None
+    created_at: str
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -72,6 +91,11 @@ class UserRow(Base):
         passive_deletes=True,
     )
     sessions: Mapped[list[SessionRow]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    collections: Mapped[list[CollectionRow]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -131,3 +155,60 @@ class TurnRow(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False)
 
     session: Mapped[SessionRow] = relationship(back_populates="turns")
+
+
+class CollectionRow(Base):
+    __tablename__ = "collections"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_collections_user_name"),
+        Index("idx_collections_user", "user_id", "created_at"),
+    )
+
+    collection_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    user: Mapped[UserRow] = relationship(back_populates="collections")
+    items: Mapped[list[CollectionItemRow]] = relationship(
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class CollectionItemRow(Base):
+    __tablename__ = "collection_items"
+    __table_args__ = (
+        Index("idx_collection_items_folder", "collection_id", "parent_item_id", "created_at"),
+    )
+
+    item_id: Mapped[str] = mapped_column(String, primary_key=True)
+    collection_id: Mapped[str] = mapped_column(
+        ForeignKey("collections.collection_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    parent_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("collection_items.item_id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    text: Mapped[str] = mapped_column(String, nullable=False)
+    extra_json: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    collection: Mapped[CollectionRow] = relationship(back_populates="items")
+    parent: Mapped[CollectionItemRow | None] = relationship(
+        back_populates="replies",
+        remote_side="CollectionItemRow.item_id",
+        foreign_keys=[parent_item_id],
+    )
+    replies: Mapped[list[CollectionItemRow]] = relationship(
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys=[parent_item_id],
+    )

@@ -178,7 +178,7 @@ CODEX_AUTO_APPROVE=true
 
 ## 身份库与数据库操作
 
-矩阵登录用户、对话会话和用户轮次落在 SQLite：`workspace/identity/identity.sqlite`（不入库）。代码在 `integrated_agent/runtimes/matrix/db/`：
+矩阵登录用户、对话会话、用户轮次和收藏夹落在 SQLite：`workspace/identity/identity.sqlite`（不入库）。代码在 `integrated_agent/runtimes/matrix/db/`：
 
 ```text
 db/
@@ -188,12 +188,26 @@ db/
 └── migrations/        # Alembic 版本脚本
 ```
 
-`identity.py` 只做注册登录与会话业务；读写都走异步 `IdentityRepository`。表关系：`users` 1:N `sessions`，`sessions` 1:N `session_turns`（`session_id` 外键，删除级联）。
+`identity.py` 只做注册登录、会话与收藏夹业务；读写都走异步 `IdentityRepository`。表关系：`users` 1:N `sessions`，`sessions` 1:N `session_turns`；`users` 1:N `collections`，`collections` 1:N `collection_items`（`parent_item_id` 自引用，推文下挂回复，删除级联）。
+
+收藏夹 HTTP（需登录，Bearer / `X-User-Token`，只读写当前用户自己的数据）：
+
+```text
+GET    /api/collections
+POST   /api/collections                      { "name": "秋天系列" }
+GET    /api/collections/{id}
+DELETE /api/collections/{id}
+POST   /api/collections/{id}/items           { "items": [...], "bind_replies": false }
+DELETE /api/collections/{id}/items/{item_id}
+```
+
+`bind_replies=true` 时按 `parent_key` / `parent_text` 把条目挂到原推下；找不到原推且有 `parent_text` 则新建一条原推。下载仍在浏览器用已拉取的数据打包，不另开下载接口。
 
 所有命令在项目根目录执行。
 
 ```bash
-# 升级到最新（空库会建 users / tokens / sessions / session_turns）
+# 升级到最新（空库会建 users / tokens / sessions / session_turns / collections / collection_items）
+# 001、002 对已存在的表幂等，旧库可直接 upgrade
 alembic upgrade head
 
 # 改完 db/models.py 后生成新版本并升级
@@ -212,12 +226,6 @@ alembic history
 
 ```bash
 alembic -c integrated_agent/runtimes/matrix/db/alembic.ini upgrade head
-```
-
-库已经是运行时 `create_all` 建出来的（表都在、没有 `alembic_version`）时，先打戳再跟后续迁移，不要直接 `upgrade`：
-
-```bash
-alembic stamp head
 ```
 
 换库路径：

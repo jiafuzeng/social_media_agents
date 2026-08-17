@@ -83,7 +83,8 @@ async function sessionRequest(url, options = {}) {
   const payload = response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = payload?.detail;
-    throw new Error(typeof detail === "string" ? detail : "会话请求失败");
+    const message = typeof detail === "string" ? detail : "请求失败";
+    throw new Error(window.matrixAuth?.errorText?.(message) || message);
   }
   return payload;
 }
@@ -150,12 +151,109 @@ function timeAgo(date) {
 }
 
 const DOCK_KEY = "matrix.dockHidden";
+const SESSION_COL_KEY = "matrix.sessionCol";
+const ASSIST_COL_KEY = "matrix.assistCol";
 
 function setDockHidden(hidden) {
   document.body.classList.toggle("dock-hidden", hidden);
   const show = document.querySelector("#dockShowBtn");
   if (show) show.hidden = !hidden;
   localStorage.setItem(DOCK_KEY, hidden ? "1" : "0");
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function readDeskCol(desk, name, fallback) {
+  const raw = getComputedStyle(desk).getPropertyValue(name).trim();
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function bindDeskSplits() {
+  const desk = document.querySelector("#taskStage");
+  if (!desk) return;
+  const chatMin = 320;
+  const gutters = 10;
+
+  const applyCols = (session, assist) => {
+    const deskWidth = desk.getBoundingClientRect().width || window.innerWidth;
+    let nextSession = clamp(session, 180, 480);
+    let nextAssist = clamp(assist, 240, 640);
+    const budget = Math.max(chatMin + gutters + 180 + 240, deskWidth);
+    const maxSide = Math.max(420, budget - chatMin - gutters);
+    if (nextSession + nextAssist > maxSide) {
+      const scale = maxSide / (nextSession + nextAssist);
+      nextSession = clamp(Math.round(nextSession * scale), 180, 480);
+      nextAssist = clamp(maxSide - nextSession, 240, 640);
+    }
+    desk.style.setProperty("--session-col", `${nextSession}px`);
+    desk.style.setProperty("--assist-col", `${nextAssist}px`);
+    return { session: nextSession, assist: nextAssist };
+  };
+
+  const sessionSaved = Number(localStorage.getItem(SESSION_COL_KEY));
+  const assistSaved = Number(localStorage.getItem(ASSIST_COL_KEY));
+  applyCols(
+    Number.isFinite(sessionSaved) && sessionSaved > 0 ? sessionSaved : 260,
+    Number.isFinite(assistSaved) && assistSaved > 0 ? assistSaved : 340
+  );
+
+  desk.querySelectorAll("[data-desk-split]").forEach(handle => {
+    handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const kind = handle.dataset.deskSplit;
+      const startX = event.clientX;
+      const startSession = readDeskCol(desk, "--session-col", 260);
+      const startAssist = readDeskCol(desk, "--assist-col", 340);
+      desk.classList.add("is-resizing");
+      handle.dataset.active = "1";
+      handle.setPointerCapture(event.pointerId);
+
+      const onMove = moveEvent => {
+        const dx = moveEvent.clientX - startX;
+        const deskWidth = desk.getBoundingClientRect().width;
+        if (kind === "session") {
+          const assist = readDeskCol(desk, "--assist-col", startAssist);
+          const maxSession = Math.max(180, deskWidth - assist - gutters - chatMin);
+          applyCols(clamp(startSession + dx, 180, Math.min(480, maxSession)), assist);
+        } else {
+          const session = readDeskCol(desk, "--session-col", startSession);
+          const maxAssist = Math.max(240, deskWidth - session - gutters - chatMin);
+          applyCols(session, clamp(startAssist - dx, 240, Math.min(640, maxAssist)));
+        }
+      };
+
+      const onUp = () => {
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+        desk.classList.remove("is-resizing");
+        delete handle.dataset.active;
+        localStorage.setItem(
+          SESSION_COL_KEY,
+          String(Math.round(readDeskCol(desk, "--session-col", startSession)))
+        );
+        localStorage.setItem(
+          ASSIST_COL_KEY,
+          String(Math.round(readDeskCol(desk, "--assist-col", startAssist)))
+        );
+      };
+
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    applyCols(
+      readDeskCol(desk, "--session-col", 260),
+      readDeskCol(desk, "--assist-col", 340)
+    );
+  });
 }
 
 function syncNav() {
@@ -249,6 +347,7 @@ function applyScenarioChrome(next) {
 }
 
 function startFreshTask({ forgetLast = false } = {}) {
+  bumpViewEpoch();
   persistPicks();
   if (forgetLast) lastThreadByScenario[scenario] = null;
   activeThreadId = null;
@@ -413,6 +512,17 @@ function failedAgentTurn(message) {
   fail.textContent = message;
   article.append(fail);
   return article;
+}
+
+let viewEpoch = 0;
+
+function bumpViewEpoch() {
+  viewEpoch += 1;
+  return viewEpoch;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function draftKey(draft, index) {
@@ -581,29 +691,71 @@ function normalizeArchiveItem(item) {
   };
 }
 
-function loadArchive() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || "[]");
-    archiveFolders = Array.isArray(raw) ? raw : [];
-  } catch {
-    archiveFolders = [];
-  }
-  archiveFolders = archiveFolders
-    .filter(folder => folder && folder.id && folder.name)
-    .map(folder => ({
-      id: String(folder.id),
-      name: String(folder.name),
-      items: (Array.isArray(folder.items) ? folder.items : [])
-        .map(normalizeArchiveItem)
-        .filter(Boolean)
-    }));
-  if (activeFolderId && !archiveFolders.some(folder => folder.id === activeFolderId)) {
-    activeFolderId = null;
+function folderFromApi(collection) {
+  return {
+    id: collection.collection_id,
+    name: collection.name,
+    items: (Array.isArray(collection.items) ? collection.items : [])
+      .map(normalizeArchiveItem)
+      .filter(Boolean)
+  };
+}
+
+function replaceArchiveFolders(collections, preferId) {
+  const current = preferId || activeFolderId;
+  archiveFolders = (collections || []).map(folderFromApi);
+  if (current && archiveFolders.some(folder => folder.id === current)) {
+    activeFolderId = current;
+  } else if (activeFolderId && archiveFolders.some(folder => folder.id === activeFolderId)) {
+    /* keep */
+  } else {
+    activeFolderId = archiveFolders[0]?.id || null;
   }
 }
 
-function persistArchive() {
-  localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archiveFolders));
+async function loadArchive() {
+  if (!window.matrixAuth?.user()) {
+    archiveFolders = [];
+    activeFolderId = null;
+    renderArchiveFolders();
+    return;
+  }
+  const payload = await sessionRequest("/api/collections");
+  if (!(payload.collections || []).length) {
+    await migrateLocalArchive();
+    const migrated = await sessionRequest("/api/collections");
+    replaceArchiveFolders(migrated.collections);
+  } else {
+    replaceArchiveFolders(payload.collections);
+  }
+  renderArchiveFolders();
+}
+
+async function migrateLocalArchive() {
+  let local = [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || "[]");
+    local = Array.isArray(raw) ? raw : [];
+  } catch {
+    return;
+  }
+  if (!local.length) return;
+  for (const folder of local) {
+    if (!folder || !folder.name) continue;
+    const created = await sessionRequest("/api/collections", {
+      method: "POST",
+      body: JSON.stringify({ name: String(folder.name) })
+    });
+    const items = (Array.isArray(folder.items) ? folder.items : [])
+      .map(normalizeArchiveItem)
+      .filter(Boolean);
+    if (!items.length) continue;
+    await sessionRequest(`/api/collections/${created.collection_id}/items`, {
+      method: "POST",
+      body: JSON.stringify({ items, bind_replies: false })
+    });
+  }
+  localStorage.removeItem(ARCHIVE_KEY);
 }
 
 function setArchiveStatus(text) {
@@ -772,13 +924,13 @@ function renderBoundReplies(item) {
     remove.textContent = "×";
     remove.addEventListener("click", event => {
       event.stopPropagation();
-      item.replies = (item.replies || []).filter(entry => entry.key !== reply.key);
-      if (archivePeek && archivePeek.key === reply.key) {
+      const folder = activeFolder();
+      const replyKey = reply.key;
+      if (archivePeek && archivePeek.key === replyKey) {
         archivePeek = null;
         renderAssistPicks();
       }
-      persistArchive();
-      renderArchiveFolders();
+      removeArchiveEntry(folder, replyKey).catch(error => setArchiveStatus(error.message));
     });
     row.append(button, remove);
     list.append(row);
@@ -814,7 +966,7 @@ function renderArchiveFolders() {
         remove.textContent = "删除";
         remove.addEventListener("click", event => {
           event.stopPropagation();
-          deleteArchiveFolder(folder);
+          deleteArchiveFolder(folder).catch(error => setArchiveStatus(error.message));
         });
         row.append(button, download, remove);
         return row;
@@ -891,7 +1043,6 @@ function renderArchiveFolders() {
         remove.textContent = "×";
         remove.addEventListener("click", event => {
           event.stopPropagation();
-          folder.items = folder.items.filter(entry => entry.key !== item.key);
           selectedArchiveKeys.delete(item.key);
           if (
             archivePeek &&
@@ -901,9 +1052,7 @@ function renderArchiveFolders() {
             archivePeek = null;
             renderAssistPicks();
           }
-          persistArchive();
-          renderArchiveFolders();
-          syncArchiveTargets();
+          removeArchiveEntry(folder, item.key).catch(error => setArchiveStatus(error.message));
         });
         row.append(button, remove);
         const replies = renderBoundReplies(item);
@@ -924,22 +1073,28 @@ function openArchiveFolder(id) {
   setArchiveStatus("");
 }
 
-function createArchiveFolder(name) {
+async function createArchiveFolder(name) {
   const label = name.trim();
   if (!label) {
     setArchiveStatus("请填写文件夹名称。");
     return;
   }
-  if (archiveFolders.some(folder => folder.name === label)) {
-    setArchiveStatus("已有同名文件夹。");
+  if (!window.matrixAuth?.user()) {
+    setArchiveStatus("请先登录后再创建收藏夹。");
     return;
   }
-  const folder = { id: crypto.randomUUID(), name: label, items: [] };
-  archiveFolders.push(folder);
-  activeFolderId = folder.id;
-  persistArchive();
-  renderArchiveFolders();
-  setArchiveStatus(`已创建「${label}」。`);
+  try {
+    const created = await sessionRequest("/api/collections", {
+      method: "POST",
+      body: JSON.stringify({ name: label })
+    });
+    await loadArchive();
+    activeFolderId = created.collection_id;
+    renderArchiveFolders();
+    setArchiveStatus(`已创建「${label}」。`);
+  } catch (error) {
+    setArchiveStatus(error.message);
+  }
 }
 
 function sourceKeysForResult(result) {
@@ -991,70 +1146,12 @@ function parentSpecForSnapshot(result, snapshot) {
   };
 }
 
-function makeArchiveParent(text, folder) {
-  return {
-    key: `comment-${crypto.randomUUID()}`,
-    index: folder.items.length,
-    text,
-    platform_key: "x-twitter",
-    rationale: "",
-    decision: "",
-    status: "",
-    issues: [],
-    evidence: [],
-    persona: personaLabel(),
-    scenario: "reply",
-    thread_title: activeThread()?.title || "",
-    task_type: "reply_comment",
-    snapshot_id: assistResult?.snapshot_id || "",
-    replies: []
-  };
-}
-
-function ensureArchiveParent(folder, spec) {
-  if (spec.key) {
-    const located = locateArchiveItem(spec.key);
-    if (located) return { ...located, created: false };
-  }
-  const needle = (spec.text || "").trim();
-  if (needle) {
-    const existing = findArchiveItemByText(needle);
-    if (existing) {
-      const located = locateArchiveItem(existing.key);
-      if (located) return { ...located, created: false };
-    }
-  }
-  if (!folder || !needle) return null;
-  const parent = makeArchiveParent(needle, folder);
-  folder.items.push(parent);
-  return { folder, item: parent, created: true };
-}
-
-function attachReplyToParent(parent, snapshot) {
-  parent.replies = parent.replies || [];
-  if (parent.replies.some(entry => entry.key === snapshot.key)) return false;
-  parent.replies.unshift({ ...snapshot, boundTo: parent.key });
-  return true;
-}
-
-function addTopLevelSnapshots(folder, snapshots) {
-  const seen = new Set(folder.items.map(item => item.key));
-  const fresh = [];
-  for (const snapshot of snapshots) {
-    if (seen.has(snapshot.key)) continue;
-    fresh.push({ ...snapshot, replies: snapshot.replies || [] });
-    seen.add(snapshot.key);
-  }
-  if (fresh.length) folder.items.unshift(...fresh);
-  return fresh.length;
-}
-
 function revealArchiveTop() {
   const items = document.querySelector("#archiveFolderItems");
   if (items) items.scrollTop = 0;
 }
 
-function archiveSelectedTo(folderId) {
+async function archiveSelectedTo(folderId) {
   const snapshots = snapshotSelectedDrafts();
   if (!snapshots.length) {
     setArchiveStatus("请先勾选要收藏的推文。");
@@ -1066,56 +1163,64 @@ function archiveSelectedTo(folderId) {
     assistResult?.task_type === "reply_comment" ||
     comments.length > 0 ||
     sourceKeysForResult(assistResult).length > 0;
-  if (!isReplySave) {
-    if (!folder) {
-      setAssistTab("archive");
-      setArchiveStatus("请先在收藏夹里新建一个文件夹。");
-      return;
-    }
-    const added = addTopLevelSnapshots(folder, snapshots);
-    activeFolderId = folder.id;
-    persistArchive();
-    renderArchiveFolders();
+  if (!folder) {
+    setAssistTab("archive");
+    setArchiveStatus("请先在收藏夹里新建一个文件夹。");
+    return;
+  }
+  if (!window.matrixAuth?.user()) {
+    setArchiveStatus("请先登录后再收藏。");
+    return;
+  }
+  try {
+    const result = await sessionRequest(`/api/collections/${folder.id}/items`, {
+      method: "POST",
+      body: JSON.stringify({
+        bind_replies: isReplySave,
+        items: snapshots.map(snapshot => {
+          if (!isReplySave) return snapshot;
+          const spec = parentSpecForSnapshot(assistResult, snapshot);
+          return {
+            ...snapshot,
+            parent_key: spec.key || null,
+            parent_text: spec.text || ""
+          };
+        })
+      })
+    });
+    await loadArchive();
+    activeFolderId = result.collection?.collection_id || folder.id;
     revealArchiveTop();
     setAssistTab("archive");
-    setArchiveStatus(added ? `已存入「${folder.name}」${added} 条。` : "这些推文已在该收藏夹里。");
-    return;
-  }
-  let bound = 0;
-  let created = 0;
-  let boundFolder = null;
-  for (const snapshot of snapshots) {
-    const located = ensureArchiveParent(folder, parentSpecForSnapshot(assistResult, snapshot));
-    if (!located) continue;
-    if (located.created) created += 1;
-    if (attachReplyToParent(located.item, snapshot)) bound += 1;
-    boundFolder = located.folder;
-  }
-  if (!bound && !created) {
+    const added = result.added || 0;
+    const bound = result.bound || 0;
+    const created = result.created_parents || 0;
+    if (!isReplySave) {
+      setArchiveStatus(added ? `已存入「${folder.name}」${added} 条。` : "这些推文已在该收藏夹里。");
+      return;
+    }
+    if (!bound && !created) {
+      if (!comments.length) setArchiveStatus("没有记下原评，无法新建原推。请再发一次回评后再存。");
+      else setArchiveStatus("这些回复已绑在原推下。");
+      return;
+    }
+    if (created && bound) {
+      setArchiveStatus(
+        created === 1
+          ? `原推不在收藏夹，已新建并绑上 ${bound} 条回复。`
+          : `已新建 ${created} 条原推，并绑上 ${bound} 条回复。`
+      );
+      return;
+    }
+    if (bound) {
+      setArchiveStatus(`已将 ${bound} 条回复绑到原推。`);
+      return;
+    }
+    setArchiveStatus(`已新建 ${created} 条原推。`);
+  } catch (error) {
     setAssistTab("archive");
-    if (!folder) setArchiveStatus("请先在收藏夹里新建一个文件夹。");
-    else if (!comments.length) setArchiveStatus("没有记下原评，无法新建原推。请再发一次回评后再存。");
-    else setArchiveStatus("这些回复已绑在原推下。");
-    return;
+    setArchiveStatus(error.message);
   }
-  activeFolderId = boundFolder?.id || folder?.id || activeFolderId;
-  persistArchive();
-  renderArchiveFolders();
-  revealArchiveTop();
-  setAssistTab("archive");
-  if (created && bound) {
-    setArchiveStatus(
-      created === 1
-        ? `原推不在收藏夹，已新建并绑上 ${bound} 条回复。`
-        : `已新建 ${created} 条原推，并绑上 ${bound} 条回复。`
-    );
-    return;
-  }
-  if (bound) {
-    setArchiveStatus(`已将 ${bound} 条回复绑到原推。`);
-    return;
-  }
-  setArchiveStatus(`已新建 ${created} 条原推。`);
 }
 
 function snapshotSelectedDrafts() {
@@ -1383,21 +1488,33 @@ async function downloadArchive(folder = activeFolder()) {
   setArchiveStatus("已开始下载 zip。");
 }
 
-function deleteArchiveFolder(folder) {
+async function deleteArchiveFolder(folder) {
   if (!folder) return;
-  archiveFolders = archiveFolders.filter(item => item.id !== folder.id);
-  if (activeFolderId === folder.id) {
-    activeFolderId = archiveFolders[0]?.id || null;
-    archivePeek = null;
+  try {
+    await sessionRequest(`/api/collections/${folder.id}`, { method: "DELETE" });
+    if (activeFolderId === folder.id) {
+      archivePeek = null;
+    }
+    await loadArchive();
+    renderAssistPicks();
+    setArchiveStatus(`已删除「${folder.name}」。`);
+  } catch (error) {
+    setArchiveStatus(error.message);
   }
-  persistArchive();
-  renderArchiveFolders();
-  renderAssistPicks();
-  setArchiveStatus(`已删除「${folder.name}」。`);
+}
+
+async function removeArchiveEntry(folder, itemId) {
+  if (!folder || !itemId) return;
+  await sessionRequest(
+    `/api/collections/${folder.id}/items/${encodeURIComponent(itemId)}`,
+    { method: "DELETE" }
+  );
+  await loadArchive();
+  syncArchiveTargets();
 }
 
 function bindArchive() {
-  loadArchive();
+  loadArchive().catch(() => {});
   renderArchiveFolders();
   document.querySelectorAll("[data-assist-tab]").forEach(tab => {
     tab.addEventListener("click", () => setAssistTab(tab.dataset.assistTab));
@@ -1405,7 +1522,7 @@ function bindArchive() {
   document.querySelector("#archiveCreate")?.addEventListener("submit", event => {
     event.preventDefault();
     const input = document.querySelector("#archiveName");
-    createArchiveFolder(input?.value || "");
+    createArchiveFolder(input?.value || "").catch(error => setArchiveStatus(error.message));
     if (input) input.value = "";
   });
   document.querySelector("#archiveSelectAll")?.addEventListener("click", () => {
@@ -1562,7 +1679,9 @@ function compactAgentBubble(result) {
     if (!result.replyComments?.length) {
       result.replyComments = originalCommentsForResult(result);
     }
-    archiveSelectedTo(target.value || activeFolderId || "");
+    archiveSelectedTo(target.value || activeFolderId || "").catch(error => {
+      setArchiveStatus(error.message);
+    });
   });
   archiveBar.append(target, archiveBtn);
   bubble.append(kicker, summary, list, actions, archiveBar);
@@ -1635,9 +1754,11 @@ function renderHistory() {
   if (!host) return;
   host.replaceChildren(
     ...items.slice(0, 20).map(item => {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = `history-item${item.id === activeThreadId ? " active" : ""}`;
+      const row = document.createElement("div");
+      row.className = "history-row";
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = `history-item${item.id === activeThreadId ? " active" : ""}`;
       const avatar = document.createElement("span");
       avatar.className = "session-avatar";
       avatar.textContent = (item.title || "任").slice(0, 1);
@@ -1648,14 +1769,43 @@ function renderHistory() {
       const last = item.turns.at(-1);
       meta.textContent = `${item.scenario === "reply" ? "回评" : "写帖"} · ${timeAgo(last?.at || item.at)}`;
       body.append(title, meta);
-      row.append(avatar, body);
-      row.addEventListener("click", () => {
-        if (button.disabled) return;
+      open.append(avatar, body);
+      open.addEventListener("click", () => {
         openThread(item.id);
       });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "history-remove";
+      remove.textContent = "删除";
+      remove.setAttribute("aria-label", `删除会话 ${item.title || ""}`);
+      remove.addEventListener("click", event => {
+        event.stopPropagation();
+        deleteThread(item).catch(error => {
+          errorPanel.textContent = error.message || "删除失败";
+          errorPanel.hidden = false;
+        });
+      });
+      row.append(open, remove);
       return row;
     })
   );
+}
+
+async function deleteThread(thread) {
+  if (!thread?.id) return;
+  await sessionRequest(`/api/sessions/${encodeURIComponent(thread.id)}`, {
+    method: "DELETE"
+  });
+  const index = threads.findIndex(item => item.id === thread.id);
+  if (index >= 0) threads.splice(index, 1);
+  for (const key of Object.keys(lastThreadByScenario)) {
+    if (lastThreadByScenario[key] === thread.id) lastThreadByScenario[key] = null;
+  }
+  if (activeThreadId === thread.id) {
+    startFreshTask({ forgetLast: true });
+    return;
+  }
+  renderHistory();
 }
 
 async function ensureThread(text) {
@@ -1696,13 +1846,16 @@ function attachTaskUrl(taskUrl) {
 async function openThread(id) {
   let thread = threads.find(item => item.id === id);
   if (!thread) return;
+  const epoch = bumpViewEpoch();
   try {
     const detail = await sessionRequest(`/api/sessions/${id}`);
+    if (epoch !== viewEpoch) return;
     thread = sessionToThread(detail);
     const index = threads.findIndex(item => item.id === id);
     if (index >= 0) threads[index] = { ...threads[index], ...thread };
     else threads.unshift(thread);
   } catch (error) {
+    if (epoch !== viewEpoch) return;
     errorPanel.textContent = error.message;
     errorPanel.hidden = false;
     return;
@@ -1718,6 +1871,7 @@ async function openThread(id) {
   threadTurns.replaceChildren();
   let lastResult = null;
   for (const turn of thread.turns) {
+    if (epoch !== viewEpoch) return;
     const isReplyTurn = Boolean(turn.replySourceKeys?.length || turn.replyComments?.length);
     const user = userBubble(turn.text, isReplyTurn ? "原推" : "");
     if (turn.error && !turn.taskUrl) {
@@ -1728,18 +1882,27 @@ async function openThread(id) {
       threadTurns.append(user);
       continue;
     }
+    const pending = pendingAgentTurn("正在加载该轮结果…");
+    threadTurns.append(chatPair(user, pending));
     try {
-      const result = await fetchTaskResult(turn.taskUrl);
+      const result = await fetchTaskResult(turn.taskUrl, {
+        wait: true,
+        isCurrent: () => epoch === viewEpoch
+      });
+      if (epoch !== viewEpoch) return;
       result.replySourceKeys = turn.replySourceKeys || [];
       result.replyComments = turn.replyComments || [];
       lastResult = result;
-      threadTurns.append(chatPair(user, compactAgentBubble(result)));
+      pending.replaceWith(compactAgentBubble(result));
     } catch (error) {
-      threadTurns.append(
-        chatPair(user, failedAgentTurn(error.message || "无法加载该轮结果，服务重启后历史任务会清空。"))
+      if (epoch !== viewEpoch) return;
+      if (error.message === "已切换会话") return;
+      pending.replaceWith(
+        failedAgentTurn(error.message || "无法加载该轮结果，服务重启后历史任务会清空。")
       );
     }
   }
+  if (epoch !== viewEpoch) return;
   if (lastResult) {
     restorePicks(thread, lastResult);
     fillAssistPanel(lastResult, 1);
@@ -2029,12 +2192,21 @@ function listItems(values, emptyText) {
   });
 }
 
-async function fetchTaskResult(taskUrl) {
-  const response = await fetch(taskUrl);
-  const snapshot = await response.json();
-  if (snapshot.status === "failed") throw new Error(snapshot.error || "任务失败");
-  if (!snapshot.result) throw new Error("任务没有返回草稿");
-  return hydrateResult(snapshot.result, snapshot);
+async function fetchTaskResult(taskUrl, { wait = false, isCurrent = () => true } = {}) {
+  const deadline = Date.now() + 180000;
+  while (isCurrent()) {
+    const response = await fetch(taskUrl);
+    const snapshot = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(errorMessage(snapshot, "无法加载任务"));
+    if (snapshot.status === "failed") throw new Error(snapshot.error || "任务失败");
+    if (snapshot.result) return hydrateResult(snapshot.result, snapshot);
+    const pending =
+      snapshot.status === "accepted" || snapshot.status === "running";
+    if (!wait || !pending) throw new Error("任务没有返回草稿");
+    if (Date.now() > deadline) throw new Error("等待任务超时");
+    await sleep(700);
+  }
+  throw new Error("已切换会话");
 }
 
 function watchMatrixTask(accepted, { onEvent } = {}) {
@@ -2307,9 +2479,15 @@ async function runMatrixJob({ displayText, comments, replySourceKeys = [] }) {
     errorPanel.hidden = false;
     return;
   }
+  const epoch = viewEpoch;
   button.disabled = true;
   syncArchiveReplyBar();
   await ensureThread(text);
+  if (epoch !== viewEpoch) {
+    button.disabled = false;
+    syncArchiveReplyBar();
+    return;
+  }
   const lastTurn = activeThread()?.turns.at(-1);
   const commentTexts = (comments || [])
     .map(item => String(item.text || "").trim())
@@ -2339,21 +2517,32 @@ async function runMatrixJob({ displayText, comments, replySourceKeys = [] }) {
   try {
     await loadAccounts();
     await loadInteractions();
+    if (epoch !== viewEpoch) return;
     const { url, body } = payloadForSubmit(comments);
     const accepted = await postMatrixTask(url, body);
+    if (epoch !== viewEpoch) return;
     attachTaskUrl(accepted.task_url);
-    await watchMatrixTask(accepted, { onEvent: addEvent });
+    await watchMatrixTask(accepted, {
+      onEvent: (type, payload) => {
+        if (epoch !== viewEpoch) return;
+        addEvent(type, payload);
+      }
+    });
+    if (epoch !== viewEpoch) return;
     await renderResult(accepted.task_url);
     const box = document.querySelector(scenario === "reply" ? "#replyText" : "#composeText");
     if (box) box.value = "";
   } catch (error) {
+    if (epoch !== viewEpoch) return;
     errorPanel.textContent = error.message;
     errorPanel.hidden = false;
     if (liveTurn) liveTurn.hidden = true;
     setBoard(threadTurns.children.length ? "done" : "home");
   } finally {
-    button.disabled = false;
-    syncArchiveReplyBar();
+    if (epoch === viewEpoch) {
+      button.disabled = false;
+      syncArchiveReplyBar();
+    }
   }
 }
 
@@ -2377,6 +2566,7 @@ bindComposerKeys(document.querySelector("#replyText"));
 document.querySelector("#dockHideBtn")?.addEventListener("click", () => setDockHidden(true));
 document.querySelector("#dockShowBtn")?.addEventListener("click", () => setDockHidden(false));
 setDockHidden(localStorage.getItem(DOCK_KEY) === "1");
+bindDeskSplits();
 
 bindArchive();
 loadAccounts();
@@ -2384,5 +2574,6 @@ loadInteractions();
 syncChatHeader();
 window.addEventListener("matrix-auth-changed", () => {
   loadSessions().catch(() => {});
+  loadArchive().catch(() => {});
 });
 loadSessions().catch(() => {});

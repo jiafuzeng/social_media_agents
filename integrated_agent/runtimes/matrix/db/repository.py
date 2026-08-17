@@ -11,8 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from .models import (
     ROLE_ADMIN,
     Base,
+    CollectionItemRow,
+    CollectionRow,
     IdentityDbError,
     SessionRow,
+    StoredCollection,
+    StoredCollectionItem,
     StoredSession,
     StoredTurn,
     StoredUser,
@@ -79,6 +83,38 @@ class IdentityRepository(Protocol):
 
     async def list_turns(self, session_id: str) -> list[StoredTurn]: ...
 
+    async def insert_collection(self, collection: StoredCollection) -> None: ...
+
+    async def get_collection(self, collection_id: str) -> StoredCollection | None: ...
+
+    async def list_collections(self, user_id: str) -> list[StoredCollection]: ...
+
+    async def update_collection(
+        self,
+        collection_id: str,
+        *,
+        name: str | None = None,
+        updated_at: str,
+    ) -> None: ...
+
+    async def delete_collection(self, collection_id: str) -> None: ...
+
+    async def insert_collection_item(self, item: StoredCollectionItem) -> None: ...
+
+    async def get_collection_item(self, item_id: str) -> StoredCollectionItem | None: ...
+
+    async def list_collection_items(self, collection_id: str) -> list[StoredCollectionItem]: ...
+
+    async def list_collection_items_for_user(
+        self, user_id: str
+    ) -> list[StoredCollectionItem]: ...
+
+    async def find_root_item_by_text(
+        self, user_id: str, text: str
+    ) -> StoredCollectionItem | None: ...
+
+    async def delete_collection_item(self, item_id: str) -> None: ...
+
 
 def _stored_user(row: UserRow) -> StoredUser:
     return StoredUser(
@@ -112,6 +148,27 @@ def _stored_turn(row: TurnRow) -> StoredTurn:
         role=row.role,
         text=row.text,
         task_id=row.task_id,
+        extra_json=row.extra_json,
+        created_at=row.created_at,
+    )
+
+
+def _stored_collection(row: CollectionRow) -> StoredCollection:
+    return StoredCollection(
+        collection_id=row.collection_id,
+        user_id=row.user_id,
+        name=row.name,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _stored_collection_item(row: CollectionItemRow) -> StoredCollectionItem:
+    return StoredCollectionItem(
+        item_id=row.item_id,
+        collection_id=row.collection_id,
+        parent_item_id=row.parent_item_id,
+        text=row.text,
         extra_json=row.extra_json,
         created_at=row.created_at,
     )
@@ -393,6 +450,150 @@ class SqlAlchemyIdentityRepository:
                 )
             ).all()
             return [_stored_turn(row) for row in rows]
+
+    async def insert_collection(self, collection: StoredCollection) -> None:
+        await self._ensure()
+        async with self._Session() as db:
+            db.add(
+                CollectionRow(
+                    collection_id=collection.collection_id,
+                    user_id=collection.user_id,
+                    name=collection.name,
+                    created_at=collection.created_at,
+                    updated_at=collection.updated_at,
+                )
+            )
+            try:
+                await db.commit()
+            except IntegrityError as error:
+                await db.rollback()
+                raise IdentityDbError(409, "folder name already exists") from error
+
+    async def get_collection(self, collection_id: str) -> StoredCollection | None:
+        await self._ensure()
+        async with self._Session() as db:
+            row = await db.get(CollectionRow, collection_id)
+            return None if row is None else _stored_collection(row)
+
+    async def list_collections(self, user_id: str) -> list[StoredCollection]:
+        await self._ensure()
+        async with self._Session() as db:
+            rows = (
+                await db.scalars(
+                    select(CollectionRow)
+                    .where(CollectionRow.user_id == user_id)
+                    .order_by(CollectionRow.created_at.asc())
+                )
+            ).all()
+            return [_stored_collection(row) for row in rows]
+
+    async def update_collection(
+        self,
+        collection_id: str,
+        *,
+        name: str | None = None,
+        updated_at: str,
+    ) -> None:
+        await self._ensure()
+        async with self._Session() as db:
+            row = await db.get(CollectionRow, collection_id)
+            if row is None:
+                raise IdentityDbError(404, "collection not found")
+            if name is not None:
+                row.name = name
+            row.updated_at = updated_at
+            try:
+                await db.commit()
+            except IntegrityError as error:
+                await db.rollback()
+                raise IdentityDbError(409, "folder name already exists") from error
+
+    async def delete_collection(self, collection_id: str) -> None:
+        await self._ensure()
+        async with self._Session() as db:
+            row = await db.get(CollectionRow, collection_id)
+            if row is None:
+                raise IdentityDbError(404, "collection not found")
+            await db.delete(row)
+            await db.commit()
+
+    async def insert_collection_item(self, item: StoredCollectionItem) -> None:
+        await self._ensure()
+        async with self._Session() as db:
+            db.add(
+                CollectionItemRow(
+                    item_id=item.item_id,
+                    collection_id=item.collection_id,
+                    parent_item_id=item.parent_item_id,
+                    text=item.text,
+                    extra_json=item.extra_json,
+                    created_at=item.created_at,
+                )
+            )
+            try:
+                await db.commit()
+            except IntegrityError as error:
+                await db.rollback()
+                raise IdentityDbError(409, "collection item already exists") from error
+
+    async def get_collection_item(self, item_id: str) -> StoredCollectionItem | None:
+        await self._ensure()
+        async with self._Session() as db:
+            row = await db.get(CollectionItemRow, item_id)
+            return None if row is None else _stored_collection_item(row)
+
+    async def list_collection_items(self, collection_id: str) -> list[StoredCollectionItem]:
+        await self._ensure()
+        async with self._Session() as db:
+            rows = (
+                await db.scalars(
+                    select(CollectionItemRow)
+                    .where(CollectionItemRow.collection_id == collection_id)
+                    .order_by(CollectionItemRow.created_at.desc())
+                )
+            ).all()
+            return [_stored_collection_item(row) for row in rows]
+
+    async def list_collection_items_for_user(
+        self, user_id: str
+    ) -> list[StoredCollectionItem]:
+        await self._ensure()
+        async with self._Session() as db:
+            rows = (
+                await db.scalars(
+                    select(CollectionItemRow)
+                    .join(CollectionRow)
+                    .where(CollectionRow.user_id == user_id)
+                    .order_by(CollectionItemRow.created_at.desc())
+                )
+            ).all()
+            return [_stored_collection_item(row) for row in rows]
+
+    async def find_root_item_by_text(
+        self, user_id: str, text: str
+    ) -> StoredCollectionItem | None:
+        await self._ensure()
+        async with self._Session() as db:
+            row = await db.scalar(
+                select(CollectionItemRow)
+                .join(CollectionRow)
+                .where(
+                    CollectionRow.user_id == user_id,
+                    CollectionItemRow.parent_item_id.is_(None),
+                    CollectionItemRow.text == text,
+                )
+                .order_by(CollectionItemRow.created_at.desc())
+            )
+            return None if row is None else _stored_collection_item(row)
+
+    async def delete_collection_item(self, item_id: str) -> None:
+        await self._ensure()
+        async with self._Session() as db:
+            row = await db.get(CollectionItemRow, item_id)
+            if row is None:
+                raise IdentityDbError(404, "collection item not found")
+            await db.delete(row)
+            await db.commit()
 
 
 SqliteIdentityRepository = SqlAlchemyIdentityRepository

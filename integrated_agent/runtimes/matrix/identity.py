@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from .db import (
     ROLE_ADMIN,
     ROLE_USER,
@@ -16,6 +18,8 @@ from .db import (
     IdentityDbError,
     IdentityRepository,
     SqlAlchemyIdentityRepository,
+    StoredCollection,
+    StoredCollectionItem,
     StoredSession,
     StoredTurn,
     StoredUser,
@@ -106,6 +110,58 @@ class CreateSessionIn(DomainModel):
 class UpdateSessionIn(DomainModel):
     title: str | None = None
     status: str | None = None
+
+
+class CollectionItemIn(BaseModel):
+    """收藏条目入站。额外字段（platform_key、rationale 等）原样写入 extra_json。"""
+
+    model_config = ConfigDict(extra="allow")
+    key: str | None = None
+    text: str = ""
+    parent_key: str | None = None
+    parent_text: str | None = None
+    replies: list[CollectionItemIn] = Field(default_factory=list)
+
+
+class AddCollectionItemsIn(DomainModel):
+    items: list[CollectionItemIn]
+    bind_replies: bool = False
+
+
+class CreateCollectionIn(DomainModel):
+    name: str
+
+
+class CollectionItemOut(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    key: str
+    text: str
+    replies: list[CollectionItemOut] = Field(default_factory=list)
+
+
+class CollectionOut(DomainModel):
+    collection_id: str
+    name: str
+    item_count: int
+    created_at: str
+    updated_at: str
+    items: list[CollectionItemOut] = Field(default_factory=list)
+
+
+class CollectionListOut(DomainModel):
+    collections: list[CollectionOut]
+
+
+class AddCollectionItemsOut(DomainModel):
+    collection: CollectionOut
+    added: int = 0
+    bound: int = 0
+    created_parents: int = 0
+
+
+_ITEM_META_KEYS = {"key", "text", "parent_key", "parent_text", "replies"}
+CollectionItemIn.model_rebuild()
+CollectionItemOut.model_rebuild()
 
 
 def _now() -> str:
@@ -509,4 +565,286 @@ class IdentityStore:
                 last_scenario=last_scenario,
                 updated_at=now,
                 last_active_at=now,
+            )
+
+    def _item_extra_json(self, item: CollectionItemIn) -> str | None:
+        extra = {
+            key: value
+            for key, value in item.model_dump().items()
+            if key not in _ITEM_META_KEYS and value is not None
+        }
+        if not extra:
+            return None
+        return json.dumps(extra, ensure_ascii=False)
+
+    def _item_out(
+        self,
+        item: StoredCollectionItem,
+        replies: list[CollectionItemOut],
+    ) -> CollectionItemOut:
+        extra = json.loads(item.extra_json) if item.extra_json else {}
+        payload = {
+            key: value
+            for key, value in extra.items()
+            if key not in _ITEM_META_KEYS
+        }
+        return CollectionItemOut(
+            key=item.item_id,
+            text=item.text,
+            replies=replies,
+            **payload,
+        )
+
+    def _nest_items(
+        self, rows: list[StoredCollectionItem]
+    ) -> list[CollectionItemOut]:
+        children: dict[str | None, list[StoredCollectionItem]] = {}
+        for row in rows:
+            children.setdefault(row.parent_item_id, []).append(row)
+
+        def branch(parent_id: str | None) -> list[CollectionItemOut]:
+            items = children.get(parent_id, [])
+            return [
+                self._item_out(item, branch(item.item_id))
+                for item in items
+            ]
+
+        return branch(None)
+
+    def _to_collection_out(
+        self,
+        collection: StoredCollection,
+        rows: list[StoredCollectionItem],
+    ) -> CollectionOut:
+        items = self._nest_items(rows)
+        return CollectionOut(
+            collection_id=collection.collection_id,
+            name=collection.name,
+            item_count=len(items),
+            created_at=collection.created_at,
+            updated_at=collection.updated_at,
+            items=items,
+        )
+
+    async def _owned_collection(
+        self, actor: StoredUser, collection_id: str
+    ) -> StoredCollection:
+        collection = await self.repository.get_collection(collection_id)
+        if collection is None:
+            raise IdentityError(404, "collection not found")
+        if collection.user_id != actor.user_id:
+            raise IdentityError(403, "collection access denied")
+        return collection
+
+    async def _insert_item_row(
+        self,
+        *,
+        collection_id: str,
+        item: CollectionItemIn,
+        parent_item_id: str | None,
+        created_at: str,
+    ) -> StoredCollectionItem | None:
+        item_id = (item.key or "").strip() or uuid4().hex
+        existing = await self.repository.get_collection_item(item_id)
+        if existing is not None:
+            return None
+        stored = StoredCollectionItem(
+            item_id=item_id,
+            collection_id=collection_id,
+            parent_item_id=parent_item_id,
+            text=item.text or "",
+            extra_json=self._item_extra_json(item),
+            created_at=created_at,
+        )
+        try:
+            await self.repository.insert_collection_item(stored)
+        except IdentityDbError as extra:
+            if extra.status == 409:
+                return None
+            raise IdentityError(extra.status, str(extra)) from extra
+        return stored
+
+    async def _ensure_parent(
+        self,
+        actor: StoredUser,
+        collection: StoredCollection,
+        *,
+        parent_key: str | None,
+        parent_text: str | None,
+        created_at: str,
+    ) -> tuple[StoredCollectionItem | None, bool]:
+        key = (parent_key or "").strip()
+        if key:
+            located = await self.repository.get_collection_item(key)
+            if located is not None:
+                folder = await self.repository.get_collection(located.collection_id)
+                if folder is not None and folder.user_id == actor.user_id:
+                    return located, False
+        needle = (parent_text or "").strip()
+        if needle:
+            located = await self.repository.find_root_item_by_text(actor.user_id, needle)
+            if located is not None:
+                return located, False
+        if not needle:
+            return None, False
+        parent = CollectionItemIn(
+            key=f"comment-{uuid4().hex}",
+            text=needle,
+            platform_key="x-twitter",
+            scenario="reply",
+            task_type="reply_comment",
+        )
+        stored = await self._insert_item_row(
+            collection_id=collection.collection_id,
+            item=parent,
+            parent_item_id=None,
+            created_at=created_at,
+        )
+        return stored, stored is not None
+
+    async def list_collections(self, token: str | None) -> CollectionListOut:
+        actor = await self.stored_user_for_token(token)
+        async with self._lock:
+            collections = await self.repository.list_collections(actor.user_id)
+            rows = await self.repository.list_collection_items_for_user(actor.user_id)
+            by_folder: dict[str, list[StoredCollectionItem]] = {}
+            for row in rows:
+                by_folder.setdefault(row.collection_id, []).append(row)
+            return CollectionListOut(
+                collections=[
+                    self._to_collection_out(
+                        item, by_folder.get(item.collection_id, [])
+                    )
+                    for item in collections
+                ]
+            )
+
+    async def create_collection(self, token: str | None, name: str) -> CollectionOut:
+        actor = await self.stored_user_for_token(token)
+        label = name.strip()
+        if not label:
+            raise IdentityError(422, "folder name must not be empty")
+        now = _now()
+        collection = StoredCollection(
+            collection_id=uuid4().hex,
+            user_id=actor.user_id,
+            name=label,
+            created_at=now,
+            updated_at=now,
+        )
+        async with self._lock:
+            try:
+                await self.repository.insert_collection(collection)
+            except IdentityDbError as extra:
+                raise IdentityError(extra.status, str(extra)) from extra
+            return self._to_collection_out(collection, [])
+
+    async def get_collection(
+        self, token: str | None, collection_id: str
+    ) -> CollectionOut:
+        actor = await self.stored_user_for_token(token)
+        async with self._lock:
+            collection = await self._owned_collection(actor, collection_id)
+            rows = await self.repository.list_collection_items(collection.collection_id)
+            return self._to_collection_out(collection, rows)
+
+    async def delete_collection(self, token: str | None, collection_id: str) -> None:
+        actor = await self.stored_user_for_token(token)
+        async with self._lock:
+            await self._owned_collection(actor, collection_id)
+            try:
+                await self.repository.delete_collection(collection_id)
+            except IdentityDbError as extra:
+                raise IdentityError(extra.status, str(extra)) from extra
+
+    async def add_collection_items(
+        self,
+        token: str | None,
+        collection_id: str,
+        items: list[CollectionItemIn],
+        *,
+        bind_replies: bool = False,
+    ) -> AddCollectionItemsOut:
+        actor = await self.stored_user_for_token(token)
+        async with self._lock:
+            collection = await self._owned_collection(actor, collection_id)
+            added = 0
+            bound = 0
+            created_parents = 0
+            now = _now()
+            for item in items:
+                if bind_replies:
+                    parent, created = await self._ensure_parent(
+                        actor,
+                        collection,
+                        parent_key=item.parent_key,
+                        parent_text=item.parent_text,
+                        created_at=now,
+                    )
+                    if parent is None:
+                        continue
+                    if created:
+                        created_parents += 1
+                    stored = await self._insert_item_row(
+                        collection_id=parent.collection_id,
+                        item=item,
+                        parent_item_id=parent.item_id,
+                        created_at=now,
+                    )
+                    if stored is not None:
+                        bound += 1
+                    continue
+                stored = await self._insert_item_row(
+                    collection_id=collection.collection_id,
+                    item=item,
+                    parent_item_id=None,
+                    created_at=now,
+                )
+                if stored is None:
+                    continue
+                added += 1
+                for reply in item.replies:
+                    child = await self._insert_item_row(
+                        collection_id=collection.collection_id,
+                        item=reply,
+                        parent_item_id=stored.item_id,
+                        created_at=now,
+                    )
+                    if child is not None:
+                        bound += 1
+            await self.repository.update_collection(
+                collection.collection_id, updated_at=now
+            )
+            collection = await self.repository.get_collection(collection.collection_id)
+            if collection is None:
+                raise IdentityError(404, "collection not found")
+            rows = await self.repository.list_collection_items(collection.collection_id)
+            return AddCollectionItemsOut(
+                collection=self._to_collection_out(collection, rows),
+                added=added,
+                bound=bound,
+                created_parents=created_parents,
+            )
+
+    async def delete_collection_item(
+        self,
+        token: str | None,
+        collection_id: str,
+        item_id: str,
+    ) -> None:
+        actor = await self.stored_user_for_token(token)
+        async with self._lock:
+            await self._owned_collection(actor, collection_id)
+            item = await self.repository.get_collection_item(item_id)
+            if item is None or item.collection_id != collection_id:
+                raise IdentityError(404, "collection item not found")
+            folder = await self.repository.get_collection(item.collection_id)
+            if folder is None or folder.user_id != actor.user_id:
+                raise IdentityError(403, "collection access denied")
+            try:
+                await self.repository.delete_collection_item(item_id)
+            except IdentityDbError as extra:
+                raise IdentityError(extra.status, str(extra)) from extra
+            await self.repository.update_collection(
+                item.collection_id, updated_at=_now()
             )
