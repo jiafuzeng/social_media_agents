@@ -121,10 +121,12 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
     )
     with TestClient(app) as client:
         accepted = client.post(
-            "/v1/tasks",
+            "/v1/question/tasks",
             json={"question": "分析 2025 年 618 经营增长质量"},
         )
         assert accepted.status_code == 202
+        assert client.get("/").status_code == 200
+        assert "auth-locked" in client.get("/").text
         assert client.get("/matrix").status_code == 200
         page = client.get("/matrix").text
         assert "写帖" in page

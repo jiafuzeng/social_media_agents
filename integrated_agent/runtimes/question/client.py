@@ -29,7 +29,7 @@ class QuestionServiceRuntime:
             trust_env=False,
         ) as client:
             response = await client.post(
-                "/v1/tasks",
+                "/v1/question/tasks",
                 json={
                     "question": request.text,
                     "requester": request.session_id,

@@ -165,7 +165,7 @@ async def run_scenario(scenario: Scenario) -> dict[str, Any]:
                 async with semaphore:
                     request_started = time.perf_counter()
                     response = await client.post(
-                        "/v1/tasks",
+                        "/v1/question/tasks",
                         json={"question": f"load question {index}"},
                     )
                     latencies_ms.append(

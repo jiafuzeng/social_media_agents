@@ -94,7 +94,7 @@ matrix analysis → 不依赖 HTTP、企业微信、Gateway 或 question.analysi
 | `TaskWorkspace` | 单任务文件边界、路径 containment、写入和回读事实 | 文件发布前必须取得真实 bytes、size 和 SHA-256 |
 | Sandbox | Python / Shell 的隔离执行和命令授权 | 默认要求 Docker，不允许隐式退回不受控本机执行 |
 | `ArtifactStore` | 已验证文件的稳定发布副本与不透明 ID | 客户端不能通过下载 URL 访问任意服务器路径 |
-| Question HTTP API | 任务受理、状态、SSE、过载拒绝 | 受理任务最终进入 completed 或 failed |
+| Question HTTP API | `/question` 页面；任务受理 `/v1/question/tasks`、状态、SSE、过载拒绝 | 受理任务最终进入 completed 或 failed |
 | `QuestionTaskService` | 有界队列、Worker pool、任务状态 | 队列满时立即返回 503 和 Retry-After |
 | Question Workflow | 五阶段问数、Evidence、ChartSpec 与 Trace | 最终答案和图表只使用本次运行证据 |
 | Question Service Runtime | 把远端 SSE 翻译成 `GatewayEvent` | 消费到稳定终态后结束 |

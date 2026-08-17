@@ -48,11 +48,12 @@ def test_web_api_accepts_task_and_replays_stable_events(tmp_path: Path) -> None:
         artifacts_root=tmp_path / "artifacts",
     )
     with TestClient(app) as client:
-        assert client.get("/").status_code == 200
-        assert "问数智能体流式服务" in client.get("/").text
+        assert client.get("/question").status_code == 200
+        assert "问数智能体流式服务" in client.get("/question").text
+        assert client.get("/").status_code == 404
         assert client.get("/matrix").status_code == 404
         accepted = client.post(
-            "/v1/tasks",
+            "/v1/question/tasks",
             json={"question": "分析 2025 年 618 经营增长质量"},
         )
         assert accepted.status_code == 202
@@ -92,9 +93,9 @@ def test_api_returns_503_when_admission_queue_is_full(tmp_path: Path) -> None:
         artifacts_root=tmp_path / "artifacts",
     )
     with TestClient(app) as client:
-        first = client.post("/v1/tasks", json={"question": "q-1"})
-        second = client.post("/v1/tasks", json={"question": "q-2"})
-        third = client.post("/v1/tasks", json={"question": "q-3"})
+        first = client.post("/v1/question/tasks", json={"question": "q-1"})
+        second = client.post("/v1/question/tasks", json={"question": "q-2"})
+        third = client.post("/v1/question/tasks", json={"question": "q-3"})
         assert first.status_code == 202
         assert second.status_code == 202
         assert third.status_code == 503

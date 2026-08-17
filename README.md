@@ -98,8 +98,9 @@ python run_server.py
 默认地址：
 
 ```text
-http://127.0.0.1:8000/          # 问数
-http://127.0.0.1:8000/matrix    # 矩阵草稿
+http://127.0.0.1:8000/          # 登录后进入矩阵草稿
+http://127.0.0.1:8000/question  # 问数
+http://127.0.0.1:8000/matrix    # 矩阵草稿（与根路径相同）
 ```
 
 检查服务：
@@ -114,10 +115,12 @@ curl http://127.0.0.1:8000/ready
 ```text
 GET  /health
 GET  /ready
+GET  /
 GET  /matrix
-POST /v1/tasks
-GET  /v1/tasks/{task_id}
-GET  /v1/tasks/{task_id}/events
+GET  /question
+POST /v1/question/tasks
+GET  /v1/question/tasks/{task_id}
+GET  /v1/question/tasks/{task_id}/events
 POST /api/create
 POST /api/reply
 POST /v1/matrix/tasks

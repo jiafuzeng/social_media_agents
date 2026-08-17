@@ -150,7 +150,7 @@ button.addEventListener("click", async () => {
   errorPanel.hidden = true;
   events.replaceChildren();
   try {
-    const response = await fetch("/v1/tasks", {
+    const response = await fetch("/v1/question/tasks", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({question: question.value, channel: "web"})

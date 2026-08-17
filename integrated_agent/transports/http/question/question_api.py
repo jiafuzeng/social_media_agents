@@ -43,7 +43,7 @@ def build_question_router(
     artifact_store = ArtifactStore(artifacts_root)
     router = APIRouter(tags=["question"])
 
-    @router.get("/", response_class=FileResponse)
+    @router.get("/question", response_class=FileResponse)
     async def index() -> FileResponse:
         return FileResponse(static_root / "index.html")
 
@@ -61,7 +61,7 @@ def build_question_router(
             filename=artifact.filename,
         )
 
-    @router.post("/v1/tasks", response_model=TaskAccepted, status_code=202)
+    @router.post("/v1/question/tasks", response_model=TaskAccepted, status_code=202)
     async def create_task(command: TaskCreate) -> TaskAccepted:
         try:
             return await service.submit(command)
@@ -72,14 +72,14 @@ def build_question_router(
                 headers={"Retry-After": "1"},
             ) from exc
 
-    @router.get("/v1/tasks/{task_id}", response_model=TaskSnapshot)
+    @router.get("/v1/question/tasks/{task_id}", response_model=TaskSnapshot)
     async def get_task(task_id: str) -> TaskSnapshot:
         snapshot = await service.get(task_id)
         if snapshot is None:
             raise HTTPException(status_code=404, detail="task not found")
         return snapshot
 
-    @router.get("/v1/tasks/{task_id}/events")
+    @router.get("/v1/question/tasks/{task_id}/events")
     async def stream_events(
         task_id: str,
         after: int = Query(default=0, ge=0),

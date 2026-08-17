@@ -92,8 +92,8 @@ class QuestionTaskService:
         )
         return TaskAccepted(
             task_id=task_id,
-            task_url=f"/v1/tasks/{task_id}",
-            events_url=f"/v1/tasks/{task_id}/events",
+            task_url=f"/v1/question/tasks/{task_id}",
+            events_url=f"/v1/question/tasks/{task_id}/events",
         )
 
     async def get(self, task_id: str) -> TaskSnapshot | None:

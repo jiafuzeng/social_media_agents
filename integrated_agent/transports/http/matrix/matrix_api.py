@@ -27,8 +27,15 @@ def build_matrix_router(
 
     if static_root is not None:
 
+        def matrix_page() -> FileResponse:
+            return FileResponse(static_root / "matrix.html")
+
+        @router.get("/", response_class=FileResponse)
+        async def root_index() -> FileResponse:
+            return matrix_page()
+
         @router.get("/matrix", response_class=FileResponse)
         async def matrix_index() -> FileResponse:
-            return FileResponse(static_root / "matrix.html")
+            return matrix_page()
 
     return router
