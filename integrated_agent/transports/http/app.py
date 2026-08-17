@@ -10,8 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from integrated_agent.runtimes.matrix.service import MatrixTaskService
 from integrated_agent.runtimes.question.service import QuestionTaskService
 
-from .matrix_api import build_matrix_router
-from .question_api import build_question_router
+from .matrix import build_matrix_router
+from .question import build_question_router
 
 
 def create_http_app(

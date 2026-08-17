@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/styles.css">
   <link rel="stylesheet" href="/static/matrix.css">
 </head>
-<body class="matrix-app" data-workspace="task" data-board="home">
+<body class="matrix-app auth-locked" data-workspace="task" data-board="home">
   <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8.6 4.6L10.1 3.2 18.3 12l-8.2 8.8-1.5-1.4L15.4 12z"/></svg>
   </button>
@@ -28,7 +28,9 @@
           </a>
         </nav>
         <span class="dock-sep" aria-hidden="true"></span>
-        <span class="foot-avatar" title="Matrix">M</span>
+        <div class="user-slot" id="userSlot">
+          <button type="button" class="foot-avatar" id="userMenuBtn" title="未登录" aria-haspopup="menu" aria-expanded="false">?</button>
+        </div>
         <button type="button" class="nav-item dock-hide" id="dockHideBtn" aria-label="隐藏导航" title="隐藏导航">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M15.4 4.6L13.9 3.2 5.7 12l8.2 8.8 1.5-1.4L8.6 12z"/></svg>
         </button>
@@ -206,6 +208,89 @@
         </div>
     </section>
   </div>
+  <div class="user-menu" id="userMenu" role="menu" hidden>
+            <p class="user-menu-id">
+              <strong id="userMenuName">未登录</strong>
+              <small id="userMenuRole">本机 SQLite 账号</small>
+            </p>
+    <button type="button" role="menuitem" id="userManageBtn">账号管理</button>
+    <button type="button" role="menuitem" id="userLogoutBtn">退出登录</button>
+  </div>
+  <div class="auth-gate" id="authGate">
+    <form class="auth-card" id="authForm">
+      <h2>登录 MatrixCopilot</h2>
+      <p>账号保存在本地 SQLite，注册后即可使用工作台。</p>
+      <label>用户名
+        <input id="authUsername" name="username" autocomplete="username" maxlength="32" required>
+      </label>
+      <label>密码
+        <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="6" required>
+      </label>
+      <p class="auth-error" id="authError" hidden></p>
+      <div class="auth-actions">
+        <button type="submit" id="authLogin">登录</button>
+        <button type="button" class="ghost" id="authRegister">注册</button>
+      </div>
+    </form>
+  </div>
+  <div class="catalog-modal user-drawer" id="userDrawer" hidden>
+    <div class="catalog-backdrop" id="userBackdrop"></div>
+    <div class="catalog-dialog user-dialog" role="dialog" aria-modal="true" aria-labelledby="userDrawerTitle">
+      <header class="catalog-modal-head">
+        <div class="catalog-modal-id">
+          <span class="avatar" id="userDrawerAvatar">?</span>
+          <div>
+            <h3 id="userDrawerTitle">账号管理</h3>
+            <p id="userDrawerSub">管理员可管理全部账号；普通用户只能改自己</p>
+          </div>
+        </div>
+        <button type="button" class="modal-x" id="userDrawerClose" aria-label="关闭">×</button>
+      </header>
+      <div class="user-manage">
+        <aside class="user-list-pane">
+          <div class="user-list-head">
+            <strong>用户</strong>
+            <button type="button" class="ghost" id="userCreateBtn">新建</button>
+          </div>
+          <div class="user-list" id="userList"></div>
+        </aside>
+        <form id="userForm" class="fields catalog-form user-form">
+          <div class="user-form-row" id="userIdentityRow">
+            <label>用户名
+              <input id="userFormUsername" name="username" autocomplete="off" maxlength="32" required>
+            </label>
+            <label id="userRoleWrap" hidden>角色
+              <select id="userFormRole">
+                <option value="user">普通用户</option>
+                <option value="admin">管理员</option>
+              </select>
+            </label>
+          </div>
+          <div class="user-form-row">
+            <label>
+              <span id="userPasswordLabel">新密码</span>
+              <input id="userFormPassword" name="password" type="password" autocomplete="new-password" minlength="6" placeholder="不修改则留空">
+            </label>
+            <label>
+              <span id="userPassword2Label">确认新密码</span>
+              <input id="userFormPassword2" name="password2" type="password" autocomplete="new-password" minlength="6" placeholder="再输入一次新密码">
+            </label>
+          </div>
+          <div class="user-form-verify" id="userCurrentPasswordWrap">
+            <label>当前登录密码
+              <input id="userFormCurrentPassword" name="current_password" type="password" autocomplete="current-password" placeholder="验证身份，改自己时必填">
+            </label>
+          </div>
+          <p class="hint" id="userFormHint">改用户名或设新密码时，必须填写当前登录密码。新密码留空表示不改。</p>
+          <p class="auth-error" id="userFormError" hidden></p>
+        </form>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="tab" id="userDeleteBtn">删除</button>
+        <button type="submit" form="userForm" id="userSaveBtn" class="modal-primary">保存</button>
+      </div>
+    </div>
+  </div>
   <div class="catalog-modal" id="catalogDrawer" hidden>
     <div class="catalog-backdrop" id="catalogBackdrop"></div>
     <div class="catalog-dialog" role="dialog" aria-modal="true" aria-labelledby="catalogDrawerTitle">
@@ -226,6 +311,7 @@
       </div>
     </div>
   </div>
+  <script src="/static/matrix-auth.js"></script>
   <script src="/static/matrix.js"></script>
   <script src="/static/matrix-catalog.js"></script>
 </body>

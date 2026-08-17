@@ -5,6 +5,7 @@ from contextlib import suppress
 from typing import Protocol
 from uuid import uuid4
 
+from .identity import IdentityStore
 from .models import (
     MatrixTaskCreate,
     MatrixTaskRequest,
@@ -34,6 +35,7 @@ class MatrixTaskService:
         worker: TaskWorker,
         tasks: InMemoryTaskStore,
         events: InMemoryEventStore,
+        identity: IdentityStore,
         worker_count: int = 4,
         queue_capacity: int = 32,
     ) -> None:
@@ -46,6 +48,7 @@ class MatrixTaskService:
         self.events = events
         self.worker_count = worker_count
         self.queue_capacity = queue_capacity
+        self.identity = identity
         self._queue: asyncio.Queue[MatrixTaskRequest] = asyncio.Queue(
             maxsize=queue_capacity
         )

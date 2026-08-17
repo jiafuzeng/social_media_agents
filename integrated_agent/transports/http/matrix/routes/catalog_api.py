@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-import asyncio
-import json
-from collections.abc import AsyncIterator
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import Field, ValidationError
 
-from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.analysis.catalog import (
     CatalogError,
     MatrixCatalog,
@@ -22,34 +15,13 @@ from integrated_agent.runtimes.matrix.analysis.snapshots import (
     SnapshotError,
     TemplateCard,
     TermListCard,
-    list_account_catalog,
-    list_interaction_catalog,
 )
-from integrated_agent.runtimes.matrix.models import (
-    MAX_COMPOSE_POSTS,
-    MIN_COMPOSE_POSTS,
-    CommentIn,
-    DomainModel,
-    MatrixTaskCreate,
-    TaskAccepted,
-    TaskEvent,
-    TaskSnapshot,
-)
-from integrated_agent.runtimes.matrix.service import (
-    MatrixTaskService,
-    ServiceBusyError,
-)
-
-
-class AccountCatalogOut(DomainModel):
-    accounts: list[AccountCard]
-
-
-class InteractionCatalogOut(DomainModel):
-    interactions: list[InteractionCard]
+from integrated_agent.runtimes.matrix.models import DomainModel
 
 
 class CatalogDumpOut(DomainModel):
+    """配置台一次拉全量，对应 matrix-catalog.js 的 GET /api/catalog。"""
+
     accounts: list[AccountCard]
     interactions: list[InteractionCard]
     guardrails: list[GuardrailCard]
@@ -59,71 +31,28 @@ class CatalogDumpOut(DomainModel):
 
 
 class TermInsertIn(DomainModel):
+    """往硬禁词清单插入一条；index 省略则追加到末尾。"""
+
     term: str = Field(min_length=1)
     index: int | None = Field(default=None, ge=0)
 
 
 class GuardrailAttachIn(DomainModel):
+    """把已有护栏挂到人设或互动规则上，不新建护栏正文。"""
+
     guardrail_key: str = Field(min_length=1)
     index: int | None = Field(default=None, ge=0)
 
 
 class TermListAttachIn(DomainModel):
+    """把已有词表挂到人设或互动规则上。"""
+
     term_list_id: str = Field(min_length=1)
     index: int | None = Field(default=None, ge=0)
 
 
-class ComposeHttpIn(DomainModel):
-    text: str = Field(min_length=1)
-    account_key: str = "default"
-    need_trends: bool = False
-    post_count: int | None = Field(
-        default=None,
-        ge=MIN_COMPOSE_POSTS,
-        le=MAX_COMPOSE_POSTS,
-    )
-    requester: str = "course-user"
-    channel: str = "web"
-
-
-class ReplyHttpIn(DomainModel):
-    text: str = Field(min_length=1)
-    interaction_key: str = "help-first"
-    reply_count: int | None = Field(
-        default=None,
-        ge=MIN_COMPOSE_POSTS,
-        le=MAX_COMPOSE_POSTS,
-    )
-    comments: list[CommentIn] | None = None
-    requester: str = "course-user"
-    channel: str = "web"
-
-
-def event_to_sse(event: TaskEvent) -> str:
-    payload = {
-        "task_id": event.task_id,
-        "sequence": event.sequence,
-        "data": event.data,
-    }
-    return (
-        f"id: {event.sequence}\n"
-        f"event: {event.event_type}\n"
-        f"data: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n"
-    )
-
-
-async def _submit(service: MatrixTaskService, command: MatrixTaskCreate) -> TaskAccepted:
-    try:
-        return await service.submit(command)
-    except ServiceBusyError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=str(exc),
-            headers={"Retry-After": "1"},
-        ) from exc
-
-
 def _catalog_call(action):
+    """把 MatrixCatalog 的领域错误映射成 HTTP，路由里不再包一层文案。"""
     try:
         return action()
     except CatalogError as exc:
@@ -134,34 +63,22 @@ def _catalog_call(action):
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
 
 
-def build_matrix_router(
-    service: MatrixTaskService,
-    *,
-    static_root: Path | None = None,
-    data_root: Path | None = None,
-) -> APIRouter:
-    router = APIRouter(tags=["matrix"])
-    catalog_root = data_root or (PROJECT_ROOT / "data" / "matrix")
-    catalog = MatrixCatalog(catalog_root)
+def build_catalog_router(catalog: MatrixCatalog) -> APIRouter:
+    """配置台 HTTP 入口。
 
-    if static_root is not None:
+    catalog 由 matrix_api 注入，读写 data/matrix 快照；本文件只做协议适配。
+    路径与 static/matrix-catalog.js 对齐。工作台下拉用的 /api/accounts、
+    /api/interactions 在 task_api，不在这里。
+    """
 
-        @router.get("/matrix", response_class=FileResponse)
-        async def matrix_index() -> FileResponse:
-            return FileResponse(static_root / "matrix.html")
-
-    @router.get("/api/accounts", response_model=AccountCatalogOut)
-    async def list_accounts() -> AccountCatalogOut:
-        return AccountCatalogOut(accounts=list_account_catalog(catalog_root))
-
-    @router.get("/api/interactions", response_model=InteractionCatalogOut)
-    async def list_interactions() -> InteractionCatalogOut:
-        return InteractionCatalogOut(interactions=list_interaction_catalog(catalog_root))
+    router = APIRouter(tags=["matrix-catalog"])
 
     @router.get("/api/catalog", response_model=CatalogDumpOut)
     async def get_catalog() -> CatalogDumpOut:
+        """打开配置台时一次取出全部卡片。"""
         return CatalogDumpOut.model_validate(_catalog_call(catalog.dump_all))
 
+    # 人设：写帖身份。index 控制插入位置，省略则追加。
     @router.post("/api/catalog/accounts", response_model=AccountCard, status_code=201)
     async def create_account(
         command: AccountCard,
@@ -184,6 +101,7 @@ def build_matrix_router(
     async def attach_account_guardrail(
         account_key: str, command: GuardrailAttachIn
     ) -> AccountCard:
+        """给人设挂一条已有护栏，返回更新后的人设卡。"""
         return _catalog_call(
             lambda: catalog.insert_account_guardrail(
                 account_key, command.guardrail_key, index=command.index
@@ -197,12 +115,14 @@ def build_matrix_router(
     async def attach_account_term_list(
         account_key: str, command: TermListAttachIn
     ) -> AccountCard:
+        """给人设挂一张硬禁词表。"""
         return _catalog_call(
             lambda: catalog.insert_account_term_list(
                 account_key, command.term_list_id, index=command.index
             )
         )
 
+    # 互动规则：回评口径。结构与人设对称。
     @router.post("/api/catalog/interactions", response_model=InteractionCard, status_code=201)
     async def create_interaction(
         command: InteractionCard,
@@ -232,6 +152,7 @@ def build_matrix_router(
     async def attach_interaction_guardrail(
         interaction_key: str, command: GuardrailAttachIn
     ) -> InteractionCard:
+        """给互动规则挂一条已有护栏。"""
         return _catalog_call(
             lambda: catalog.insert_interaction_guardrail(
                 interaction_key, command.guardrail_key, index=command.index
@@ -245,12 +166,14 @@ def build_matrix_router(
     async def attach_interaction_term_list(
         interaction_key: str, command: TermListAttachIn
     ) -> InteractionCard:
+        """给互动规则挂一张硬禁词表。"""
         return _catalog_call(
             lambda: catalog.insert_interaction_term_list(
                 interaction_key, command.term_list_id, index=command.index
             )
         )
 
+    # 护栏 / 平台 / 硬禁词表 / 核准模板：独立资源，人设与互动只引用 key。
     @router.post("/api/catalog/guardrails", response_model=GuardrailCard, status_code=201)
     async def create_guardrail(
         command: GuardrailCard,
@@ -271,6 +194,7 @@ def build_matrix_router(
         command: PlatformCard,
         index: int | None = Query(default=None, ge=0),
     ) -> PlatformCard:
+        """平台字数、条数上限等硬约束。"""
         return _catalog_call(lambda: catalog.create_platform(command, index=index))
 
     @router.put("/api/catalog/platforms/{platform_key}", response_model=PlatformCard)
@@ -286,6 +210,7 @@ def build_matrix_router(
         command: TermListCard,
         index: int | None = Query(default=None, ge=0),
     ) -> TermListCard:
+        """新建硬禁词清单；词条增删走下面的 /terms。"""
         return _catalog_call(lambda: catalog.create_term_list(command, index=index))
 
     @router.put("/api/catalog/policy/{term_list_id}", response_model=TermListCard)
@@ -301,6 +226,7 @@ def build_matrix_router(
         response_model=TermListCard,
     )
     async def insert_policy_term(term_list_id: str, command: TermInsertIn) -> TermListCard:
+        """往清单插入一条拦截词。"""
         return _catalog_call(
             lambda: catalog.insert_term(
                 command.term, term_list_id=term_list_id, index=command.index
@@ -312,6 +238,7 @@ def build_matrix_router(
         response_model=TermListCard,
     )
     async def delete_policy_term(term_list_id: str, term: str) -> TermListCard:
+        """从清单删掉一条拦截词。"""
         return _catalog_call(
             lambda: catalog.delete_term(term, term_list_id=term_list_id)
         )
@@ -321,6 +248,7 @@ def build_matrix_router(
         command: TemplateCard,
         index: int | None = Query(default=None, ge=0),
     ) -> TemplateCard:
+        """核准模板：硬门降级时的兜底文案。"""
         return _catalog_call(lambda: catalog.create_template(command, index=index))
 
     @router.put("/api/catalog/templates/{template_key}", response_model=TemplateCard)
@@ -330,66 +258,5 @@ def build_matrix_router(
     @router.delete("/api/catalog/templates/{template_key}", status_code=204)
     async def delete_template(template_key: str) -> None:
         _catalog_call(lambda: catalog.delete_template(template_key))
-
-    @router.post("/api/create", response_model=TaskAccepted, status_code=202)
-    async def create_compose(command: ComposeHttpIn) -> TaskAccepted:
-        return await _submit(
-            service,
-            MatrixTaskCreate(scenario="compose", **command.model_dump()),
-        )
-
-    @router.post("/api/reply", response_model=TaskAccepted, status_code=202)
-    async def create_reply(command: ReplyHttpIn) -> TaskAccepted:
-        return await _submit(
-            service,
-            MatrixTaskCreate(scenario="reply", **command.model_dump()),
-        )
-
-    @router.post("/v1/matrix/tasks", response_model=TaskAccepted, status_code=202)
-    async def create_matrix_task(command: MatrixTaskCreate) -> TaskAccepted:
-        return await _submit(service, command)
-
-    @router.get("/v1/matrix/tasks/{task_id}", response_model=TaskSnapshot)
-    async def get_matrix_task(task_id: str) -> TaskSnapshot:
-        snapshot = await service.get(task_id)
-        if snapshot is None:
-            raise HTTPException(status_code=404, detail="task not found")
-        return snapshot
-
-    @router.get("/v1/matrix/tasks/{task_id}/events")
-    async def stream_matrix_events(
-        task_id: str,
-        after: int = Query(default=0, ge=0),
-    ) -> StreamingResponse:
-        if await service.get(task_id) is None:
-            raise HTTPException(status_code=404, detail="task not found")
-
-        async def generate() -> AsyncIterator[str]:
-            cursor = after
-            while True:
-                batch = service.events.list_for(task_id)[cursor:]
-                for event in batch:
-                    cursor = event.sequence
-                    yield event_to_sse(event)
-                    if event.event_type in {"task.completed", "task.failed"}:
-                        return
-                snapshot = await service.get(task_id)
-                if snapshot is not None and snapshot.status in {"completed", "failed"}:
-                    terminal_events = {"task.completed", "task.failed"}
-                    if any(
-                        event.event_type in terminal_events
-                        for event in service.events.list_for(task_id)[cursor:]
-                    ):
-                        continue
-                try:
-                    await service.events.wait_for_change(task_id, cursor, timeout=15.0)
-                except asyncio.TimeoutError:
-                    yield ": keep-alive\n\n"
-
-        return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
 
     return router

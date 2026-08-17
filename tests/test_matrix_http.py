@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
+from integrated_agent.runtimes.matrix.identity import IdentityStore
 from integrated_agent.runtimes.matrix.models import (
     MatrixTaskCreate,
     MatrixTaskRequest,
@@ -82,6 +83,7 @@ def test_t12_queue_full_returns_503(tmp_path: Path) -> None:
         events=events,
         worker_count=1,
         queue_capacity=1,
+        identity=IdentityStore(tmp_path / "identity"),
     )
     app = create_matrix_api(service)
     with TestClient(app) as client:

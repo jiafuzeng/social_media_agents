@@ -50,12 +50,13 @@ html:has(.matrix-app),
   background: transparent;
   border: 0;
   z-index: 20;
-  overflow: hidden;
+  overflow: visible;
   transition: opacity .2s ease, transform .28s cubic-bezier(.2, .8, .2, 1);
 }
 .matrix-app.dock-hidden .icon-rail {
   opacity: 0;
   pointer-events: none;
+  overflow: hidden;
   transform: translateX(-10px);
 }
 .app-dock {
@@ -1537,5 +1538,222 @@ html:has(.matrix-app),
 @media (max-width: 1200px) {
   .desk {
     grid-template-columns: 220px minmax(0, 1fr) 280px;
+  }
+}
+.matrix-app.auth-locked .workbench {
+  filter: blur(8px);
+  pointer-events: none;
+}
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, .28);
+}
+.matrix-app:not(.auth-locked) .auth-gate {
+  display: none;
+}
+.auth-card {
+  width: min(380px, calc(100vw - 32px));
+  padding: 28px 24px 22px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, .18);
+  display: grid;
+  gap: 12px;
+}
+.auth-card h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.auth-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.auth-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+}
+.auth-card input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+.auth-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.auth-actions button {
+  flex: 1;
+}
+.auth-error {
+  color: #b42318;
+  font-size: 13px;
+}
+.icon-rail .foot-avatar {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.user-slot {
+  position: relative;
+  z-index: 21;
+}
+.user-menu {
+  position: fixed;
+  z-index: 90;
+  width: 196px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, .16);
+  display: grid;
+  gap: 6px;
+}
+.user-menu-id {
+  margin: 0;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid #eef1f6;
+}
+.user-menu-id strong {
+  display: block;
+  font-size: 14px;
+}
+.user-menu-id small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.user-menu button {
+  margin: 0;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: #f4f6fa;
+  color: #1f2937;
+  justify-content: flex-start;
+  padding: 0 12px;
+}
+.user-menu #userLogoutBtn {
+  color: #b42318;
+  background: #fef3f2;
+}
+.user-drawer {
+  z-index: 86;
+}
+.user-dialog {
+  width: min(860px, 100%);
+}
+.user-manage {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  flex: 1;
+  min-height: 380px;
+  border-top: 1px solid #f3f4f6;
+}
+.user-list-pane {
+  border-right: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.user-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+.user-list {
+  overflow: auto;
+  padding: 0 8px 12px;
+  display: grid;
+  gap: 4px;
+}
+.user-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+.user-list-item.active {
+  background: var(--accent-soft);
+  color: #2a4ea8;
+}
+.user-list-item small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.user-form {
+  padding: 20px 24px 16px;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  overflow: auto;
+}
+.user-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+#userIdentityRow:has(#userRoleWrap[hidden]) {
+  grid-template-columns: 1fr;
+}
+.user-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #4b5563;
+}
+.user-form input,
+.user-form select {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  background: #fff;
+}
+.user-form-verify {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #eef1f6;
+}
+.user-form-verify[hidden] {
+  display: none;
+}
+.user-form .hint {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .user-manage {
+    grid-template-columns: 1fr;
+  }
+  .user-list-pane {
+    border-right: 0;
+    border-bottom: 1px solid #f3f4f6;
+    max-height: 160px;
+  }
+  .user-form-row {
+    grid-template-columns: 1fr;
   }
 }
