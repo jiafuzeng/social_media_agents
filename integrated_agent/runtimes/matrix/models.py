@@ -38,7 +38,7 @@ class MatrixTaskCreate(DomainModel):
 
     text: str = Field(
         min_length=1,
-        description="用户原话：创作是主题/口径；回复有 thread_key 或 comments 时是运营指令，否则签发为待回评论",
+        description="用户原话：创作是主题/口径；回复有 comments 时是运营指令，否则签发为待回评论",
     )
     scenario: Scenario = Field(description="入口绑定的流程，compose 或 reply，决定跑哪张 Flow")
     account_key: str | None = Field(
@@ -65,13 +65,9 @@ class MatrixTaskCreate(DomainModel):
         le=MAX_COMPOSE_POSTS,
         description="本次要出几条回复草稿；仅 reply，范围 1–10。一条评论时为变体数，多条评论时为覆盖条数。省略则每条评论一条",
     )
-    thread_key: str | None = Field(
-        default=None,
-        description="回复线程夹具 id；仅 reply，compose 携带则 422。与 comments 都省略时，把 text 签发为一条评论",
-    )
     comments: list[CommentIn] | None = Field(
         default=None,
-        description="直接提交的评论；与 thread_key 二选一即可走回复。都省略则用 text 签发一条。compose 携带则 422",
+        description="直接提交的评论；仅 reply。省略则用 text 签发一条。compose 携带则 422",
     )
     requester: str = Field(default="course-user", description="提交者，仅审计/日志，不参与拆解")
     channel: str = Field(default="web", description="来源通道 web 或 gateway，不改流程")
@@ -79,8 +75,8 @@ class MatrixTaskCreate(DomainModel):
     @model_validator(mode="after")
     def bind_entry_invariants(self) -> "MatrixTaskCreate":
         if self.scenario == "compose":
-            if self.thread_key is not None or self.comments is not None:
-                raise ValueError("compose must not include thread_key or comments")
+            if self.comments is not None:
+                raise ValueError("compose must not include comments")
             if self.interaction_key is not None:
                 raise ValueError("compose must not include interaction_key")
             if self.reply_count is not None:
@@ -94,7 +90,7 @@ class MatrixTaskCreate(DomainModel):
                 raise ValueError("reply must not include account_key")
             if not self.interaction_key:
                 self.interaction_key = "help-first"
-            if not self.thread_key and not self.comments:
+            if not self.comments:
                 self.comments = [CommentIn(text=self.text, role="root")]
         return self
 

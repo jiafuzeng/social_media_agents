@@ -87,8 +87,7 @@ MatrixTaskCreate
   account_key: str = "default"
   brand_key: str = "default"
   need_trends: bool = false              # 仅 compose；reply 忽略
-  thread_key: str | null = null          # compose 携带 → 422
-  comments: list[CommentIn] | null = null
+  comments: list[CommentIn] | null = null  # 仅 reply；compose 携带 → 422；省略则签发 text
   requester: str = "course-user"
   channel: str = "web"
 
@@ -99,9 +98,9 @@ CommentIn
   author_display: str | null = null      # 不得含 UID
 ```
 
-HTTP Transport 把路径写成 `GatewayRequest`（`runtime_key` + `scenario`）后交给 `AgentGateway`，不直连 TaskService。`/api/create` → matrix + compose；`/api/reply` → matrix + reply（`thread_key` / `comments` 都省略则把 `text` 签发为一条评论，不再默认 `demo-1`）；`/v1/matrix/tasks` 须显式 `scenario=compose|reply`。
+HTTP Transport 把路径写成 `GatewayRequest`（`runtime_key` + `scenario`）后交给 `AgentGateway`，不直连 TaskService。`/api/create` → matrix + compose；`/api/reply` → matrix + reply（`comments` 省略则把 `text` 签发为一条评论）；`/v1/matrix/tasks` 须显式 `scenario=compose|reply`。
 
-企业微信：`text` 原样进入 Gateway；匹配 `thread:<key>` 则 `scenario=reply`，否则落到 matrix 时为 compose。附件不进 matrix。Brief 不做场景分类。
+企业微信：`text` 原样进入 Gateway；落到 matrix 时为 compose。回评走 HTTP `comments[]`。附件不进 matrix。Brief 不做场景分类。
 
 ### 3.2 快照（execution resources）
 
@@ -319,7 +318,6 @@ AUTO_RUNTIMES +=
 | `data/matrix/platforms.yaml` | `x-twitter`：`max_chars=280` |
 | `data/matrix/policy_terms.yaml` | 演示禁词（如「稳赚」「治愈」） |
 | `data/matrix/templates.yaml` | 1 条中性免责模板 |
-| `data/matrix/sample_threads.json` | `demo-1`：3 评，含 1 条攻击 |
 | `data/matrix/cases/x-twitter.json` | 已有 12 条夹具 |
 
 `snapshot_id` = 上述文件规范化 JSON 的 SHA-256 前 16 位。任一文件变更即新快照。
@@ -346,7 +344,7 @@ AUTO_RUNTIMES +=
 | T14 | gw | auto offered 含 matrix，不含 codex |
 | T15 | gw | 附件 → agent，不进 matrix |
 
-S4 真模型（不阻塞合入）：X 预热一题；`thread:demo-1` 一题。看 `logs/<task_id>/run.json`，不用正则判正文质量。
+S4 真模型（不阻塞合入）：X 预热一题；回评贴评一题。看 `logs/<task_id>/run.json`，不用正则判正文质量。
 
 ---
 
@@ -390,7 +388,7 @@ S4 真模型（不阻塞合入）：X 预热一题；`thread:demo-1` 一题。�
 | 中 | auto 误路由 | 卡片文案 + `/agent matrix` | 否 |
 | 中 | 复制队列壳分叉 | 只复制 service/stores | 否 |
 | 中 | 中文分词导致 AC 漏拦 | P0 用整词/子串匹配；列已知限制 | 否 |
-| 低 | Gateway 无结构化评论 | `thread:demo-1` | 否 |
+| 低 | Gateway 无结构化评论 | 回评走 HTTP `comments[]` | 否 |
 
 开放问题（请评审口头定）：
 

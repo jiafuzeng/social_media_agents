@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import httpx
 
 from integrated_agent.gateway import GatewayEvent, GatewayRequest
-
-
-# 企业微信里用「thread:demo-1 回评」进入回复 Flow；否则默认创作。
-THREAD_RE = re.compile(r"^thread:([A-Za-z0-9._-]+)(?:\s+(.*))?$", re.DOTALL)
 
 
 class MatrixServiceRuntime:
@@ -95,17 +90,6 @@ class MatrixServiceRuntime:
 def _task_body(request: GatewayRequest) -> dict[str, Any]:
     """GatewayRequest → MatrixTaskCreate。这里绑定 scenario，禁止把 auto 交给 HTTP。"""
 
-    match = THREAD_RE.match(request.text.strip())
-    if match:
-        thread_key = match.group(1)
-        remainder = (match.group(2) or "").strip()
-        return {
-            "text": remainder or request.text.strip(),
-            "scenario": "reply",
-            "thread_key": thread_key,
-            "requester": request.session_id,
-            "channel": "gateway",
-        }
     return {
         "text": request.text,
         "scenario": "compose",

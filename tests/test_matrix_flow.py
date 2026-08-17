@@ -7,7 +7,7 @@ from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixMod
 from integrated_agent.runtimes.matrix.analysis.workflows.compose_flow import run_compose
 from integrated_agent.runtimes.matrix.analysis.workflows.reply_flow import run_reply
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
-from tests.fakes import install_scripted_ask
+from tests.fakes import DEMO_REPLY_COMMENTS, install_scripted_ask
 
 
 DATA_ROOT = PROJECT_ROOT / "data/matrix"
@@ -73,9 +73,9 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> Non
     run = await run_reply(
         MatrixTaskRequest(
             task_id="t08",
-            text="处理 demo 线程",
+            text="处理这组评论",
             scenario="reply",
-            thread_key="demo-1",
+            comments=DEMO_REPLY_COMMENTS,
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t08",
@@ -93,9 +93,9 @@ async def test_reply_honors_requested_reply_count(tmp_path, monkeypatch) -> None
     run = await run_reply(
         MatrixTaskRequest(
             task_id="t08-count",
-            text="处理 demo 线程",
+            text="处理这组评论",
             scenario="reply",
-            thread_key="demo-1",
+            comments=DEMO_REPLY_COMMENTS,
             reply_count=1,
         ),
         data_root=DATA_ROOT,
@@ -150,9 +150,9 @@ async def test_t09_one_gate_failure_keeps_successful_item(tmp_path, monkeypatch)
     run = await run_reply(
         MatrixTaskRequest(
             task_id="t09",
-            text="处理 demo 线程",
+            text="处理这组评论",
             scenario="reply",
-            thread_key="demo-1",
+            comments=DEMO_REPLY_COMMENTS,
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t09",
@@ -171,9 +171,9 @@ async def test_t10_review_cannot_lift_skip(tmp_path, monkeypatch) -> None:
     run = await run_reply(
         MatrixTaskRequest(
             task_id="t10",
-            text="处理 demo 线程",
+            text="处理这组评论",
             scenario="reply",
-            thread_key="demo-1",
+            comments=DEMO_REPLY_COMMENTS,
         ),
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t10",

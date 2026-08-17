@@ -94,7 +94,6 @@ class ReplyHttpIn(DomainModel):
         ge=MIN_COMPOSE_POSTS,
         le=MAX_COMPOSE_POSTS,
     )
-    thread_key: str | None = None
     comments: list[CommentIn] | None = None
     requester: str = "course-user"
     channel: str = "web"

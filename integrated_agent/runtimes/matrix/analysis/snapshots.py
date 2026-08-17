@@ -322,14 +322,6 @@ def _load_yaml(path: Path) -> Any:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def _load_json(path: Path) -> Any:
-    import json
-
-    if not path.is_file():
-        raise SnapshotError(f"missing snapshot file: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def _canonical_bytes(payload: Any) -> bytes:
     import json
 
@@ -345,13 +337,12 @@ def snapshot_id_for(data_root: Path) -> str:
         data_root / "platforms.yaml",
         data_root / "policy_terms.yaml",
         data_root / "templates.yaml",
-        data_root / "sample_threads.json",
     ]
     hasher = sha256()
     for path in files:
         hasher.update(path.name.encode("utf-8"))
         hasher.update(b"\0")
-        hasher.update(_canonical_bytes(_load_yaml(path) if path.suffix == ".yaml" else _load_json(path)))
+        hasher.update(_canonical_bytes(_load_yaml(path)))
         hasher.update(b"\n")
     return hasher.hexdigest()[:16]
 
@@ -387,7 +378,6 @@ def bind_snapshot(
     scenario: str,
     account_key: str | None = None,
     interaction_key: str | None = None,
-    thread_key: str | None = None,
     comments: list[CommentIn] | None = None,
 ) -> Snapshot:
     accounts_doc = _load_yaml(data_root / "accounts.yaml")
@@ -444,17 +434,8 @@ def bind_snapshot(
     if scenario == "reply":
         if comments:
             comment_cards = _issue_comment_keys(comments)
-        elif thread_key:
-            threads = _load_json(data_root / "sample_threads.json").get("threads") or {}
-            if thread_key not in threads:
-                raise SnapshotError(f"unknown thread_key: {thread_key}")
-            thread = threads[thread_key]
-            raw_comments = [
-                CommentIn.model_validate(item) for item in thread.get("comments") or []
-            ]
-            comment_cards = _issue_comment_keys(raw_comments)
         else:
-            raise SnapshotError("reply requires thread_key or comments")
+            raise SnapshotError("reply requires comments")
 
     playbook = account or interaction
     if playbook is None:

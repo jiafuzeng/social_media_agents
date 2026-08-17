@@ -150,7 +150,7 @@ python run_im_assistant.py
 - `question`：企业经营数据库问数。
 - `matrix`：写推文、多平台草稿、回复评论与评理。
 
-Codex 必须由用户明确切换。企业微信可用 `thread:demo-1` 绑定回复 Flow。
+Codex 必须由用户明确切换。企业微信落到 matrix 时绑定创作 Flow；回评走 HTTP `comments[]`。
 
 ### 5. 调整沙盒策略
 

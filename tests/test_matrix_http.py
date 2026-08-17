@@ -4,7 +4,9 @@ import asyncio
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.config import PROJECT_ROOT
@@ -143,19 +145,17 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
         assert auto.status_code == 422
 
 
-def test_reply_without_thread_issues_text_as_comment() -> None:
+def test_reply_without_comments_issues_text_as_comment() -> None:
     created = MatrixTaskCreate(text="成分表在哪看？", scenario="reply")
-    assert created.thread_key is None
     assert created.comments is not None
     assert len(created.comments) == 1
     assert created.comments[0].text == "成分表在哪看？"
     assert created.comments[0].role == "root"
 
 
-def test_reply_with_thread_key_keeps_fixture() -> None:
-    created = MatrixTaskCreate(text="处理 demo 线程", scenario="reply", thread_key="demo-1")
-    assert created.thread_key == "demo-1"
-    assert created.comments is None
+def test_reply_rejects_thread_key() -> None:
+    with pytest.raises(ValidationError):
+        MatrixTaskCreate(text="处理 demo 线程", scenario="reply", thread_key="demo-1")
 
 
 def test_reply_without_thread_stays_on_demo(tmp_path: Path, monkeypatch) -> None:
@@ -216,7 +216,6 @@ def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
             json={
                 "text": "回评",
                 "scenario": "reply",
-                "thread_key": "demo-1",
                 "post_count": 2,
             },
         )
@@ -231,7 +230,6 @@ def test_reply_must_not_include_account_key(tmp_path: Path, monkeypatch) -> None
             json={
                 "text": "回评",
                 "scenario": "reply",
-                "thread_key": "demo-1",
                 "account_key": "default",
             },
         )
@@ -240,7 +238,6 @@ def test_reply_must_not_include_account_key(tmp_path: Path, monkeypatch) -> None
             "/api/reply",
             json={
                 "text": "回评",
-                "thread_key": "demo-1",
                 "account_key": "default",
             },
         )

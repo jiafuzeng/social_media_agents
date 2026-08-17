@@ -42,7 +42,6 @@ async def run_reply(
         data_root=data_root,
         interaction_key=request.interaction_key,
         scenario="reply",
-        thread_key=request.thread_key,
         comments=request.comments,
     )
     execution = REPLY_FLOW.create_execution(

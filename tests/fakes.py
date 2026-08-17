@@ -3,6 +3,29 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from integrated_agent.runtimes.matrix.models import CommentIn
+
+DEMO_REPLY_COMMENTS = [
+    CommentIn(
+        comment_key="c1",
+        text="这个真的稳赚吗？买了能翻倍吗？",
+        role="root",
+        author_display="用户甲",
+    ),
+    CommentIn(
+        comment_key="c2",
+        text="你们就是骗子，滚出这个平台",
+        role="root",
+        author_display="用户乙",
+    ),
+    CommentIn(
+        comment_key="c3",
+        text="成分表在哪看？有没有官方说明？",
+        role="root",
+        author_display="用户丙",
+    ),
+]
+
 
 async def fake_question_runner(
     question: str,

@@ -301,12 +301,51 @@ function applyComposerState(state) {
   document.querySelector("#needTrends").checked = Boolean(state.needTrends);
 }
 
-function userBubble(text) {
+function userBubble(text, kicker = "") {
   const article = document.createElement("article");
   article.className = "user-turn";
+  if (kicker) {
+    const tag = document.createElement("p");
+    tag.className = "msg-kicker";
+    tag.textContent = kicker;
+    article.append(tag);
+  }
   const body = document.createElement("p");
   body.textContent = text;
   article.append(body);
+  return article;
+}
+
+function chatPair(userNode, agentNode) {
+  const wrap = document.createElement("div");
+  wrap.className = "chat-pair";
+  wrap.append(userNode, agentNode);
+  return wrap;
+}
+
+function pendingAgentTurn(status = "正在回评…") {
+  const article = document.createElement("article");
+  article.className = "agent-turn";
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble agent pending";
+  const kicker = document.createElement("p");
+  kicker.className = "msg-kicker";
+  kicker.textContent = "AI 回评";
+  const line = document.createElement("p");
+  line.className = "thinking-status";
+  line.textContent = status;
+  bubble.append(kicker, line);
+  article.append(bubble);
+  return article;
+}
+
+function failedAgentTurn(message) {
+  const article = document.createElement("article");
+  article.className = "agent-turn";
+  const fail = document.createElement("p");
+  fail.className = "panel error";
+  fail.textContent = message;
+  article.append(fail);
   return article;
 }
 
@@ -501,6 +540,26 @@ function persistArchive() {
   localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archiveFolders));
 }
 
+function setArchiveStatus(text) {
+  const node = document.querySelector("#archiveStatus");
+  if (!node) return;
+  const message = String(text || "").trim();
+  node.hidden = !message;
+  node.textContent = message;
+}
+
+function hydrateResult(result, snapshot) {
+  if (!result) return result;
+  if (!result.task_id && snapshot?.task_id) result.task_id = snapshot.task_id;
+  return result;
+}
+
+function archiveSnapshotKey(result, row) {
+  const taskId = String(result?.task_id || "").trim();
+  if (taskId) return `${taskId}:${row.key}`;
+  return `once:${crypto.randomUUID()}`;
+}
+
 function activeFolder() {
   return archiveFolders.find(folder => folder.id === activeFolderId) || null;
 }
@@ -537,16 +596,19 @@ function findArchiveItemByText(text) {
 }
 
 function pruneArchiveSelection() {
-  const valid = new Set(archiveFolders.flatMap(folder => folder.items.map(item => item.key)));
+  const folder = activeFolder();
+  const valid = new Set((folder?.items || []).map(item => item.key));
   for (const key of [...selectedArchiveKeys]) {
     if (!valid.has(key)) selectedArchiveKeys.delete(key);
   }
 }
 
 function selectedArchiveComments() {
-  return [...selectedArchiveKeys]
-    .map(archiveItemByKey)
-    .filter(item => item && (item.text || "").trim());
+  const folder = activeFolder();
+  if (!folder) return [];
+  return folder.items.filter(
+    item => selectedArchiveKeys.has(item.key) && (item.text || "").trim()
+  );
 }
 
 function loadArchiveItemToReply(item) {
@@ -570,7 +632,7 @@ function syncArchiveReplyBar() {
   if (hint) {
     hint.textContent =
       scenario === "reply"
-        ? "点一条填入输入框；勾选后可批量回复。"
+        ? "在当前收藏夹勾选要回的推文，批量会并发回评。"
         : "先建收藏夹，对话里勾选后点「存入收藏夹」。";
   }
   const bar = document.querySelector("#archiveReplyBar");
@@ -712,14 +774,15 @@ function renderArchiveFolders() {
     const extra = Boolean(folder && folder.items.length > 5);
     foldHint.hidden = !extra;
     foldHint.textContent = extra
-      ? `共 ${folder.items.length} 条，默认显示 5 条，滑动可看全部。`
+      ? `共 ${folder.items.length} 条，滑动可看全部。`
       : "";
   }
   if (items && folder) {
     items.replaceChildren(
-      ...folder.items.map(item => {
+      ...folder.items.map((item, index) => {
         const row = document.createElement("li");
         row.className = `archive-item${scenario === "reply" ? " has-pick" : ""}`;
+        row.dataset.archiveKey = item.key;
         if (scenario === "reply") {
           const box = document.createElement("input");
           box.type = "checkbox";
@@ -739,7 +802,7 @@ function renderArchiveFolders() {
         button.type = "button";
         button.className = `pick-item${archivePeek && archivePeek.key === item.key ? " active" : ""}`;
         const heading = document.createElement("strong");
-        heading.textContent = `推文 ${item.index + 1} · ${item.platform_key || "x-twitter"}`;
+        heading.textContent = `推文 ${index + 1} · ${item.platform_key || "x-twitter"}`;
         const bound = (item.replies || []).length;
         if (bound) heading.textContent += ` · 已绑 ${bound} 条回复`;
         const text = document.createElement("p");
@@ -904,20 +967,25 @@ function ensureArchiveParent(folder, spec) {
 function attachReplyToParent(parent, snapshot) {
   parent.replies = parent.replies || [];
   if (parent.replies.some(entry => entry.key === snapshot.key)) return false;
-  parent.replies.push({ ...snapshot, boundTo: parent.key });
+  parent.replies.unshift({ ...snapshot, boundTo: parent.key });
   return true;
 }
 
 function addTopLevelSnapshots(folder, snapshots) {
   const seen = new Set(folder.items.map(item => item.key));
-  let added = 0;
+  const fresh = [];
   for (const snapshot of snapshots) {
     if (seen.has(snapshot.key)) continue;
-    folder.items.push({ ...snapshot, replies: snapshot.replies || [] });
+    fresh.push({ ...snapshot, replies: snapshot.replies || [] });
     seen.add(snapshot.key);
-    added += 1;
   }
-  return added;
+  if (fresh.length) folder.items.unshift(...fresh);
+  return fresh.length;
+}
+
+function revealArchiveTop() {
+  const items = document.querySelector("#archiveFolderItems");
+  if (items) items.scrollTop = 0;
 }
 
 function archiveSelectedTo(folderId) {
@@ -942,6 +1010,7 @@ function archiveSelectedTo(folderId) {
     activeFolderId = folder.id;
     persistArchive();
     renderArchiveFolders();
+    revealArchiveTop();
     setAssistTab("archive");
     setArchiveStatus(added ? `已存入「${folder.name}」${added} 条。` : "这些推文已在该收藏夹里。");
     return;
@@ -966,6 +1035,7 @@ function archiveSelectedTo(folderId) {
   activeFolderId = boundFolder?.id || folder?.id || activeFolderId;
   persistArchive();
   renderArchiveFolders();
+  revealArchiveTop();
   setAssistTab("archive");
   if (created && bound) {
     setArchiveStatus(
@@ -987,7 +1057,7 @@ function snapshotSelectedDrafts() {
   return visibleDraftRows(assistResult)
     .filter(row => selectedDraftKeys.has(row.key))
     .map(row => ({
-      key: row.key,
+      key: archiveSnapshotKey(assistResult, row),
       index: row.index,
       text: row.draft.text || "",
       platform_key: row.draft.platform_key || "x-twitter",
@@ -1018,7 +1088,7 @@ function gateLine(item) {
 function buildArchiveMarkdown(items, withSource, folderName) {
   const lines = [`# ${folderName || "MatrixCopilot 推文归档"}`, ""];
   items.forEach((item, index) => {
-    lines.push(`## 推文 ${item.index + 1} · ${item.platform_key}`);
+    lines.push(`## 推文 ${index + 1} · ${item.platform_key}`);
     lines.push("");
     lines.push(item.text || "（正文已清空）");
     lines.push("");
@@ -1304,7 +1374,7 @@ function renderTweetPick(result, row) {
   box.addEventListener("change", () => toggleDraftPick(result, row.key, box.checked));
   const body = document.createElement("div");
   const title = document.createElement("strong");
-  title.textContent = `推文 ${row.index + 1}`;
+  title.textContent = `${result.task_type === "reply_comment" ? "回复" : "推文"} ${row.index + 1}`;
   const text = document.createElement("p");
   text.className = "draft-text";
   text.textContent = row.draft.text || "（正文已清空）";
@@ -1356,10 +1426,12 @@ function compactAgentBubble(result) {
   bubble.className = "msg-bubble agent";
   const kicker = document.createElement("p");
   kicker.className = "msg-kicker";
-  kicker.textContent = "AI 回复";
+  const isReply = result.task_type === "reply_comment";
+  kicker.textContent = isReply ? "AI 回评" : "AI 回复";
   const summary = document.createElement("p");
   const remaining = visibleDraftRows(result).length;
-  summary.textContent = result.summary || `已生成 ${remaining} 条推文`;
+  summary.textContent =
+    result.summary || `已生成 ${remaining} 条${isReply ? "回复" : "推文"}`;
   const list = document.createElement("div");
   list.className = "tweet-list";
   fillTweetList(list, result);
@@ -1565,29 +1637,26 @@ async function openThread(id) {
   threadTurns.replaceChildren();
   let lastResult = null;
   for (const turn of thread.turns) {
-    threadTurns.append(userBubble(turn.text));
-    if (!turn.taskUrl) continue;
+    const isReplyTurn = Boolean(turn.replySourceKeys?.length || turn.replyComments?.length);
+    const user = userBubble(turn.text, isReplyTurn ? "原推" : "");
+    if (turn.error && !turn.taskUrl) {
+      threadTurns.append(chatPair(user, failedAgentTurn(turn.error)));
+      continue;
+    }
+    if (!turn.taskUrl) {
+      threadTurns.append(user);
+      continue;
+    }
     try {
-      const response = await fetch(turn.taskUrl);
-      const snapshot = await response.json();
-      if (snapshot.status === "failed") {
-        const fail = document.createElement("p");
-        fail.className = "panel error";
-        fail.textContent = snapshot.error || "该轮任务失败";
-        threadTurns.append(fail);
-        continue;
-      }
-      if (snapshot.result) {
-        lastResult = snapshot.result;
-        lastResult.replySourceKeys = turn.replySourceKeys || [];
-        lastResult.replyComments = turn.replyComments || [];
-        threadTurns.append(compactAgentBubble(snapshot.result, 1));
-      }
+      const result = await fetchTaskResult(turn.taskUrl);
+      result.replySourceKeys = turn.replySourceKeys || [];
+      result.replyComments = turn.replyComments || [];
+      lastResult = result;
+      threadTurns.append(chatPair(user, compactAgentBubble(result)));
     } catch (error) {
-      const fail = document.createElement("p");
-      fail.className = "panel error";
-      fail.textContent = "无法加载该轮结果，服务重启后历史任务会清空。";
-      threadTurns.append(fail);
+      threadTurns.append(
+        chatPair(user, failedAgentTurn(error.message || "无法加载该轮结果，服务重启后历史任务会清空。"))
+      );
     }
   }
   if (lastResult) {
@@ -1876,11 +1945,62 @@ function listItems(values, emptyText) {
   });
 }
 
-async function renderResult(taskUrl) {
+async function fetchTaskResult(taskUrl) {
   const response = await fetch(taskUrl);
   const snapshot = await response.json();
   if (snapshot.status === "failed") throw new Error(snapshot.error || "任务失败");
-  const result = snapshot.result;
+  if (!snapshot.result) throw new Error("任务没有返回草稿");
+  return hydrateResult(snapshot.result, snapshot);
+}
+
+function watchMatrixTask(accepted, { onEvent } = {}) {
+  return new Promise((resolve, reject) => {
+    const source = new EventSource(accepted.events_url);
+    let settled = false;
+    const stop = () => {
+      if (settled) return false;
+      settled = true;
+      source.close();
+      return true;
+    };
+    Object.keys(labels).forEach(type => {
+      source.addEventListener(type, async event => {
+        const payload = JSON.parse(event.data);
+        onEvent?.(type, payload);
+        if (type === "task.completed") {
+          if (!stop()) return;
+          try {
+            resolve(await fetchTaskResult(accepted.task_url));
+          } catch (error) {
+            reject(error);
+          }
+        }
+        if (type === "task.failed") {
+          if (!stop()) return;
+          reject(new Error(payload.data?.message || "任务失败"));
+        }
+      });
+    });
+    source.onerror = () => {
+      if (!stop()) return;
+      reject(new Error("事件连接中断"));
+    };
+  });
+}
+
+async function postMatrixTask(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const accepted = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(errorMessage(accepted, "请求未被服务接受"));
+  return accepted;
+}
+
+async function renderResult(taskUrl) {
+  const result = await fetchTaskResult(taskUrl);
   const seconds = Math.max(1, Math.round((Date.now() - runStartedAt) / 1000));
   selectedDraftKeys = new Set();
   focusedDraftKey = null;
@@ -1895,7 +2015,7 @@ async function renderResult(taskUrl) {
     (lastTurn?.replyComments || []).length
       ? lastTurn.replyComments
       : lastReplyJob.comments || [];
-  threadTurns.append(compactAgentBubble(result, seconds));
+  threadTurns.append(compactAgentBubble(result));
   fillAssistPanel(result, seconds);
   if (liveTurn) liveTurn.hidden = true;
   setBoard("done");
@@ -1940,33 +2060,132 @@ function payloadForSubmit(replyComments) {
   };
 }
 
+function newReplyThread(title) {
+  const thread = {
+    id: crypto.randomUUID(),
+    title,
+    ...composerState(),
+    scenario: "reply",
+    turns: [],
+    at: new Date()
+  };
+  threads.unshift(thread);
+  activeThreadId = thread.id;
+  lastThreadByScenario.reply = thread.id;
+  return thread;
+}
+
 async function submitArchiveBatch() {
   if (button.disabled) return;
   if (scenario !== "reply") {
     setArchiveStatus("请先切换到回评。");
     return;
   }
+  const folder = activeFolder();
   const items = selectedArchiveComments();
+  if (!folder) {
+    setArchiveStatus("请先选择一个收藏夹。");
+    return;
+  }
   if (!items.length) {
-    setArchiveStatus("请先勾选要回复的推文。");
+    setArchiveStatus("请在当前收藏夹里勾选要回复的推文。");
     return;
   }
   if (items.length > 10) {
     setArchiveStatus("一次最多回复 10 条，请先减少勾选。");
     return;
   }
-  const comments = items.map(item => ({ text: item.text.trim(), role: "root" }));
-  const displayText =
-    comments.length === 1
-      ? comments[0].text
-      : comments.map((item, index) => `${index + 1}. ${item.text}`).join("\n\n");
-  pendingReplySources = items.map(item => item.key);
-  await runMatrixJob({
-    displayText,
-    comments,
-    fromArchive: true,
-    replySourceKeys: pendingReplySources.slice()
+  let replyCount;
+  try {
+    replyCount = draftCount();
+  } catch (error) {
+    setArchiveStatus(error.message);
+    return;
+  }
+  button.disabled = true;
+  persistPicks();
+  syncArchiveReplyBar();
+  const thread = newReplyThread(`批量回评 · ${folder.name} · ${items.length} 条`);
+  renderHistory();
+  syncChatHeader();
+  setWorkspace("task");
+  setBoard("run");
+  progress.hidden = false;
+  threadTurns.replaceChildren();
+  if (liveTurn) liveTurn.hidden = true;
+  if (packagePanel) packagePanel.hidden = true;
+  setAssistEmpty(true);
+  errorPanel.hidden = true;
+  const agentMeta = document.querySelector("#agentMeta");
+  if (agentMeta) agentMeta.hidden = true;
+  runStartedAt = Date.now();
+  const interactionKey = selectedInteraction().interaction_key;
+  const slots = items.map((item, index) => {
+    const turn = {
+      text: item.text.trim(),
+      taskUrl: "",
+      at: new Date(),
+      replyComments: [item.text.trim()],
+      replySourceKeys: [item.key]
+    };
+    thread.turns.push(turn);
+    const pending = pendingAgentTurn(`正在回评 ${index + 1}/${items.length}…`);
+    const pair = chatPair(userBubble(item.text.trim(), "原推"), pending);
+    threadTurns.append(pair);
+    return { item, turn, pending, pair };
   });
+  threadTurns.lastElementChild?.scrollIntoView({ block: "end" });
+  let finished = 0;
+  let lastResult = null;
+  setArchiveStatus(`正在并发回评 0/${slots.length}…`);
+  try {
+    await loadAccounts();
+    await loadInteractions();
+    await Promise.all(
+      slots.map(async slot => {
+        try {
+          const accepted = await postMatrixTask("/api/reply", {
+            text: slot.item.text.trim(),
+            comments: [{ text: slot.item.text.trim(), role: "root" }],
+            interaction_key: interactionKey,
+            reply_count: replyCount,
+            channel: "web"
+          });
+          slot.turn.taskUrl = accepted.task_url;
+          const result = await watchMatrixTask(accepted);
+          result.replySourceKeys = [slot.item.key];
+          result.replyComments = [slot.item.text.trim()];
+          lastResult = result;
+          slot.pending.replaceWith(compactAgentBubble(result));
+        } catch (error) {
+          slot.turn.error = error.message || "回评失败";
+          slot.pending.replaceWith(failedAgentTurn(slot.turn.error));
+        } finally {
+          finished += 1;
+          setArchiveStatus(`正在并发回评 ${finished}/${slots.length}…`);
+        }
+      })
+    );
+    if (lastResult) fillAssistPanel(lastResult, Math.max(1, Math.round((Date.now() - runStartedAt) / 1000)));
+    selectedArchiveKeys.clear();
+    renderArchiveFolders();
+    setBoard("done");
+    const failed = slots.filter(slot => slot.turn.error).length;
+    const ok = slots.length - failed;
+    setArchiveStatus(
+      failed
+        ? `已完成 ${ok} 条原推，失败 ${failed} 条。`
+        : `已并发回评 ${ok} 条原推，每条 ${replyCount} 个回复。`
+    );
+    threadTurns.lastElementChild?.scrollIntoView({ block: "end" });
+  } catch (error) {
+    errorPanel.textContent = error.message;
+    errorPanel.hidden = false;
+    setBoard(threadTurns.children.length ? "done" : "home");
+  } finally {
+    button.disabled = false;
+    syncArchiveReplyBar();
+  }
 }
 
 async function submitTask(event) {
@@ -1995,7 +2214,7 @@ async function submitTask(event) {
   });
 }
 
-async function runMatrixJob({ displayText, comments, fromArchive = false, replySourceKeys = [] }) {
+async function runMatrixJob({ displayText, comments, replySourceKeys = [] }) {
   if (button.disabled) return;
   const text = (displayText || "").trim();
   if (!text) {
@@ -2022,7 +2241,7 @@ async function runMatrixJob({ displayText, comments, fromArchive = false, replyS
   setWorkspace("task");
   setBoard("run");
   progress.hidden = false;
-  threadTurns.append(userBubble(text));
+  threadTurns.append(userBubble(text, commentTexts.length ? "原推" : ""));
   if (liveTurn) liveTurn.hidden = false;
   resetLiveProcess();
   if (packagePanel) packagePanel.hidden = true;
@@ -2035,47 +2254,13 @@ async function runMatrixJob({ displayText, comments, fromArchive = false, replyS
   try {
     await loadAccounts();
     await loadInteractions();
-    const {url, body} = payloadForSubmit(comments);
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body)
-    });
-    const accepted = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(errorMessage(accepted, "请求未被服务接受"));
+    const { url, body } = payloadForSubmit(comments);
+    const accepted = await postMatrixTask(url, body);
     attachTaskUrl(accepted.task_url);
-    await new Promise((resolve, reject) => {
-      const source = new EventSource(accepted.events_url);
-      Object.keys(labels).forEach(type => {
-        source.addEventListener(type, async event => {
-          const payload = JSON.parse(event.data);
-          addEvent(type, payload);
-          if (type === "task.completed") {
-            source.close();
-            try {
-              await renderResult(accepted.task_url);
-              resolve();
-            } catch (error) {
-              reject(error);
-            }
-          }
-          if (type === "task.failed") {
-            source.close();
-            reject(new Error(payload.data?.message || "任务失败"));
-          }
-        });
-      });
-      source.onerror = () => {
-        source.close();
-        reject(new Error("事件连接中断"));
-      };
-    });
+    await watchMatrixTask(accepted, { onEvent: addEvent });
+    await renderResult(accepted.task_url);
     const box = document.querySelector(scenario === "reply" ? "#replyText" : "#composeText");
     if (box) box.value = "";
-    if (fromArchive) {
-      selectedArchiveKeys.clear();
-      renderArchiveFolders();
-    }
   } catch (error) {
     errorPanel.textContent = error.message;
     errorPanel.hidden = false;

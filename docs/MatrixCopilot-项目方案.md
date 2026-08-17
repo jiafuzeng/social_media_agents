@@ -87,11 +87,10 @@ flowchart LR
 | 入口 | 路由层写入 | 绑定 |
 |---|---|---|
 | HTTP `POST /api/create` | `runtime=matrix`，`scenario=compose` | `COMPOSE_FLOW` |
-| HTTP `POST /api/reply` | `runtime=matrix`，`scenario=reply`；无评论 → 422 | `REPLY_FLOW` |
+| HTTP `POST /api/reply` | `runtime=matrix`，`scenario=reply`；无 `comments` 则把 `text` 签发为一条评论 | `REPLY_FLOW` |
 | HTTP `POST /v1/matrix/tasks` | `runtime=matrix`；`scenario` 须 compose/reply，否则 422 | 对应 Flow |
 | HTTP `POST /v1/tasks` | `runtime=question` | 问数 Flow |
-| 企业微信 `thread:<key>` | auto 可选 matrix；`scenario=reply` | `REPLY_FLOW` |
-| 企业微信其余文本 | auto 选 runtime；落到 matrix 则 `scenario=compose` | `COMPOSE_FLOW` 或其它 Runtime |
+| 企业微信文本 | auto 选 runtime；落到 matrix 则 `scenario=compose` | `COMPOSE_FLOW` 或其它 Runtime |
 
 禁止：HTTP 绕过 Gateway 直打队列；一张 TriggerFlow 用 `scenario` 开关；由 Brief 做 `compose|reply|auto` 分类；一单 `mixed`。Gateway 的 runtime `auto`（选 matrix / question / agent）仍在。
 
@@ -99,7 +98,7 @@ flowchart LR
 
 | 项 | 约定 |
 |---|---|
-| 入站 | HTTP `/api/create` 或企业微信无 `thread:`；皆经 Gateway |
+| 入站 | HTTP `/api/create` 或企业微信文本落到 matrix；皆经 Gateway |
 | 输入 | 主题、目标、`platform_keys[]`、`account_key` |
 | 可选 | `need_trends=true` 时先抓取爆款，校验成 top-N 卡片再进 ComposeBrief |
 | Brief | 共享 talking points，按平台拆 work_item |
@@ -112,8 +111,8 @@ flowchart LR
 
 | 项 | 约定 |
 |---|---|
-| 入站 | HTTP `/api/reply` 或企业微信 `thread:<key>`；皆经 Gateway |
-| 输入 | 帖子快照 + offered comment 卡片；平台从线程继承 |
+| 入站 | HTTP `/api/reply`；Web 贴评或 `comments[]` |
+| 输入 | offered comment 卡片；平台固定 `x-twitter` |
 | 不用爆款 | 流程里没有 `fetch_trends` 节点 |
 | Brief | 每条评论一个 work_item |
 | Draft | 先裁 `reply / acknowledge / skip`，再写正文 |
@@ -345,15 +344,15 @@ P0 使用设计夹具，例如 `data/matrix/cases/x-twitter.json`（12 条 Twitt
 
 | 字段 | 含义 |
 |---|---|
-| text | 创作主题；回复有线程/评论时是运营指令，否则签发为待回评论 |
+| text | 创作主题；回复有 comments 时是运营指令，否则签发为待回评论 |
 | scenario | `compose` \| `reply`；入口已绑定则由宿主写入，禁止 `auto` |
-| platform_keys[] | 创作矩阵；回复可空，从 thread 继承 |
+| platform_keys[] | 创作矩阵；回复可空，平台固定 `x-twitter` |
 | account_key / brand_key | 矩阵账号人设 |
 | need_trends | 仅 compose；true 才跑抓取。reply 请求携带则忽略 |
-| thread_key / comments[] | 仅 reply；compose 请求携带则 422。都省略则用 text 签发一条评论，不默认 demo-1 |
+| comments[] | 仅 reply；compose 请求携带则 422。省略则用 text 签发一条评论 |
 | requester / channel | 审计，不进模型身份 |
 
-Gateway 纯文本可用 `thread:demo-1` 加载样例线程并绑定 `REPLY_FLOW`。无该前缀则绑定 `COMPOSE_FLOW`。
+Gateway 纯文本落到 matrix 时绑定 `COMPOSE_FLOW`。回评走 HTTP `comments[]`。
 
 ### 8.2 TaskResult
 
@@ -433,7 +432,6 @@ data/matrix/
   platforms.yaml
   policy_terms.yaml
   templates.yaml
-  sample_threads.json
   cases/x-twitter.json
 ```
 
@@ -489,7 +487,7 @@ S0→S3 串行合入；S4 可与 S2/S3 并行。P0 的 RetrieveCases 可以先�
 | 风险 | 缓解 |
 |---|---|
 | 演示案例被当成现行法 | 夹具带 disclaimer；生产只收官方摘录与内部拒稿 |
-| Gateway 文本带不上 thread_key | P0 允许 `thread:demo-1` |
+| Gateway 文本带不上结构化评论 | 回评走 HTTP `comments[]`；企业微信落到 matrix 时走创作 |
 | auto 把写帖误送到 agent | intent 卡片写清；可 `/agent matrix` |
 | Review 改写后又超限 | revise 后强制再跑 Gate，失败则保留已通过原文 |
 | 以后把 RAG 焊进 Gate | P0 先占 RetrieveCases 节点，空结果走 empty 契约 |

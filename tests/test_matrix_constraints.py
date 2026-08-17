@@ -15,6 +15,8 @@ from integrated_agent.runtimes.matrix.analysis.snapshots import (
     list_interaction_catalog,
     merged_forbidden_topics,
 )
+from integrated_agent.runtimes.matrix.models import CommentIn
+from tests.fakes import DEMO_REPLY_COMMENTS
 
 
 DATA_ROOT = PROJECT_ROOT / "data/matrix"
@@ -35,7 +37,7 @@ def test_unknown_interaction_key_fails_snapshot() -> None:
             data_root=DATA_ROOT,
             interaction_key="not-a-rule",
             scenario="reply",
-            thread_key="demo-1",
+            comments=[CommentIn(text="成分表在哪看？")],
         )
 
 
@@ -103,7 +105,7 @@ def test_bind_reply_uses_interaction_not_account() -> None:
         data_root=DATA_ROOT,
         interaction_key="support-handoff",
         scenario="reply",
-        thread_key="demo-1",
+        comments=DEMO_REPLY_COMMENTS,
     )
     assert snapshot.account is None
     assert snapshot.interaction is not None

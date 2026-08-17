@@ -373,10 +373,21 @@ html:has(.matrix-app),
   display: grid;
   gap: 14px;
 }
+.chat-pair {
+  display: grid;
+  gap: 8px;
+  max-width: 94%;
+  justify-self: start;
+}
+.chat-pair > .user-turn,
+.chat-pair > .agent-turn {
+  max-width: none;
+}
 .user-turn,
 .agent-turn { margin: 0; max-width: 86%; }
 .user-turn { justify-self: start; }
 .agent-turn { justify-self: start; max-width: 94%; }
+.user-turn .msg-kicker { color: #6b7280; }
 .msg-bubble {
   border-radius: 12px;
   padding: 12px 14px;
@@ -503,6 +514,14 @@ html:has(.matrix-app),
 .draft-source .result-heading {
   margin: 12px 0 6px;
 }
+.archive-box {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
 .archive-box > .assist-hint,
 .archive-status {
   flex: none;
@@ -519,9 +538,13 @@ html:has(.matrix-app),
 .archive-panel[data-archive-box="pick"] { flex: none; }
 .archive-panel[data-archive-box="content"] {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.archive-panel[data-archive-box="content"] > :not(.archive-item-list) {
+  flex: none;
 }
 .archive-panel-kicker {
   margin: 0 0 10px;
@@ -639,14 +662,11 @@ html:has(.matrix-app),
   border-color: var(--accent);
 }
 .archive-item-list {
-  --row: 96px;
-  --gap: 8px;
   flex: 1;
   min-height: 0;
-  max-height: calc(5 * var(--row) + 4 * var(--gap));
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-right: 4px;
+  padding: 0 4px 12px 0;
   scrollbar-width: thin;
 }
 .archive-item-list > .archive-item {
@@ -655,14 +675,14 @@ html:has(.matrix-app),
 .archive-item-list .pick-item {
   height: auto;
   padding: 8px 12px;
-  overflow: visible;
+  overflow: hidden;
   text-align: left;
 }
 .archive-item-list .pick-item p {
   display: block;
   -webkit-line-clamp: unset;
   -webkit-box-orient: unset;
-  overflow: visible;
+  overflow: hidden;
   white-space: pre-wrap;
   word-break: break-word;
   text-align: left;
