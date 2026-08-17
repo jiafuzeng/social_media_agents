@@ -9,115 +9,190 @@
   <link rel="stylesheet" href="/static/matrix.css">
 </head>
 <body class="matrix-app" data-workspace="task" data-board="home">
+  <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8.6 4.6L10.1 3.2 18.3 12l-8.2 8.8-1.5-1.4L15.4 12z"/></svg>
+  </button>
   <div class="workbench">
-    <aside class="sidebar" aria-label="导航">
-      <header class="sidebar-brand">
-        <span class="rail-brand">M</span>
-        <div>
-          <strong>MatrixCopilot</strong>
-          <small>草稿工作台</small>
-        </div>
-      </header>
-      <nav class="sidebar-nav">
-        <button type="button" class="nav-item active" id="newTaskBtn" data-workspace="task">新建任务</button>
-        <button type="button" class="nav-item" data-workspace="catalog">专家·技能·连接器</button>
-        <a class="nav-item" href="/">问数</a>
-      </nav>
-      <section class="sidebar-block">
-        <h3>任务 <span id="taskCount">0</span></h3>
-        <div id="taskHistory" class="history-list"></div>
-      </section>
-      <footer class="sidebar-foot">
-        <span class="foot-avatar">M</span>
-        <span>Matrix</span>
-      </footer>
+    <aside class="icon-rail" id="iconRail" aria-label="导航">
+      <div class="app-dock">
+        <span class="rail-brand" title="MatrixCopilot">M</span>
+        <nav class="rail-nav">
+          <button type="button" class="nav-item active" id="newTaskBtn" data-workspace="task" aria-label="工作台" title="工作台">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/></svg>
+          </button>
+          <button type="button" class="nav-item" data-workspace="catalog" aria-label="配置" title="配置">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6.22l-2.39.96a7.03 7.03 0 00-1.63-.94l-.36-2.54a.5.5 0 00-.5-.42h-3.84a.5.5 0 00-.5.42l-.36 2.54c-.59.24-1.13.55-1.63.94l-2.39-.96a.5.5 0 00-.6.22L2.71 8.84a.5.5 0 00.12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 00-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.39 1.04.7 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.55 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>
+          </button>
+          <a class="nav-item" href="/" aria-label="问数" title="问数">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-10h8V3h-8z"/></svg>
+          </a>
+        </nav>
+        <span class="dock-sep" aria-hidden="true"></span>
+        <span class="foot-avatar" title="Matrix">M</span>
+        <button type="button" class="nav-item dock-hide" id="dockHideBtn" aria-label="隐藏导航" title="隐藏导航">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M15.4 4.6L13.9 3.2 5.7 12l8.2 8.8 1.5-1.4L8.6 12z"/></svg>
+        </button>
+      </div>
     </aside>
 
-    <main class="stage">
-      <section class="thread" id="taskStage">
-        <div class="home-hero" id="homeHero">
-          <h1 class="home-title" id="stageTitle">MatrixCopilot，我帮你</h1>
-          <div class="mode-switch" id="modeTabs" role="tablist">
-            <button type="button" class="tab active" data-scenario="compose" role="tab" aria-selected="true">写帖</button>
-            <button type="button" class="tab" data-scenario="reply" role="tab" aria-selected="false">回评</button>
+    <section class="desk" id="taskStage">
+      <aside class="session-pane">
+        <header class="session-head">
+          <div>
+            <strong>会话</strong>
+            <small>进行中 <span id="taskCount">0</span></small>
+          </div>
+        </header>
+        <div class="session-tabs" id="modeTabs" role="tablist">
+          <button type="button" class="tab active" data-scenario="compose" role="tab" aria-selected="true">写帖</button>
+          <button type="button" class="tab" data-scenario="reply" role="tab" aria-selected="false">回评</button>
+        </div>
+        <div id="taskHistory" class="history-list"></div>
+      </aside>
+
+      <section class="chat-pane">
+        <header class="chat-head">
+          <div class="chat-id">
+            <span class="chat-dot"></span>
+            <div>
+              <strong id="chatTitle">新任务</strong>
+              <small id="chatSub">写帖 · Twitter</small>
+            </div>
           </div>
           <div class="skill-chips" id="skillChips"></div>
+        </header>
+        <div class="home-hero" id="homeHero">
+          <h1 class="home-title" id="stageTitle">开始一单草稿</h1>
+          <p>交代写帖主题，或贴上要回的评论；右侧助手给出过硬门的草稿包。</p>
         </div>
         <div id="progress" class="thread-log" hidden>
           <div id="threadTurns"></div>
           <article class="agent-turn" id="liveTurn" hidden>
-            <p class="agent-name">MatrixCopilot</p>
-            <p class="agent-meta" id="agentMeta" hidden></p>
-            <div class="thinking" id="thinking">
-              <p class="thinking-title">执行过程</p>
-              <ol id="events"></ol>
-              <p class="thinking-status" id="thinkingStatus">生成草稿中，请稍候…</p>
+            <div class="msg-bubble agent pending">
+              <p class="msg-kicker">AI 回复</p>
+              <ol id="liveSteps" class="live-steps"></ol>
+              <p class="thinking-status" id="thinkingStatus">正在准备…</p>
             </div>
-            <section id="package" class="final-result" hidden>
-              <p id="summary" class="lede"></p>
-              <ol id="drafts" class="result-steps"></ol>
-              <p class="result-heading">证据</p>
-              <ul id="evidence" class="result-bullets"></ul>
-              <p class="result-heading">限制说明</p>
-              <ol id="limitations" class="result-steps"></ol>
-              <p id="snapshot" class="meta"></p>
-              <p id="packageMeta" class="meta"></p>
-            </section>
           </article>
         </div>
         <section id="error" class="panel error" hidden></section>
         <form id="taskForm" class="composer-dock">
-          <div class="composer-mascot" aria-hidden="true">🐱</div>
           <div id="composeForm" class="fields">
             <textarea id="composeText" rows="3" placeholder="今天帮你写点什么？Enter 发送，Shift+Enter 换行"></textarea>
+          </div>
+          <div id="replyForm" class="fields" hidden>
+            <textarea id="replyText" rows="3" placeholder="贴上要回的评论，Enter 发送，Shift+Enter 换行"></textarea>
+          </div>
+          <div class="composer-toolbar">
             <div class="dock-tools">
               <label class="field compact">
                 <span class="field-label">条数</span>
                 <input id="postCount" type="number" min="1" max="10" step="1" value="1">
               </label>
-              <label class="check chip-check">
+              <label class="check chip-check" id="trendsWrap">
                 <input type="checkbox" id="needTrends"> 爆款趋势
               </label>
             </div>
-          </div>
-          <div id="replyForm" class="fields" hidden>
-            <textarea id="replyText" rows="3" placeholder="交代回评任务，Enter 发送，Shift+Enter 换行"></textarea>
-            <div class="dock-tools">
-              <label class="field compact">
-                <span class="field-label">线程</span>
-                <input id="threadKey" value="demo-1" spellcheck="false">
-              </label>
-              <p class="hint">demo-1 含攻击评，应 skip 且正文为空。</p>
-            </div>
-          </div>
-          <div class="composer-toolbar">
-            <span class="plus-btn" aria-hidden="true">+</span>
             <div class="composer-toolbar-end">
-              <label class="foot-select">
-                <span>选择人设</span>
+              <label class="foot-select" id="accountSelectWrap">
+                <span>人设</span>
                 <select id="accountKey"></select>
               </label>
-              <button type="submit" id="submit" class="send-btn" aria-label="发送">
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 4l-1.4 1.4 5.6 5.6H4v2h12.2l-5.6 5.6L12 20l8-8z"/></svg>
-              </button>
+              <label class="foot-select" id="interactionSelectWrap" hidden>
+                <span>互动规则</span>
+                <select id="interactionKey"></select>
+              </label>
+              <button type="submit" id="submit" class="send-btn" aria-label="发送">发送</button>
             </div>
           </div>
         </form>
       </section>
 
-      <section class="catalog-stage" id="catalogEditor" hidden>
+      <aside class="assist-pane">
+        <header class="assist-head">
+          <div>
+            <strong>超级助手</strong>
+            <small>看依据 · 收藏夹</small>
+          </div>
+          <p class="agent-meta" id="agentMeta" hidden></p>
+        </header>
+        <div class="assist-tabs" id="assistTabs" role="tablist">
+          <button type="button" class="tab active" data-assist-tab="source" role="tab" aria-selected="true">依据</button>
+          <button type="button" class="tab" data-assist-tab="archive" role="tab" aria-selected="false">收藏夹</button>
+        </div>
+        <div class="assist-body">
+          <div class="assist-leaf" id="sourceLeaf">
+            <p id="assistEmpty" class="assist-empty">勾选一条推文，这里显示它为什么这样写。</p>
+            <div id="draftSource" class="draft-source" hidden>
+              <p class="result-heading">为什么这样写</p>
+              <p id="sourceRationale" class="rationale"></p>
+              <p class="result-heading">证据</p>
+              <ul id="sourceEvidence" class="result-bullets"></ul>
+              <p class="result-heading">硬门</p>
+              <p id="sourceGate" class="meta"></p>
+            </div>
+          </div>
+          <div class="assist-leaf" id="archiveLeaf" hidden>
+            <section id="archiveBox" class="archive-box">
+              <p id="archiveHint" class="assist-hint">先建收藏夹，对话里勾选后点「存入收藏夹」。</p>
+              <section class="archive-panel" data-archive-box="create">
+                <p class="archive-panel-kicker">新建收藏夹</p>
+                <form id="archiveCreate" class="archive-create">
+                  <input id="archiveName" type="text" maxlength="24" placeholder="文件夹名称">
+                  <button type="submit">创建</button>
+                </form>
+              </section>
+              <section class="archive-panel" data-archive-box="pick">
+                <p class="archive-panel-kicker">选择收藏夹</p>
+                <ol id="archiveFolders" class="archive-folders"></ol>
+                <p id="archivePickEmpty" class="archive-panel-empty">还没有收藏夹。</p>
+              </section>
+              <section class="archive-panel" id="archiveFolderView" data-archive-box="content" hidden>
+                <p class="archive-panel-kicker">收藏夹内容</p>
+                <p class="result-heading" id="archiveFolderTitle">文件夹</p>
+                <p id="archiveFoldHint" class="assist-hint" hidden>默认显示 5 条，滑动可看全部。</p>
+                <p id="archiveContentEmpty" class="archive-panel-empty" hidden>这个收藏夹还是空的。</p>
+                <ol id="archiveFolderItems" class="pick-list archive-item-list"></ol>
+                <div id="archiveReplyBar" class="archive-reply-bar" hidden>
+                  <p class="assist-hint">点一条填入输入框；勾选后可批量回复，最多 10 条。</p>
+                  <div class="archive-actions">
+                    <button type="button" id="archiveSelectAll">全选</button>
+                    <button type="button" id="archiveClearPick">清空选择</button>
+                    <button type="button" id="archiveBatchReply">批量回复</button>
+                  </div>
+                </div>
+              </section>
+              <p id="archiveStatus" class="archive-status" hidden></p>
+            </section>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="catalog-stage" id="catalogEditor" hidden>
         <div class="catalog-market">
           <header class="catalog-kicker">
-            <h2>精选场景</h2>
-            <p>人设、护栏、平台、词表、模板分开管。点卡片编辑，下一单写稿会重新加载。</p>
+            <h2>功能模块</h2>
+            <p>人设、互动规则、护栏、平台、硬禁词、模板分开管。点卡片进入对应目录，下一单会重新加载。</p>
           </header>
-          <div class="scenario-row" id="catalogScenarios"></div>
+          <div class="scenario-carousel">
+            <div class="scenario-viewport">
+              <div class="scenario-row" id="catalogScenarios"></div>
+            </div>
+            <button type="button" class="scene-nav scene-nav-prev" id="scenePrev" aria-label="上一组">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M15.4 4.6L13.9 3.2 5.7 12l8.2 8.8 1.5-1.4L8.6 12z"/></svg>
+            </button>
+            <button type="button" class="scene-nav scene-nav-next" id="sceneNext" aria-label="下一组">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8.6 4.6L10.1 3.2 18.3 12l-8.2 8.8-1.5-1.4L15.4 12z"/></svg>
+            </button>
+          </div>
           <div class="catalog-toolbar">
             <div class="tabs catalog-pills" id="catalogTabs" role="tablist">
               <button type="button" class="tab active" data-kind="accounts">人设</button>
+              <button type="button" class="tab" data-kind="interactions">互动规则</button>
               <button type="button" class="tab" data-kind="guardrails">护栏</button>
               <button type="button" class="tab" data-kind="platforms">平台</button>
-              <button type="button" class="tab" data-kind="policy">词表</button>
+              <button type="button" class="tab" data-kind="policy">硬禁词</button>
               <button type="button" class="tab" data-kind="templates">模板</button>
             </div>
             <div class="catalog-sort">
@@ -125,11 +200,11 @@
               <button type="button" class="ghost" id="catalogInsert">插入</button>
             </div>
           </div>
+          <p id="catalogKindHint" class="catalog-kind-hint">人设决定写帖的身份、目标和声量。</p>
           <div id="catalogList" class="catalog-grid"></div>
           <p id="catalogStatus" class="hint"></p>
         </div>
-      </section>
-    </main>
+    </section>
   </div>
   <div class="catalog-modal" id="catalogDrawer" hidden>
     <div class="catalog-backdrop" id="catalogBackdrop"></div>

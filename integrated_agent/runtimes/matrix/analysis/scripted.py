@@ -103,23 +103,43 @@ class ScriptedMatrixModel:
         comments = list(info.get("comments") or [])
         req_id = "r-reply"
         items: list[WorkItem] = []
-        for index, comment in enumerate(comments, start=1):
+        target = int(info.get("reply_count") or 0) or len(comments)
+        if len(comments) == 1:
+            comment = comments[0]
             body = str(comment.get("text") or "")
             claim_types = ["harassment", "reply_risk"] if _is_attack(body) else ["format"]
-            items.append(
-                WorkItem(
-                    work_item_id=f"rw{index}",
-                    kind="reply_comment",
-                    requirement_ids=[req_id],
-                    platform_key=TWITTER_PLATFORM_KEY,
-                    source_comment_key=str(comment["comment_key"]),
-                    goal="判断该不该回并起草",
-                    talking_points=[body[:40]],
-                    claim_types=claim_types,
+            key = str(comment["comment_key"])
+            for index in range(1, max(target, 1) + 1):
+                items.append(
+                    WorkItem(
+                        work_item_id=f"rw{index}",
+                        kind="reply_comment",
+                        requirement_ids=[req_id],
+                        platform_key=TWITTER_PLATFORM_KEY,
+                        source_comment_key=key,
+                        goal="判断该不该回并起草",
+                        talking_points=[body[:40]],
+                        claim_types=claim_types,
+                    )
                 )
-            )
+        else:
+            for index, comment in enumerate(comments, start=1):
+                body = str(comment.get("text") or "")
+                claim_types = ["harassment", "reply_risk"] if _is_attack(body) else ["format"]
+                items.append(
+                    WorkItem(
+                        work_item_id=f"rw{index}",
+                        kind="reply_comment",
+                        requirement_ids=[req_id],
+                        platform_key=TWITTER_PLATFORM_KEY,
+                        source_comment_key=str(comment["comment_key"]),
+                        goal="判断该不该回并起草",
+                        talking_points=[body[:40]],
+                        claim_types=claim_types,
+                    )
+                )
         return BriefOut(
-            normalized_brief=text.strip() or "回复样例线程",
+            normalized_brief=text.strip() or "回复已签发评论",
             requirements=[
                 Requirement(requirement_id=req_id, description="逐条评理并起草")
             ],

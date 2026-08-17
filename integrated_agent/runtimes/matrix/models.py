@@ -36,9 +36,19 @@ class CommentIn(DomainModel):
 class MatrixTaskCreate(DomainModel):
     """矩阵任务入站契约。Web 与 Gateway 最终都落成此对象；禁止 extra 字段，禁止 scenario=auto。"""
 
-    text: str = Field(min_length=1, description="用户原话：创作是主题/口径，回复是运营指令")
+    text: str = Field(
+        min_length=1,
+        description="用户原话：创作是主题/口径；回复有 thread_key 或 comments 时是运营指令，否则签发为待回评论",
+    )
     scenario: Scenario = Field(description="入口绑定的流程，compose 或 reply，决定跑哪张 Flow")
-    account_key: str = Field(default="default", description="矩阵账号：声量与人设；护栏由人设配置，不单独入参")
+    account_key: str | None = Field(
+        default=None,
+        description="写帖获客人设；仅 compose。reply 携带则 422",
+    )
+    interaction_key: str | None = Field(
+        default=None,
+        description="回评互动规则；仅 reply。compose 携带则 422",
+    )
     need_trends: bool = Field(
         default=False,
         description="是否先抓热帖再写；仅 compose 有效，reply 携带则忽略",
@@ -49,13 +59,19 @@ class MatrixTaskCreate(DomainModel):
         le=MAX_COMPOSE_POSTS,
         description="本次要出几条推文；仅 compose，范围 1–10。省略则由模型在平台上限内决定",
     )
+    reply_count: int | None = Field(
+        default=None,
+        ge=MIN_COMPOSE_POSTS,
+        le=MAX_COMPOSE_POSTS,
+        description="本次要出几条回复草稿；仅 reply，范围 1–10。一条评论时为变体数，多条评论时为覆盖条数。省略则每条评论一条",
+    )
     thread_key: str | None = Field(
         default=None,
-        description="回复线程夹具 id；仅 reply，compose 携带则 422",
+        description="回复线程夹具 id；仅 reply，compose 携带则 422。与 comments 都省略时，把 text 签发为一条评论",
     )
     comments: list[CommentIn] | None = Field(
         default=None,
-        description="直接提交的评论；与 thread_key 二选一即可走回复，compose 携带则 422",
+        description="直接提交的评论；与 thread_key 二选一即可走回复。都省略则用 text 签发一条。compose 携带则 422",
     )
     requester: str = Field(default="course-user", description="提交者，仅审计/日志，不参与拆解")
     channel: str = Field(default="web", description="来源通道 web 或 gateway，不改流程")
@@ -65,8 +81,21 @@ class MatrixTaskCreate(DomainModel):
         if self.scenario == "compose":
             if self.thread_key is not None or self.comments is not None:
                 raise ValueError("compose must not include thread_key or comments")
-        if self.scenario == "reply" and self.post_count is not None:
-            raise ValueError("reply must not include post_count")
+            if self.interaction_key is not None:
+                raise ValueError("compose must not include interaction_key")
+            if self.reply_count is not None:
+                raise ValueError("compose must not include reply_count")
+            if not self.account_key:
+                self.account_key = "default"
+        if self.scenario == "reply":
+            if self.post_count is not None:
+                raise ValueError("reply must not include post_count")
+            if self.account_key is not None:
+                raise ValueError("reply must not include account_key")
+            if not self.interaction_key:
+                self.interaction_key = "help-first"
+            if not self.thread_key and not self.comments:
+                self.comments = [CommentIn(text=self.text, role="root")]
         return self
 
 

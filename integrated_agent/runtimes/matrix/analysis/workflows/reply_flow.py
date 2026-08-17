@@ -40,7 +40,7 @@ async def run_reply(
 ) -> dict[str, Any]:
     snapshot = bind_snapshot(
         data_root=data_root,
-        account_key=request.account_key,
+        interaction_key=request.interaction_key,
         scenario="reply",
         thread_key=request.thread_key,
         comments=request.comments,

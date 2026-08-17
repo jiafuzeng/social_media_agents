@@ -99,7 +99,7 @@ CommentIn
   author_display: str | null = null      # 不得含 UID
 ```
 
-HTTP Transport 把路径写成 `GatewayRequest`（`runtime_key` + `scenario`）后交给 `AgentGateway`，不直连 TaskService。`/api/create` → matrix + compose；`/api/reply` → matrix + reply（须有 `thread_key` 或 `comments`）；`/v1/matrix/tasks` 须显式 `scenario=compose|reply`。
+HTTP Transport 把路径写成 `GatewayRequest`（`runtime_key` + `scenario`）后交给 `AgentGateway`，不直连 TaskService。`/api/create` → matrix + compose；`/api/reply` → matrix + reply（`thread_key` / `comments` 都省略则把 `text` 签发为一条评论，不再默认 `demo-1`）；`/v1/matrix/tasks` 须显式 `scenario=compose|reply`。
 
 企业微信：`text` 原样进入 Gateway；匹配 `thread:<key>` 则 `scenario=reply`，否则落到 matrix 时为 compose。附件不进 matrix。Brief 不做场景分类。
 

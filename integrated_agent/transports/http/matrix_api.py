@@ -7,21 +7,23 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import Field, ValidationError, model_validator
+from pydantic import Field, ValidationError
 
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.analysis.catalog import (
     CatalogError,
     MatrixCatalog,
-    PolicyDoc,
 )
 from integrated_agent.runtimes.matrix.analysis.snapshots import (
     AccountCard,
     GuardrailCard,
+    InteractionCard,
     PlatformCard,
     SnapshotError,
     TemplateCard,
+    TermListCard,
     list_account_catalog,
+    list_interaction_catalog,
 )
 from integrated_agent.runtimes.matrix.models import (
     MAX_COMPOSE_POSTS,
@@ -43,17 +45,16 @@ class AccountCatalogOut(DomainModel):
     accounts: list[AccountCard]
 
 
-class PolicyHttpIn(DomainModel):
-    term_list_id: str = Field(min_length=1)
-    disclaimer: str = ""
-    terms: list[str] = Field(min_length=1)
+class InteractionCatalogOut(DomainModel):
+    interactions: list[InteractionCard]
 
 
 class CatalogDumpOut(DomainModel):
     accounts: list[AccountCard]
+    interactions: list[InteractionCard]
     guardrails: list[GuardrailCard]
     platforms: list[PlatformCard]
-    policy: PolicyHttpIn
+    policy: list[TermListCard]
     templates: list[TemplateCard]
 
 
@@ -64,6 +65,11 @@ class TermInsertIn(DomainModel):
 
 class GuardrailAttachIn(DomainModel):
     guardrail_key: str = Field(min_length=1)
+    index: int | None = Field(default=None, ge=0)
+
+
+class TermListAttachIn(DomainModel):
+    term_list_id: str = Field(min_length=1)
     index: int | None = Field(default=None, ge=0)
 
 
@@ -82,17 +88,16 @@ class ComposeHttpIn(DomainModel):
 
 class ReplyHttpIn(DomainModel):
     text: str = Field(min_length=1)
-    account_key: str = "default"
+    interaction_key: str = "help-first"
+    reply_count: int | None = Field(
+        default=None,
+        ge=MIN_COMPOSE_POSTS,
+        le=MAX_COMPOSE_POSTS,
+    )
     thread_key: str | None = None
     comments: list[CommentIn] | None = None
     requester: str = "course-user"
     channel: str = "web"
-
-    @model_validator(mode="after")
-    def require_comments(self) -> "ReplyHttpIn":
-        if not self.thread_key and not self.comments:
-            raise ValueError("reply requires thread_key or comments")
-        return self
 
 
 def event_to_sse(event: TaskEvent) -> str:
@@ -150,6 +155,10 @@ def build_matrix_router(
     async def list_accounts() -> AccountCatalogOut:
         return AccountCatalogOut(accounts=list_account_catalog(catalog_root))
 
+    @router.get("/api/interactions", response_model=InteractionCatalogOut)
+    async def list_interactions() -> InteractionCatalogOut:
+        return InteractionCatalogOut(interactions=list_interaction_catalog(catalog_root))
+
     @router.get("/api/catalog", response_model=CatalogDumpOut)
     async def get_catalog() -> CatalogDumpOut:
         return CatalogDumpOut.model_validate(_catalog_call(catalog.dump_all))
@@ -179,6 +188,67 @@ def build_matrix_router(
         return _catalog_call(
             lambda: catalog.insert_account_guardrail(
                 account_key, command.guardrail_key, index=command.index
+            )
+        )
+
+    @router.post(
+        "/api/catalog/accounts/{account_key}/term-lists",
+        response_model=AccountCard,
+    )
+    async def attach_account_term_list(
+        account_key: str, command: TermListAttachIn
+    ) -> AccountCard:
+        return _catalog_call(
+            lambda: catalog.insert_account_term_list(
+                account_key, command.term_list_id, index=command.index
+            )
+        )
+
+    @router.post("/api/catalog/interactions", response_model=InteractionCard, status_code=201)
+    async def create_interaction(
+        command: InteractionCard,
+        index: int | None = Query(default=None, ge=0),
+    ) -> InteractionCard:
+        return _catalog_call(lambda: catalog.create_interaction(command, index=index))
+
+    @router.put(
+        "/api/catalog/interactions/{interaction_key}",
+        response_model=InteractionCard,
+    )
+    async def update_interaction(
+        interaction_key: str, command: InteractionCard
+    ) -> InteractionCard:
+        return _catalog_call(
+            lambda: catalog.update_interaction(interaction_key, command)
+        )
+
+    @router.delete("/api/catalog/interactions/{interaction_key}", status_code=204)
+    async def delete_interaction(interaction_key: str) -> None:
+        _catalog_call(lambda: catalog.delete_interaction(interaction_key))
+
+    @router.post(
+        "/api/catalog/interactions/{interaction_key}/guardrails",
+        response_model=InteractionCard,
+    )
+    async def attach_interaction_guardrail(
+        interaction_key: str, command: GuardrailAttachIn
+    ) -> InteractionCard:
+        return _catalog_call(
+            lambda: catalog.insert_interaction_guardrail(
+                interaction_key, command.guardrail_key, index=command.index
+            )
+        )
+
+    @router.post(
+        "/api/catalog/interactions/{interaction_key}/term-lists",
+        response_model=InteractionCard,
+    )
+    async def attach_interaction_term_list(
+        interaction_key: str, command: TermListAttachIn
+    ) -> InteractionCard:
+        return _catalog_call(
+            lambda: catalog.insert_interaction_term_list(
+                interaction_key, command.term_list_id, index=command.index
             )
         )
 
@@ -212,30 +282,40 @@ def build_matrix_router(
     async def delete_platform(platform_key: str) -> None:
         _catalog_call(lambda: catalog.delete_platform(platform_key))
 
-    @router.put("/api/catalog/policy", response_model=PolicyHttpIn)
-    async def update_policy(command: PolicyHttpIn) -> PolicyHttpIn:
-        updated = _catalog_call(
-            lambda: catalog.update_policy(
-                PolicyDoc(
-                    term_list_id=command.term_list_id,
-                    disclaimer=command.disclaimer,
-                    terms=command.terms,
-                )
+    @router.post("/api/catalog/policy", response_model=TermListCard, status_code=201)
+    async def create_term_list(
+        command: TermListCard,
+        index: int | None = Query(default=None, ge=0),
+    ) -> TermListCard:
+        return _catalog_call(lambda: catalog.create_term_list(command, index=index))
+
+    @router.put("/api/catalog/policy/{term_list_id}", response_model=TermListCard)
+    async def update_term_list(term_list_id: str, command: TermListCard) -> TermListCard:
+        return _catalog_call(lambda: catalog.update_term_list(term_list_id, command))
+
+    @router.delete("/api/catalog/policy/{term_list_id}", status_code=204)
+    async def delete_term_list(term_list_id: str) -> None:
+        _catalog_call(lambda: catalog.delete_term_list(term_list_id))
+
+    @router.post(
+        "/api/catalog/policy/{term_list_id}/terms",
+        response_model=TermListCard,
+    )
+    async def insert_policy_term(term_list_id: str, command: TermInsertIn) -> TermListCard:
+        return _catalog_call(
+            lambda: catalog.insert_term(
+                command.term, term_list_id=term_list_id, index=command.index
             )
         )
-        return PolicyHttpIn.model_validate(updated.as_dict())
 
-    @router.post("/api/catalog/policy/terms", response_model=PolicyHttpIn)
-    async def insert_policy_term(command: TermInsertIn) -> PolicyHttpIn:
-        updated = _catalog_call(
-            lambda: catalog.insert_term(command.term, index=command.index)
+    @router.delete(
+        "/api/catalog/policy/{term_list_id}/terms/{term}",
+        response_model=TermListCard,
+    )
+    async def delete_policy_term(term_list_id: str, term: str) -> TermListCard:
+        return _catalog_call(
+            lambda: catalog.delete_term(term, term_list_id=term_list_id)
         )
-        return PolicyHttpIn.model_validate(updated.as_dict())
-
-    @router.delete("/api/catalog/policy/terms/{term}", response_model=PolicyHttpIn)
-    async def delete_policy_term(term: str) -> PolicyHttpIn:
-        updated = _catalog_call(lambda: catalog.delete_term(term))
-        return PolicyHttpIn.model_validate(updated.as_dict())
 
     @router.post("/api/catalog/templates", response_model=TemplateCard, status_code=201)
     async def create_template(

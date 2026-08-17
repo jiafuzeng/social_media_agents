@@ -12,6 +12,7 @@ from integrated_agent.runtimes.matrix.analysis.snapshots import (
     SnapshotError,
     bind_snapshot,
     list_account_catalog,
+    list_interaction_catalog,
     merged_forbidden_topics,
 )
 
@@ -28,6 +29,16 @@ def test_t01_unknown_account_key_fails_snapshot() -> None:
         )
 
 
+def test_unknown_interaction_key_fails_snapshot() -> None:
+    with pytest.raises(SnapshotError, match="unknown interaction_key"):
+        bind_snapshot(
+            data_root=DATA_ROOT,
+            interaction_key="not-a-rule",
+            scenario="reply",
+            thread_key="demo-1",
+        )
+
+
 def test_twitter_platform_caps_posts_at_ten() -> None:
     snapshot = bind_snapshot(
         data_root=DATA_ROOT,
@@ -40,9 +51,9 @@ def test_twitter_platform_caps_posts_at_ten() -> None:
     assert snapshot.account.goals
 
 
-def test_account_catalog_has_ten_personas() -> None:
+def test_account_catalog_has_compose_personas() -> None:
     cards = list_account_catalog(DATA_ROOT)
-    assert len(cards) == 10
+    assert len(cards) == 8
     keys = {item.account_key for item in cards}
     assert keys == {
         "default",
@@ -53,34 +64,65 @@ def test_account_catalog_has_ten_personas() -> None:
         "neighborhood-host",
         "career-editor",
         "oss-devrel",
-        "civic-ngo",
-        "support-desk",
     }
-    civic = next(item for item in cards if item.account_key == "civic-ngo")
-    assert civic.background
-    assert civic.goals
-    assert civic.must_not
-    assert civic.guardrail_keys == ["default", "civic"]
+    for item in cards:
+        assert "reply_stance" not in item.model_dump()
+
+
+def test_interaction_catalog_is_separate_from_accounts() -> None:
+    cards = list_interaction_catalog(DATA_ROOT)
+    assert {item.interaction_key for item in cards} == {
+        "help-first",
+        "cool-down",
+        "strict-skip",
+        "support-handoff",
+    }
+    help_first = next(item for item in cards if item.interaction_key == "help-first")
+    assert help_first.skip_guidance
+    assert help_first.guardrail_keys == ["default"]
+    assert help_first.term_list_keys == ["baseline"]
 
 
 def test_bind_merges_account_guardrails() -> None:
-    snapshot = bind_snapshot(
-        data_root=DATA_ROOT,
-        account_key="support-desk",
-        scenario="compose",
-    )
-    assert snapshot.account.display_name == "青木支持 / 口碑增长"
-    assert [item.guardrail_key for item in snapshot.guardrails] == ["default", "support"]
-    topics = merged_forbidden_topics(snapshot.guardrails)
-    assert "虚假疗效" in topics
-    assert "收集密码或验证码" in topics
     maker = bind_snapshot(
         data_root=DATA_ROOT,
         account_key="indie-hacker",
         scenario="compose",
     )
+    assert maker.interaction is None
     assert [item.guardrail_key for item in maker.guardrails] == ["default", "maker"]
     assert "虚构融资或客户" in merged_forbidden_topics(maker.guardrails)
+    assert maker.account.term_list_keys == ["baseline", "finance"]
+    assert "财务自由" in maker.policy.terms
+    assert "治愈" in maker.policy.terms
+    assert maker.policy.term_list_id == "baseline+finance"
+
+
+def test_bind_reply_uses_interaction_not_account() -> None:
+    snapshot = bind_snapshot(
+        data_root=DATA_ROOT,
+        interaction_key="support-handoff",
+        scenario="reply",
+        thread_key="demo-1",
+    )
+    assert snapshot.account is None
+    assert snapshot.interaction is not None
+    assert snapshot.interaction.display_name == "客服分流"
+    assert [item.guardrail_key for item in snapshot.guardrails] == ["default", "support"]
+    topics = merged_forbidden_topics(snapshot.guardrails)
+    assert "虚假疗效" in topics
+    assert "收集密码或验证码" in topics
+    assert snapshot.interaction.term_list_keys == ["baseline", "support-hard"]
+    assert "把验证码发给我" in snapshot.policy.terms
+    assert "把密码发给我" in snapshot.policy.terms
+    assert "立即赔偿" in snapshot.policy.terms
+
+
+def test_unknown_term_list_id_fails_resolve() -> None:
+    from integrated_agent.runtimes.matrix.analysis.snapshots import resolve_term_lists
+
+    with pytest.raises(SnapshotError, match="unknown term_list_id"):
+        resolve_term_lists(["no-such-pack"], {})
 
 
 @pytest.mark.asyncio

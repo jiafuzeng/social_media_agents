@@ -27,9 +27,10 @@ accounts:
     - 承诺稳赚、保本、治愈或保证涨粉数字
     - 虚构排队、售罄或未授权最高级
     - 冒充监管、平台或公权力
-    reply_stance: 产品怎么用、哪里买、是否适合某场景——认真回并顺势邀请关注系列。人身攻击、索要内部数据、无法核实的诱导不回。
     guardrail_keys:
     - default
+    term_list_keys:
+    - baseline
   indie-hacker:
     account_key: indie-hacker
     display_name: 林可 / 独立产品增长
@@ -60,10 +61,12 @@ accounts:
     - 保证涨粉、被动收入或稳赚
     - 伪造融资、团队或大客户
     - 把未上线功能写成已发布
-    reply_stance: 对技术细节和「在哪加入等待名单」详细回。求带、保证月入、嘲讽跳过。
     guardrail_keys:
     - default
     - maker
+    term_list_keys:
+    - baseline
+    - finance
   community-host:
     account_key: community-host
     display_name: 阿舟 / 社群裂变
@@ -92,9 +95,10 @@ accounts:
     - 承诺加入就能变现或治愈焦虑
     - 未披露的广告位或互刷关注
     - 公开羞辱以博眼球
-    reply_stance: 感谢、报名、场地问题必回，并邀请关注置顶场次。阴阳怪气降温一次后升级则跳过。
     guardrail_keys:
     - default
+    term_list_keys:
+    - baseline
   science-writer:
     account_key: science-writer
     display_name: 沈秋 / 科普获客
@@ -125,9 +129,11 @@ accounts:
     - 治愈、药到病除、替代正规治疗
     - 用恐吓涨粉或给个体化用药建议
     - 把预印本当成已确认结论
-    reply_stance: 方法学追问认真回并邀请看系列。求方、求确诊、传谣跳过。
     guardrail_keys:
     - default
+    term_list_keys:
+    - baseline
+    - medical
   b2b-pm:
     account_key: b2b-pm
     display_name: 韩放 / SaaS 获客
@@ -158,10 +164,12 @@ accounts:
     - 保证 SLA、赔偿或赢单
     - 泄露客户名或贬低具名竞品
     - 把内测当成全量可用
-    reply_stance: 公开产品问题给文档；报价合同转销售/客服。对「怎么关注版本系列」热情回。
     guardrail_keys:
     - default
     - maker
+    term_list_keys:
+    - baseline
+    - finance
   neighborhood-host:
     account_key: neighborhood-host
     display_name: 南街窗口 / 到店种草
@@ -190,9 +198,11 @@ accounts:
     - 减肥、排毒、治愈等功效承诺
     - 虚构排队或强迫倒计时
     - 未经同意描述顾客正脸或儿童
-    reply_stance: 问路、过敏原、座位必回。引战和假优惠码不回。
     guardrail_keys:
     - default
+    term_list_keys:
+    - baseline
+    - medical
   career-editor:
     account_key: career-editor
     display_name: 乔白 / 职场获客
@@ -223,9 +233,10 @@ accounts:
     - 保证录取、涨薪、内推成功或涨粉数量
     - 贩卖裁员焦虑、贬低具名员工
     - 在评论区收身份证或薪资单
-    reply_stance: 通用方法详细回。要改个人简历、要内推、要预测裁员——说明做不到，邀请看免费系列即可。
     guardrail_keys:
     - default
+    term_list_keys:
+    - baseline
   oss-devrel:
     account_key: oss-devrel
     display_name: Mira / 开发者品牌
@@ -256,13 +267,11 @@ accounts:
     - 编造 benchmark 或保证性能
     - 攻击其他维护者来涨粉
     - 把未合并 PR 说成已发布
-    reply_stance: 可复现 bug 去 issue；功能给文档。对「如何跟版本」热情回。安全与诉讼不展开。
     guardrail_keys:
     - default
     - maker
-
-
-    
+    term_list_keys:
+    - baseline
 guardrails:
   default:
     guardrail_key: default

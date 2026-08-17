@@ -9,7 +9,11 @@ from fastapi.testclient import TestClient
 from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
-from integrated_agent.runtimes.matrix.models import MatrixTaskRequest, MatrixTaskResult
+from integrated_agent.runtimes.matrix.models import (
+    MatrixTaskCreate,
+    MatrixTaskRequest,
+    MatrixTaskResult,
+)
 from integrated_agent.runtimes.matrix.service import MatrixTaskService
 from integrated_agent.runtimes.question.analysis import QuestionAnalysisCapability
 from integrated_agent.runtimes.question.service import QuestionTaskService
@@ -121,7 +125,10 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
         page = client.get("/matrix").text
         assert "写帖" in page
         assert 'id="postCount"' in page
+        assert 'id="threadKey"' not in page
         assert 'id="accountKey"' in page
+        assert 'id="interactionKey"' in page
+        assert "互动规则" in page
         assert 'id="submit"' in page
         assert 'id="taskForm"' in page
         assert 'max="10"' in page
@@ -131,16 +138,46 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
         assert 'id="taskHistory"' in page
         catalog = client.get("/api/accounts")
         assert catalog.status_code == 200
-        assert len(catalog.json()["accounts"]) == 10
+        assert len(catalog.json()["accounts"]) == 8
         auto = client.post("/v1/matrix/tasks", json={"text": "写帖", "scenario": "auto"})
         assert auto.status_code == 422
 
 
-def test_reply_without_comments_is_422(tmp_path: Path, monkeypatch) -> None:
+def test_reply_without_thread_issues_text_as_comment() -> None:
+    created = MatrixTaskCreate(text="成分表在哪看？", scenario="reply")
+    assert created.thread_key is None
+    assert created.comments is not None
+    assert len(created.comments) == 1
+    assert created.comments[0].text == "成分表在哪看？"
+    assert created.comments[0].role == "root"
+
+
+def test_reply_with_thread_key_keeps_fixture() -> None:
+    created = MatrixTaskCreate(text="处理 demo 线程", scenario="reply", thread_key="demo-1")
+    assert created.thread_key == "demo-1"
+    assert created.comments is None
+
+
+def test_reply_without_thread_stays_on_demo(tmp_path: Path, monkeypatch) -> None:
     app = create_matrix_api(_matrix_service(monkeypatch))
     with TestClient(app) as client:
-        rejected = client.post("/api/reply", json={"text": "回评"})
-        assert rejected.status_code == 422
+        accepted = client.post("/api/reply", json={"text": "成分表在哪看？"})
+        assert accepted.status_code == 202
+        payload = accepted.json()
+        snapshot: dict[str, object] = {}
+        for _ in range(200):
+            snapshot = client.get(payload["task_url"]).json()
+            if snapshot["status"] in {"completed", "failed"}:
+                break
+            time.sleep(0.02)
+        assert snapshot["status"] == "completed"
+        result = snapshot["result"]
+        assert isinstance(result, dict)
+        drafts = result["drafts"]
+        assert isinstance(drafts, list)
+        assert len(drafts) == 1
+        assert drafts[0]["source_comment_key"] == "c1"
+        assert drafts[0]["text"]
 
 
 def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
@@ -150,6 +187,25 @@ def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> 
         too_high = client.post("/api/create", json={"text": "写帖", "post_count": 11})
         assert too_low.status_code == 422
         assert too_high.status_code == 422
+
+
+def test_reply_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        too_low = client.post("/api/reply", json={"text": "回评", "reply_count": 0})
+        too_high = client.post("/api/reply", json={"text": "回评", "reply_count": 11})
+        assert too_low.status_code == 422
+        assert too_high.status_code == 422
+
+
+def test_compose_must_not_include_reply_count(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        rejected = client.post(
+            "/v1/matrix/tasks",
+            json={"text": "写帖", "scenario": "compose", "reply_count": 2},
+        )
+        assert rejected.status_code == 422
 
 
 def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
@@ -167,6 +223,44 @@ def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
         assert rejected.status_code == 422
 
 
+def test_reply_must_not_include_account_key(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        rejected = client.post(
+            "/v1/matrix/tasks",
+            json={
+                "text": "回评",
+                "scenario": "reply",
+                "thread_key": "demo-1",
+                "account_key": "default",
+            },
+        )
+        assert rejected.status_code == 422
+        extra = client.post(
+            "/api/reply",
+            json={
+                "text": "回评",
+                "thread_key": "demo-1",
+                "account_key": "default",
+            },
+        )
+        assert extra.status_code == 422
+
+
+def test_compose_must_not_include_interaction_key(tmp_path: Path, monkeypatch) -> None:
+    app = create_matrix_api(_matrix_service(monkeypatch))
+    with TestClient(app) as client:
+        rejected = client.post(
+            "/v1/matrix/tasks",
+            json={
+                "text": "写帖",
+                "scenario": "compose",
+                "interaction_key": "help-first",
+            },
+        )
+        assert rejected.status_code == 422
+
+
 def test_account_catalog_endpoint(tmp_path: Path, monkeypatch) -> None:
     app = create_matrix_api(_matrix_service(monkeypatch))
     with TestClient(app) as client:
@@ -174,4 +268,12 @@ def test_account_catalog_endpoint(tmp_path: Path, monkeypatch) -> None:
         assert catalog.status_code == 200
         keys = [item["account_key"] for item in catalog.json()["accounts"]]
         assert "indie-hacker" in keys
-        assert len(keys) == 10
+        assert len(keys) == 8
+        interactions = client.get("/api/interactions")
+        assert interactions.status_code == 200
+        interaction_keys = [
+            item["interaction_key"] for item in interactions.json()["interactions"]
+        ]
+        assert "help-first" in interaction_keys
+        assert "support-handoff" in interaction_keys
+        assert len(interaction_keys) == 4

@@ -345,12 +345,12 @@ P0 使用设计夹具，例如 `data/matrix/cases/x-twitter.json`（12 条 Twitt
 
 | 字段 | 含义 |
 |---|---|
-| text | 创作主题或回复指令 |
+| text | 创作主题；回复有线程/评论时是运营指令，否则签发为待回评论 |
 | scenario | `compose` \| `reply`；入口已绑定则由宿主写入，禁止 `auto` |
 | platform_keys[] | 创作矩阵；回复可空，从 thread 继承 |
 | account_key / brand_key | 矩阵账号人设 |
 | need_trends | 仅 compose；true 才跑抓取。reply 请求携带则忽略 |
-| thread_key / comments[] | 仅 reply；compose 请求携带则 422 |
+| thread_key / comments[] | 仅 reply；compose 请求携带则 422。都省略则用 text 签发一条评论，不默认 demo-1 |
 | requester / channel | 审计，不进模型身份 |
 
 Gateway 纯文本可用 `thread:demo-1` 加载样例线程并绑定 `REPLY_FLOW`。无该前缀则绑定 `COMPOSE_FLOW`。

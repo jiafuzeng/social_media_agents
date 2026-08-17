@@ -68,8 +68,7 @@ async def retrieve_and_gate_draft(
 
     platform = snapshot.platform
     matcher = AhoCorasickMatcher(snapshot.policy.terms)
-    info = {
-        "account": snapshot.account.model_dump(mode="json"),
+    info: dict[str, Any] = {
         "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
         "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
         "max_chars": platform.max_chars,
@@ -81,6 +80,10 @@ async def retrieve_and_gate_draft(
         },
         "comment": comment,
     }
+    if snapshot.account is not None:
+        info["account"] = snapshot.account.model_dump(mode="json")
+    if snapshot.interaction is not None:
+        info["interaction"] = snapshot.interaction.model_dump(mode="json")
     draft = await draft_once(
         work_item=work_item.model_dump(mode="json"),
         info=info,

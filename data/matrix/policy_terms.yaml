@@ -1,8 +1,83 @@
-term_list_id: demo-policy-v1
-disclaimer: 演示词表，不是现行执法清单。
-terms:
-  - 稳赚
-  - 治愈
-  - 保本
-  - 药到病除
-  - 必涨
+disclaimer: 演示清单，按常见公域翻车口径整理，不是现行执法清单。
+term_lists:
+  baseline:
+    term_list_id: baseline
+    display_name: 通用空承诺
+    summary: 广告法绝对化用语和获客数字保证。所有写帖、回评默认都挂。
+    disclaimer: 演示清单，不是现行执法清单。
+    terms:
+    - 稳赚
+    - 保本
+    - 治愈
+    - 药到病除
+    - 保证涨粉
+    - 永久有效
+    - 无效退款
+    - 第一品牌
+    - 国家级认证
+    - 点击就赚
+    - 保证录取
+    - 保证涨薪
+    - 加入就能变现
+  medical:
+    term_list_id: medical
+    display_name: 医疗保健
+    summary: 诊疗、处方、保健品功效等字面承诺。挂科普号、到店餐饮和高风险少回。
+    disclaimer: 演示清单，不是现行执法清单。
+    terms:
+    - 根治
+    - 包治
+    - 替代正规治疗
+    - 处方药
+    - 无副作用
+    - 祖传秘方
+    - 特效药
+    - 排毒养颜
+    - 减肥药
+    - 一次见效
+    - 三甲医院推荐
+  finance:
+    term_list_id: finance
+    display_name: 收益与变现
+    summary: 理财保本、躺赚和成交保证。挂独立开发和 B2B 获客号。
+    disclaimer: 演示清单，不是现行执法清单。
+    terms:
+    - 财务自由
+    - 被动收入
+    - 躺赚
+    - 月入十万
+    - 零风险
+    - 保证收益
+    - 必涨
+    - 保证成交
+    - 保证SLA
+    - 内幕消息
+    - 保本保息
+  civic-hard:
+    term_list_id: civic-hard
+    display_name: 公权力口径
+    summary: 冒充官方、伪造通报或诱导转账。挂高风险少回。
+    disclaimer: 演示清单，不是现行执法清单。
+    terms:
+    - 代表政府
+    - 官方认证必过
+    - 我是民警
+    - 以警方名义
+    - 内部红头文件
+    - 国家点名通报
+    - 配合调查转账
+    - 已被列为失信
+  support-hard:
+    term_list_id: support-hard
+    display_name: 客服红线
+    summary: 公域承诺时效、索要口令或诱导转账。挂客服分流。
+    disclaimer: 演示清单，不是现行执法清单。
+    terms:
+    - 立即赔偿
+    - 保证三天内赔
+    - 今天必须到账
+    - 把密码发给我
+    - 把验证码发给我
+    - 把银行卡发给我
+    - 远程帮你转账
+    - 点击链接解封

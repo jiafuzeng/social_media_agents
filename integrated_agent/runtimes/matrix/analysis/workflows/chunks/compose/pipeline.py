@@ -73,7 +73,7 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
         "platform": snapshot.platform.model_dump(mode="json"),
         "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
         "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
-        "account": snapshot.account.model_dump(mode="json"),
+        "account": snapshot.account.model_dump(mode="json") if snapshot.account else {},
         "trend_cards": [item.model_dump(mode="json") for item in snapshot.trend_cards],
         "offered_claim_types": sorted(OFFERED_CLAIM_TYPES),
         "post_count": max_posts,

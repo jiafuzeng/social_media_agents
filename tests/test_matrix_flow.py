@@ -88,6 +88,61 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> Non
 
 
 @pytest.mark.asyncio
+async def test_reply_honors_requested_reply_count(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
+    run = await run_reply(
+        MatrixTaskRequest(
+            task_id="t08-count",
+            text="处理 demo 线程",
+            scenario="reply",
+            thread_key="demo-1",
+            reply_count=1,
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "t08-count",
+    )
+    assert len(run["drafts"]) == 1
+    assert run["drafts"][0]["source_comment_key"] in {"c1", "c2", "c3"}
+    assert "truncated_to_reply_count:1" in run["limitations"]
+
+
+@pytest.mark.asyncio
+async def test_reply_without_thread_replies_to_user_text(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
+    run = await run_reply(
+        MatrixTaskRequest(
+            task_id="t08-text",
+            text="成分表在哪看？有没有官方说明？",
+            scenario="reply",
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "t08-text",
+    )
+    assert len(run["drafts"]) == 1
+    assert run["drafts"][0]["source_comment_key"] == "c1"
+    assert run["drafts"][0]["degrade_op"] != "skip"
+    assert run["drafts"][0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_reply_count_on_single_comment_yields_variants(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
+    run = await run_reply(
+        MatrixTaskRequest(
+            task_id="t08-variants",
+            text="成分表在哪看？有没有官方说明？",
+            scenario="reply",
+            reply_count=3,
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "t08-variants",
+    )
+    assert len(run["drafts"]) == 3
+    assert {item["source_comment_key"] for item in run["drafts"]} == {"c1"}
+    assert all(item["text"] for item in run["drafts"])
+
+
+@pytest.mark.asyncio
 async def test_t09_one_gate_failure_keeps_successful_item(tmp_path, monkeypatch) -> None:
     install_scripted_ask(
         monkeypatch, ScriptedMatrixModel(evidence_overrides={"rw1": ["no-such-ref"]})

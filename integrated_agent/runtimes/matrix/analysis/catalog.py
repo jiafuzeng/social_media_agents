@@ -15,12 +15,18 @@ from .snapshots import (
     TWITTER_PLATFORM_KEY,
     AccountCard,
     GuardrailCard,
+    InteractionCard,
     PlatformCard,
     SnapshotError,
     TemplateCard,
+    TermListCard,
     parse_account_card,
     parse_guardrail_card,
+    parse_interaction_card,
+    parse_term_list_card,
     resolve_guardrails,
+    resolve_term_lists,
+    term_list_catalog,
 )
 
 
@@ -33,20 +39,6 @@ class CatalogError(ValueError):
         self.status = status
 
 
-class PolicyDoc:
-    def __init__(self, *, term_list_id: str, disclaimer: str, terms: list[str]) -> None:
-        self.term_list_id = term_list_id
-        self.disclaimer = disclaimer
-        self.terms = terms
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "term_list_id": self.term_list_id,
-            "disclaimer": self.disclaimer,
-            "terms": list(self.terms),
-        }
-
-
 class MatrixCatalog:
     def __init__(self, data_root: Path) -> None:
         self.data_root = data_root
@@ -54,6 +46,9 @@ class MatrixCatalog:
 
     def accounts_path(self) -> Path:
         return self.data_root / "accounts.yaml"
+
+    def interactions_path(self) -> Path:
+        return self.data_root / "interactions.yaml"
 
     def platforms_path(self) -> Path:
         return self.data_root / "platforms.yaml"
@@ -72,13 +67,18 @@ class MatrixCatalog:
                 for raw in (accounts_doc.get("accounts") or {}).values()
                 if isinstance(raw, dict)
             ],
+            "interactions": [
+                parse_interaction_card(raw).model_dump(mode="json")
+                for raw in (self._interactions_doc().get("interactions") or {}).values()
+                if isinstance(raw, dict)
+            ],
             "guardrails": [
                 parse_guardrail_card(raw, catalog_key=str(key)).model_dump(mode="json")
                 for key, raw in (accounts_doc.get("guardrails") or {}).items()
                 if isinstance(raw, dict)
             ],
             "platforms": [item.model_dump(mode="json") for item in self.list_platforms()],
-            "policy": self.read_policy().as_dict(),
+            "policy": [item.model_dump(mode="json") for item in self.list_term_lists()],
             "templates": [item.model_dump(mode="json") for item in self.list_templates()],
         }
 
@@ -91,6 +91,7 @@ class MatrixCatalog:
                 raise CatalogError(f"account already exists: {key}", status=409)
             parsed = parse_account_card(card.model_dump(mode="json"))
             resolve_guardrails(parsed.guardrail_keys, doc.get("guardrails") or {})
+            resolve_term_lists(parsed.term_list_keys, term_list_catalog(self._policy_doc()))
             doc["accounts"] = _insert_mapping(
                 accounts, key, parsed.model_dump(mode="json"), index
             )
@@ -108,6 +109,7 @@ class MatrixCatalog:
                 raise CatalogError("account_key cannot be renamed on update")
             parsed = parse_account_card(card.model_dump(mode="json"))
             resolve_guardrails(parsed.guardrail_keys, doc.get("guardrails") or {})
+            resolve_term_lists(parsed.term_list_keys, term_list_catalog(self._policy_doc()))
             accounts[key] = parsed.model_dump(mode="json")
             doc["accounts"] = accounts
             self._write_yaml(self.accounts_path(), doc)
@@ -156,6 +158,146 @@ class MatrixCatalog:
             self._write_yaml(self.accounts_path(), doc)
             return updated
 
+    def insert_account_term_list(
+        self,
+        account_key: str,
+        term_list_id: str,
+        *,
+        index: int | None = None,
+    ) -> AccountCard:
+        with self._lock:
+            doc = self._accounts_doc()
+            accounts = dict(doc.get("accounts") or {})
+            key = _require_key(account_key, field="account_key")
+            pack = _require_key(term_list_id, field="term_list_id")
+            raw = accounts.get(key)
+            if not isinstance(raw, dict):
+                raise CatalogError(f"unknown account_key: {key}", status=404)
+            card = parse_account_card(raw)
+            keys = list(card.term_list_keys)
+            if pack in keys:
+                raise CatalogError(f"term list already attached: {pack}", status=409)
+            if index is None or index >= len(keys):
+                keys.append(pack)
+            else:
+                keys.insert(max(0, index), pack)
+            updated = card.model_copy(update={"term_list_keys": keys})
+            resolve_term_lists(updated.term_list_keys, term_list_catalog(self._policy_doc()))
+            accounts[key] = updated.model_dump(mode="json")
+            doc["accounts"] = accounts
+            self._write_yaml(self.accounts_path(), doc)
+            return updated
+
+    def create_interaction(
+        self, card: InteractionCard, *, index: int | None = None
+    ) -> InteractionCard:
+        with self._lock:
+            doc = self._interactions_doc()
+            items = dict(doc.get("interactions") or {})
+            key = _require_key(card.interaction_key, field="interaction_key")
+            if key in items:
+                raise CatalogError(f"interaction already exists: {key}", status=409)
+            parsed = parse_interaction_card(card.model_dump(mode="json"))
+            resolve_guardrails(parsed.guardrail_keys, self._guardrail_catalog())
+            resolve_term_lists(parsed.term_list_keys, term_list_catalog(self._policy_doc()))
+            doc["interactions"] = _insert_mapping(
+                items, key, parsed.model_dump(mode="json"), index
+            )
+            self._write_yaml(self.interactions_path(), doc)
+            return parsed
+
+    def update_interaction(
+        self, interaction_key: str, card: InteractionCard
+    ) -> InteractionCard:
+        with self._lock:
+            doc = self._interactions_doc()
+            items = dict(doc.get("interactions") or {})
+            key = _require_key(interaction_key, field="interaction_key")
+            if key not in items:
+                raise CatalogError(f"unknown interaction_key: {key}", status=404)
+            if card.interaction_key != key:
+                raise CatalogError("interaction_key cannot be renamed on update")
+            parsed = parse_interaction_card(card.model_dump(mode="json"))
+            resolve_guardrails(parsed.guardrail_keys, self._guardrail_catalog())
+            resolve_term_lists(parsed.term_list_keys, term_list_catalog(self._policy_doc()))
+            items[key] = parsed.model_dump(mode="json")
+            doc["interactions"] = items
+            self._write_yaml(self.interactions_path(), doc)
+            return parsed
+
+    def delete_interaction(self, interaction_key: str) -> None:
+        with self._lock:
+            doc = self._interactions_doc()
+            items = dict(doc.get("interactions") or {})
+            key = _require_key(interaction_key, field="interaction_key")
+            if key not in items:
+                raise CatalogError(f"unknown interaction_key: {key}", status=404)
+            if len(items) <= 1:
+                raise CatalogError("cannot delete the last interaction", status=409)
+            del items[key]
+            doc["interactions"] = items
+            self._write_yaml(self.interactions_path(), doc)
+
+    def insert_interaction_guardrail(
+        self,
+        interaction_key: str,
+        guardrail_key: str,
+        *,
+        index: int | None = None,
+    ) -> InteractionCard:
+        with self._lock:
+            doc = self._interactions_doc()
+            items = dict(doc.get("interactions") or {})
+            key = _require_key(interaction_key, field="interaction_key")
+            pack = _require_key(guardrail_key, field="guardrail_key")
+            raw = items.get(key)
+            if not isinstance(raw, dict):
+                raise CatalogError(f"unknown interaction_key: {key}", status=404)
+            card = parse_interaction_card(raw)
+            keys = list(card.guardrail_keys)
+            if pack in keys:
+                raise CatalogError(f"guardrail already attached: {pack}", status=409)
+            if index is None or index >= len(keys):
+                keys.append(pack)
+            else:
+                keys.insert(max(0, index), pack)
+            updated = card.model_copy(update={"guardrail_keys": keys})
+            resolve_guardrails(updated.guardrail_keys, self._guardrail_catalog())
+            items[key] = updated.model_dump(mode="json")
+            doc["interactions"] = items
+            self._write_yaml(self.interactions_path(), doc)
+            return updated
+
+    def insert_interaction_term_list(
+        self,
+        interaction_key: str,
+        term_list_id: str,
+        *,
+        index: int | None = None,
+    ) -> InteractionCard:
+        with self._lock:
+            doc = self._interactions_doc()
+            items = dict(doc.get("interactions") or {})
+            key = _require_key(interaction_key, field="interaction_key")
+            pack = _require_key(term_list_id, field="term_list_id")
+            raw = items.get(key)
+            if not isinstance(raw, dict):
+                raise CatalogError(f"unknown interaction_key: {key}", status=404)
+            card = parse_interaction_card(raw)
+            keys = list(card.term_list_keys)
+            if pack in keys:
+                raise CatalogError(f"term list already attached: {pack}", status=409)
+            if index is None or index >= len(keys):
+                keys.append(pack)
+            else:
+                keys.insert(max(0, index), pack)
+            updated = card.model_copy(update={"term_list_keys": keys})
+            resolve_term_lists(updated.term_list_keys, term_list_catalog(self._policy_doc()))
+            items[key] = updated.model_dump(mode="json")
+            doc["interactions"] = items
+            self._write_yaml(self.interactions_path(), doc)
+            return updated
+
     def create_guardrail(
         self, card: GuardrailCard, *, index: int | None = None
     ) -> GuardrailCard:
@@ -196,11 +338,7 @@ class MatrixCatalog:
                 raise CatalogError(f"unknown guardrail_key: {key}", status=404)
             if len(catalog) <= 1:
                 raise CatalogError("cannot delete the last guardrail", status=409)
-            users = [
-                str(item.get("account_key") or name)
-                for name, item in (doc.get("accounts") or {}).items()
-                if isinstance(item, dict) and key in (item.get("guardrail_keys") or [])
-            ]
+            users = _guardrail_users(self._accounts_doc(), self._interactions_doc(), key)
             if users:
                 raise CatalogError(
                     f"guardrail is in use by: {', '.join(users)}", status=409
@@ -262,50 +400,110 @@ class MatrixCatalog:
             doc["platforms"] = catalog
             self._write_yaml(self.platforms_path(), doc)
 
-    def read_policy(self) -> PolicyDoc:
-        return _parse_policy(self._load(self.policy_path()))
+    def list_term_lists(self) -> list[TermListCard]:
+        catalog = term_list_catalog(self._policy_doc())
+        cards: list[TermListCard] = []
+        for key, raw in catalog.items():
+            if isinstance(raw, dict):
+                cards.append(parse_term_list_card(raw, catalog_key=str(key)))
+        return cards
 
-    def update_policy(self, policy: PolicyDoc) -> PolicyDoc:
+    def create_term_list(
+        self, card: TermListCard, *, index: int | None = None
+    ) -> TermListCard:
         with self._lock:
-            parsed = _parse_policy(policy.as_dict())
-            self._write_yaml(self.policy_path(), parsed.as_dict())
+            doc = self._policy_doc()
+            catalog = dict(term_list_catalog(doc))
+            key = _require_key(card.term_list_id, field="term_list_id")
+            if key in catalog:
+                raise CatalogError(f"term list already exists: {key}", status=409)
+            parsed = parse_term_list_card(card.model_dump(mode="json"), catalog_key=key)
+            doc["term_lists"] = _insert_mapping(
+                catalog, key, parsed.model_dump(mode="json"), index
+            )
+            self._write_yaml(self.policy_path(), doc)
             return parsed
 
-    def insert_term(self, term: str, *, index: int | None = None) -> PolicyDoc:
+    def update_term_list(self, term_list_id: str, card: TermListCard) -> TermListCard:
         with self._lock:
-            policy = _parse_policy(self._load(self.policy_path()))
+            doc = self._policy_doc()
+            catalog = dict(term_list_catalog(doc))
+            key = _require_key(term_list_id, field="term_list_id")
+            if key not in catalog:
+                raise CatalogError(f"unknown term_list_id: {key}", status=404)
+            if card.term_list_id != key:
+                raise CatalogError("term_list_id cannot be renamed on update")
+            parsed = parse_term_list_card(card.model_dump(mode="json"), catalog_key=key)
+            catalog[key] = parsed.model_dump(mode="json")
+            doc["term_lists"] = catalog
+            self._write_yaml(self.policy_path(), doc)
+            return parsed
+
+    def delete_term_list(self, term_list_id: str) -> None:
+        with self._lock:
+            doc = self._policy_doc()
+            catalog = dict(term_list_catalog(doc))
+            key = _require_key(term_list_id, field="term_list_id")
+            if key not in catalog:
+                raise CatalogError(f"unknown term_list_id: {key}", status=404)
+            if len(catalog) <= 1:
+                raise CatalogError("cannot delete the last term list", status=409)
+            users = _term_list_users(self._accounts_doc(), self._interactions_doc(), key)
+            if users:
+                raise CatalogError(
+                    f"term list is in use by: {', '.join(users)}", status=409
+                )
+            del catalog[key]
+            doc["term_lists"] = catalog
+            self._write_yaml(self.policy_path(), doc)
+
+    def insert_term(
+        self, term: str, *, term_list_id: str = "baseline", index: int | None = None
+    ) -> TermListCard:
+        with self._lock:
+            doc = self._policy_doc()
+            catalog = dict(term_list_catalog(doc))
+            key = _require_key(term_list_id, field="term_list_id")
+            raw = catalog.get(key)
+            if not isinstance(raw, dict):
+                raise CatalogError(f"unknown term_list_id: {key}", status=404)
+            card = parse_term_list_card(raw, catalog_key=key)
             text = str(term or "").strip()
             if not text:
                 raise CatalogError("term is required")
-            terms = list(policy.terms)
+            terms = list(card.terms)
             if text in terms:
                 raise CatalogError(f"term already exists: {text}", status=409)
             if index is None or index >= len(terms):
                 terms.append(text)
             else:
                 terms.insert(max(0, index), text)
-            updated = PolicyDoc(
-                term_list_id=policy.term_list_id,
-                disclaimer=policy.disclaimer,
-                terms=terms,
-            )
-            self._write_yaml(self.policy_path(), updated.as_dict())
+            updated = card.model_copy(update={"terms": terms})
+            catalog[key] = updated.model_dump(mode="json")
+            doc["term_lists"] = catalog
+            self._write_yaml(self.policy_path(), doc)
             return updated
 
-    def delete_term(self, term: str) -> PolicyDoc:
+    def delete_term(self, term: str, *, term_list_id: str = "baseline") -> TermListCard:
         with self._lock:
-            policy = _parse_policy(self._load(self.policy_path()))
+            doc = self._policy_doc()
+            catalog = dict(term_list_catalog(doc))
+            key = _require_key(term_list_id, field="term_list_id")
+            raw = catalog.get(key)
+            if not isinstance(raw, dict):
+                raise CatalogError(f"unknown term_list_id: {key}", status=404)
+            card = parse_term_list_card(raw, catalog_key=key)
             text = str(term or "").strip()
-            if text not in policy.terms:
+            if text not in card.terms:
                 raise CatalogError(f"unknown term: {text}", status=404)
-            if len(policy.terms) <= 1:
+            if len(card.terms) <= 1:
                 raise CatalogError("cannot delete the last policy term", status=409)
-            updated = PolicyDoc(
-                term_list_id=policy.term_list_id,
-                disclaimer=policy.disclaimer,
-                terms=[item for item in policy.terms if item != text],
+            updated = card.model_copy(
+                update={"terms": [item for item in card.terms if item != text]}
             )
-            self._write_yaml(self.policy_path(), updated.as_dict())
+            catalog[key] = updated.model_dump(mode="json")
+            doc["term_lists"] = catalog
+            self._write_yaml(self.policy_path(), doc)
             return updated
 
     def list_templates(self) -> list[TemplateCard]:
@@ -393,6 +591,21 @@ class MatrixCatalog:
             raise CatalogError("accounts.yaml is invalid")
         return doc
 
+    def _interactions_doc(self) -> dict[str, Any]:
+        doc = self._load(self.interactions_path())
+        if not isinstance(doc, dict):
+            raise CatalogError("interactions.yaml is invalid")
+        return doc
+
+    def _guardrail_catalog(self) -> dict[str, Any]:
+        return self._accounts_doc().get("guardrails") or {}
+
+    def _policy_doc(self) -> dict[str, Any]:
+        doc = self._load(self.policy_path())
+        if not isinstance(doc, dict):
+            raise CatalogError("policy_terms.yaml is invalid")
+        return doc
+
     def _load(self, path: Path) -> dict[str, Any]:
         if not path.is_file():
             raise CatalogError(f"missing snapshot file: {path.name}", status=404)
@@ -439,6 +652,36 @@ def _insert_mapping(
     return dict(items)
 
 
+def _guardrail_users(
+    accounts_doc: dict[str, Any],
+    interactions_doc: dict[str, Any],
+    key: str,
+) -> list[str]:
+    users: list[str] = []
+    for name, item in (accounts_doc.get("accounts") or {}).items():
+        if isinstance(item, dict) and key in (item.get("guardrail_keys") or []):
+            users.append(str(item.get("account_key") or name))
+    for name, item in (interactions_doc.get("interactions") or {}).items():
+        if isinstance(item, dict) and key in (item.get("guardrail_keys") or []):
+            users.append(str(item.get("interaction_key") or name))
+    return users
+
+
+def _term_list_users(
+    accounts_doc: dict[str, Any],
+    interactions_doc: dict[str, Any],
+    key: str,
+) -> list[str]:
+    users: list[str] = []
+    for name, item in (accounts_doc.get("accounts") or {}).items():
+        if isinstance(item, dict) and key in (item.get("term_list_keys") or []):
+            users.append(str(item.get("account_key") or name))
+    for name, item in (interactions_doc.get("interactions") or {}).items():
+        if isinstance(item, dict) and key in (item.get("term_list_keys") or []):
+            users.append(str(item.get("interaction_key") or name))
+    return users
+
+
 def _parse_platform(raw: dict[str, Any], *, catalog_key: str) -> PlatformCard:
     key = str(raw.get("platform_key") or catalog_key)
     if key != catalog_key:
@@ -460,18 +703,6 @@ def _parse_template(raw: dict[str, Any]) -> TemplateCard:
         template_key=key,
         text=str(raw.get("text") or ""),
         claim_types=[str(item) for item in (raw.get("claim_types") or []) if str(item)],
-    )
-
-
-def _parse_policy(raw: dict[str, Any]) -> PolicyDoc:
-    term_list_id = str(raw.get("term_list_id") or "").strip()
-    terms = [str(item).strip() for item in (raw.get("terms") or []) if str(item).strip()]
-    if not term_list_id or not terms:
-        raise CatalogError("policy terms are required")
-    return PolicyDoc(
-        term_list_id=term_list_id,
-        disclaimer=str(raw.get("disclaimer") or ""),
-        terms=terms,
     )
 
 

@@ -46,17 +46,64 @@ async def reply_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     return payload
 
 
+def _reply_item_limit(request: MatrixTaskRequest, snapshot: Snapshot) -> int:
+    offered = len(snapshot.comments)
+    cap = snapshot.platform.max_posts
+    if request.reply_count is None:
+        return offered
+    if offered <= 1:
+        return min(request.reply_count, cap)
+    return min(request.reply_count, offered, cap)
+
+
+def _fit_reply_items(
+    items: list[WorkItem],
+    *,
+    max_items: int,
+    offered_keys: set[str],
+    expand: bool,
+) -> tuple[list[WorkItem], list[str]]:
+    kept = [item for item in items if item.source_comment_key in offered_keys]
+    extra: list[str] = []
+    if len(kept) != len(items):
+        extra.append("dropped_out_of_thread_comments")
+    if max_items and len(kept) > max_items:
+        kept = kept[:max_items]
+        extra.append(f"truncated_to_reply_count:{max_items}")
+    elif expand and kept and max_items and len(kept) < max_items:
+        seed = kept[0]
+        while len(kept) < max_items:
+            n = len(kept) + 1
+            kept.append(seed.model_copy(update={"work_item_id": f"{seed.work_item_id}-v{n}"}))
+        extra.append(f"expanded_to_reply_count:{max_items}")
+    return kept, extra
+
+
 async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     request = MatrixTaskRequest.model_validate(data.get_state("request"))
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
+    max_items = _reply_item_limit(request, snapshot)
+    single_comment = len(snapshot.comments) == 1
+    if request.reply_count is not None and single_comment:
+        count_rule = (
+            f"必须正好生成 {max_items} 条 work_item，全部使用同一条 source_comment_key，"
+            "角度不同，不要另造评论。"
+        )
+    elif request.reply_count is not None:
+        count_rule = f"必须正好生成 {max_items} 条 work_item。"
+    else:
+        count_rule = "为 info.snapshot.comments 中每一条评论生成 work_item。"
     info = {
         "platform": snapshot.platform.model_dump(mode="json"),
         "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
         "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
-        "account": snapshot.account.model_dump(mode="json"),
+        "interaction": (
+            snapshot.interaction.model_dump(mode="json") if snapshot.interaction else {}
+        ),
         "comments": [item.model_dump(mode="json") for item in snapshot.comments],
         "offered_claim_types": sorted(OFFERED_CLAIM_TYPES),
+        "reply_count": max_items,
     }
     try:
         result = await (
@@ -66,9 +113,11 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
             .instruct(
                 [
                     "只做回复拆解，不要判断这是创作还是回复，不要输出 scenario。",
+                    "input.text 若与已签发评论原文相同，把它当待回评论，不要当写帖主题。",
                     "requirements 写运营目标，不要复述本页 instruct。",
-                    "拆解必须符合 info.snapshot.account 的人设与 reply_stance；回复也服务于口碑和涨粉，但不为互动而放松 skip。",
-                    f"为 info.snapshot.comments 中每一条评论生成 work_item，kind 必须是 reply_comment，source_comment_key 必须是已签发的 comment_key，platform_key 必须是 {TWITTER_PLATFORM_KEY}。",
+                    "拆解必须符合 info.snapshot.interaction 的互动规则：goals、must_do、must_not 与 skip_guidance。回复服务答疑和该回才回，不服务涨粉或关注引导。",
+                    count_rule,
+                    f"每条 work_item 的 kind 必须是 reply_comment，source_comment_key 必须是当前线程已签发的 comment_key，platform_key 必须是 {TWITTER_PLATFORM_KEY}。不要发明线程外的评论。",
                     "每个 requirement 必须被引用；claim_types 只能从 info.snapshot.offered_claim_types 选取，不要把 template_key 写进去。",
                     "不写回复正文。",
                 ]
@@ -106,6 +155,19 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
             .async_start()
         )
         brief = BriefOut.model_validate(result)
+        offered_keys = {item.comment_key for item in snapshot.comments}
+        kept, extra = _fit_reply_items(
+            brief.work_items,
+            max_items=max_items,
+            offered_keys=offered_keys,
+            expand=single_comment and request.reply_count is not None,
+        )
+        if kept:
+            brief = brief.model_copy(update={"work_items": kept})
+        if extra:
+            limitations = list(cast(list[str], data.get_state("limitations") or []))
+            limitations.extend(extra)
+            await data.async_set_state("limitations", limitations, emit=False)
     except Exception as exc:
         await data.async_set_state("final_failed", True, emit=False)
         trace.log(
@@ -151,8 +213,8 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
             .info({"context": info})
             .instruct(
                 [
-                    "先裁 reply、acknowledge 或 skip，再写正文。人身攻击、仇恨或无法核实的诱导默认 skip。",
-                    "用 info.context.account 的声量与 reply_stance 回复，优先可被围观的帮助和关注引导，不要换成别的身份。",
+                    "先裁 reply、acknowledge 或 skip，再写正文。遵循 info.context.interaction.skip_guidance；人身攻击、仇恨或无法核实的诱导默认 skip。",
+                    "用 info.context.interaction 的 voice_summary 与 must_do / must_not 回复，不要导关注或报名，不要换成别的身份。",
                     "skip 时 draft_text 必须是空串。不得输出 escalate。",
                     "证据只能引用 info.context.offered_refs 的 ref_id；不得承诺稳赚或治愈。",
                     "正文长度不得超过 info.context.max_chars。",
