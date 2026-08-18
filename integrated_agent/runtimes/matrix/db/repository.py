@@ -1,3 +1,5 @@
+"""身份库异步仓储：用户、token、会话、收藏夹。SQLite 与 MySQL 共用同一套 AsyncSession。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -27,8 +29,9 @@ from .settings import IdentityDbSettings
 
 
 class IdentityRepository(Protocol):
-    """用户注册与 token 的异步持久化接口。默认 SQLAlchemy AsyncSession。"""
+    """身份库异步持久化接口：用户、token、会话轮次、收藏夹。"""
 
+    # 用户
     async def get_user_by_id(self, user_id: str) -> StoredUser | None: ...
 
     async def get_user_by_username(self, username: str) -> StoredUser | None: ...
@@ -60,6 +63,7 @@ class IdentityRepository(Protocol):
 
     async def delete_other_tokens(self, user_id: str, keep_token_hash: str) -> None: ...
 
+    # 会话与轮次
     async def insert_session(self, session: StoredSession) -> None: ...
 
     async def get_session(self, session_id: str) -> StoredSession | None: ...
@@ -83,6 +87,7 @@ class IdentityRepository(Protocol):
 
     async def list_turns(self, session_id: str) -> list[StoredTurn]: ...
 
+    # 收藏夹
     async def insert_collection(self, collection: StoredCollection) -> None: ...
 
     async def get_collection(self, collection_id: str) -> StoredCollection | None: ...
@@ -117,6 +122,7 @@ class IdentityRepository(Protocol):
 
 
 def _stored_user(row: UserRow) -> StoredUser:
+    """ORM 行转为业务 DTO，避免上层直接依赖 SQLAlchemy。"""
     return StoredUser(
         user_id=row.user_id,
         username=row.username,
@@ -175,6 +181,12 @@ def _stored_collection_item(row: CollectionItemRow) -> StoredCollectionItem:
 
 
 class SqlAlchemyIdentityRepository:
+    """IdentityRepository 的 SQLAlchemy 实现。
+
+    SQLite：首次访问时 create_all，并给旧库补 users.role。
+    MySQL：表结构由 Alembic 管理；这里只建连，create_all 作空库兜底。
+    """
+
     def __init__(self, settings: IdentityDbSettings) -> None:
         self.settings = settings
         self.url = settings.async_url
@@ -201,6 +213,7 @@ class SqlAlchemyIdentityRepository:
                 cursor.close()
 
     async def _ensure(self) -> None:
+        """懒初始化：迁移旧 SQLite 列，并确保 ORM 表存在。"""
         if self._ready:
             return
         async with self._init_lock:
@@ -212,6 +225,7 @@ class SqlAlchemyIdentityRepository:
             self._ready = True
 
     async def _migrate(self, connection) -> None:
+        """仅 SQLite：给无 role 列的旧 users 表补列，并把最早用户升为 admin。"""
         if not self._sqlite:
             return
         def existing_columns(sync_connection):
@@ -348,6 +362,7 @@ class SqlAlchemyIdentityRepository:
                 await db.commit()
 
     async def delete_other_tokens(self, user_id: str, keep_token_hash: str) -> None:
+        """登录后作废该用户除当前 token 外的其它会话。"""
         await self._ensure()
         async with self._Session() as db:
             await db.execute(
@@ -382,6 +397,7 @@ class SqlAlchemyIdentityRepository:
             return None if row is None else _stored_session(row)
 
     async def list_sessions(self, user_id: str) -> list[StoredSession]:
+        """列出该用户仍为 active 的会话，按最近活跃时间倒序。"""
         await self._ensure()
         async with self._Session() as db:
             rows = (
@@ -577,6 +593,7 @@ class SqlAlchemyIdentityRepository:
     async def find_root_item_by_text(
         self, user_id: str, text: str
     ) -> StoredCollectionItem | None:
+        """按原文匹配当前用户收藏里的根推文，供 bind_replies 挂回复。"""
         await self._ensure()
         async with self._Session() as db:
             row = await db.scalar(
@@ -601,4 +618,5 @@ class SqlAlchemyIdentityRepository:
             await db.commit()
 
 
+# 兼容旧导入名
 SqliteIdentityRepository = SqlAlchemyIdentityRepository
