@@ -25,11 +25,11 @@ def upgrade() -> None:
     if "collections" not in tables:
         op.create_table(
             "collections",
-            sa.Column("collection_id", sa.String(), nullable=False),
-            sa.Column("user_id", sa.String(), nullable=False),
-            sa.Column("name", sa.String(), nullable=False),
-            sa.Column("created_at", sa.String(), nullable=False),
-            sa.Column("updated_at", sa.String(), nullable=False),
+            sa.Column("collection_id", sa.String(length=64), nullable=False),
+            sa.Column("user_id", sa.String(length=64), nullable=False),
+            sa.Column("name", sa.String(length=255), nullable=False),
+            sa.Column("created_at", sa.String(length=255), nullable=False),
+            sa.Column("updated_at", sa.String(length=255), nullable=False),
             sa.ForeignKeyConstraint(["user_id"], ["users.user_id"], ondelete="CASCADE"),
             sa.PrimaryKeyConstraint("collection_id"),
             sa.UniqueConstraint("user_id", "name", name="uq_collections_user_name"),
@@ -43,12 +43,12 @@ def upgrade() -> None:
     if "collection_items" not in tables:
         op.create_table(
             "collection_items",
-            sa.Column("item_id", sa.String(), nullable=False),
-            sa.Column("collection_id", sa.String(), nullable=False),
-            sa.Column("parent_item_id", sa.String(), nullable=True),
-            sa.Column("text", sa.String(), nullable=False),
-            sa.Column("extra_json", sa.String(), nullable=True),
-            sa.Column("created_at", sa.String(), nullable=False),
+            sa.Column("item_id", sa.String(length=64), nullable=False),
+            sa.Column("collection_id", sa.String(length=64), nullable=False),
+            sa.Column("parent_item_id", sa.String(length=64), nullable=True),
+            sa.Column("text", sa.Text(), nullable=False),
+            sa.Column("extra_json", sa.Text(), nullable=True),
+            sa.Column("created_at", sa.String(length=255), nullable=False),
             sa.ForeignKeyConstraint(
                 ["collection_id"],
                 ["collections.collection_id"],

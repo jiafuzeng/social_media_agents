@@ -25,21 +25,21 @@ def upgrade() -> None:
     if "users" not in tables:
         op.create_table(
             "users",
-            sa.Column("user_id", sa.String(), nullable=False),
-            sa.Column("username", sa.String(), nullable=False),
-            sa.Column("password_salt", sa.String(), nullable=False),
-            sa.Column("password_hash", sa.String(), nullable=False),
-            sa.Column("role", sa.String(), nullable=False),
-            sa.Column("created_at", sa.String(), nullable=False),
-            sa.Column("updated_at", sa.String(), nullable=False),
+            sa.Column("user_id", sa.String(length=64), nullable=False),
+            sa.Column("username", sa.String(length=32), nullable=False),
+            sa.Column("password_salt", sa.String(length=128), nullable=False),
+            sa.Column("password_hash", sa.String(length=128), nullable=False),
+            sa.Column("role", sa.String(length=16), nullable=False),
+            sa.Column("created_at", sa.String(length=255), nullable=False),
+            sa.Column("updated_at", sa.String(length=255), nullable=False),
             sa.PrimaryKeyConstraint("user_id"),
             sa.UniqueConstraint("username"),
         )
     if "tokens" not in tables:
         op.create_table(
             "tokens",
-            sa.Column("token_hash", sa.String(), nullable=False),
-            sa.Column("user_id", sa.String(), nullable=False),
+            sa.Column("token_hash", sa.String(length=128), nullable=False),
+            sa.Column("user_id", sa.String(length=64), nullable=False),
             sa.ForeignKeyConstraint(
                 ["user_id"], ["users.user_id"], ondelete="CASCADE"
             ),
@@ -49,14 +49,14 @@ def upgrade() -> None:
     if "sessions" not in tables:
         op.create_table(
             "sessions",
-            sa.Column("session_id", sa.String(), nullable=False),
-            sa.Column("user_id", sa.String(), nullable=False),
-            sa.Column("title", sa.String(), nullable=False),
-            sa.Column("status", sa.String(), nullable=False),
-            sa.Column("last_scenario", sa.String(), nullable=True),
-            sa.Column("created_at", sa.String(), nullable=False),
-            sa.Column("updated_at", sa.String(), nullable=False),
-            sa.Column("last_active_at", sa.String(), nullable=False),
+            sa.Column("session_id", sa.String(length=64), nullable=False),
+            sa.Column("user_id", sa.String(length=64), nullable=False),
+            sa.Column("title", sa.String(length=255), nullable=False),
+            sa.Column("status", sa.String(length=32), nullable=False),
+            sa.Column("last_scenario", sa.String(length=32), nullable=True),
+            sa.Column("created_at", sa.String(length=255), nullable=False),
+            sa.Column("updated_at", sa.String(length=255), nullable=False),
+            sa.Column("last_active_at", sa.String(length=255), nullable=False),
             sa.ForeignKeyConstraint(
                 ["user_id"], ["users.user_id"], ondelete="CASCADE"
             ),
@@ -71,13 +71,13 @@ def upgrade() -> None:
     if "session_turns" not in tables:
         op.create_table(
             "session_turns",
-            sa.Column("turn_id", sa.String(), nullable=False),
-            sa.Column("session_id", sa.String(), nullable=False),
-            sa.Column("role", sa.String(), nullable=False),
-            sa.Column("text", sa.String(), nullable=False),
-            sa.Column("task_id", sa.String(), nullable=True),
-            sa.Column("extra_json", sa.String(), nullable=True),
-            sa.Column("created_at", sa.String(), nullable=False),
+            sa.Column("turn_id", sa.String(length=64), nullable=False),
+            sa.Column("session_id", sa.String(length=64), nullable=False),
+            sa.Column("role", sa.String(length=16), nullable=False),
+            sa.Column("text", sa.Text(), nullable=False),
+            sa.Column("task_id", sa.String(length=64), nullable=True),
+            sa.Column("extra_json", sa.Text(), nullable=True),
+            sa.Column("created_at", sa.String(length=255), nullable=False),
             sa.ForeignKeyConstraint(
                 ["session_id"],
                 ["sessions.session_id"],

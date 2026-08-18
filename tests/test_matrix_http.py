@@ -32,8 +32,9 @@ from integrated_agent.transports.http import create_http_app, create_matrix_api
 from tests.fakes import fake_question_runner, install_scripted_ask
 
 
-def _matrix_service(monkeypatch, **kwargs) -> MatrixTaskService:
+def _matrix_service(monkeypatch, tmp_path: Path, **kwargs) -> MatrixTaskService:
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
+    kwargs.setdefault("identity_root", tmp_path / "identity")
     return build_matrix_service(
         PROJECT_ROOT,
         **kwargs,
@@ -41,7 +42,7 @@ def _matrix_service(monkeypatch, **kwargs) -> MatrixTaskService:
 
 
 def test_t11_create_returns_202_and_one_package_ready(tmp_path: Path, monkeypatch) -> None:
-    service = _matrix_service(monkeypatch)
+    service = _matrix_service(monkeypatch, tmp_path)
     app = create_matrix_api(service)
     with TestClient(app) as client:
         accepted = client.post(
@@ -124,7 +125,7 @@ def test_t13_question_tasks_still_accepted(tmp_path: Path, monkeypatch) -> None:
         tasks=InMemoryTaskStore(),
         events=events,
     )
-    matrix = _matrix_service(monkeypatch)
+    matrix = _matrix_service(monkeypatch, tmp_path)
     static_root = Path(__file__).parents[1] / "static"
     app = create_http_app(
         question_service=question,
@@ -180,7 +181,7 @@ def test_reply_rejects_thread_key() -> None:
 
 
 def test_reply_without_thread_stays_on_demo(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         accepted = client.post(
             "/v1/matrix/tasks",
@@ -209,7 +210,7 @@ def test_reply_without_thread_stays_on_demo(tmp_path: Path, monkeypatch) -> None
 
 
 def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         too_low = client.post(
             "/api/create", json={"text": "写帖", "post_count": 0, "session_id": "s1"}
@@ -222,7 +223,7 @@ def test_compose_post_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> 
 
 
 def test_reply_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         too_low = client.post(
             "/api/reply", json={"text": "回评", "reply_count": 0, "session_id": "s1"}
@@ -235,7 +236,7 @@ def test_reply_count_out_of_range_is_422(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_compose_must_not_include_reply_count(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         rejected = client.post(
             "/v1/matrix/tasks",
@@ -245,7 +246,7 @@ def test_compose_must_not_include_reply_count(tmp_path: Path, monkeypatch) -> No
 
 
 def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         rejected = client.post(
             "/v1/matrix/tasks",
@@ -260,7 +261,7 @@ def test_reply_must_not_include_post_count(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_reply_must_not_include_account_key(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         rejected = client.post(
             "/v1/matrix/tasks",
@@ -282,7 +283,7 @@ def test_reply_must_not_include_account_key(tmp_path: Path, monkeypatch) -> None
 
 
 def test_compose_must_not_include_interaction_key(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         rejected = client.post(
             "/v1/matrix/tasks",
@@ -296,7 +297,7 @@ def test_compose_must_not_include_interaction_key(tmp_path: Path, monkeypatch) -
 
 
 def test_account_catalog_endpoint(tmp_path: Path, monkeypatch) -> None:
-    app = create_matrix_api(_matrix_service(monkeypatch))
+    app = create_matrix_api(_matrix_service(monkeypatch, tmp_path))
     with TestClient(app) as client:
         catalog = client.get("/api/accounts")
         assert catalog.status_code == 200

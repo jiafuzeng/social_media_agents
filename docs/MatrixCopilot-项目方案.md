@@ -435,7 +435,7 @@ data/matrix/
   cases/x-twitter.json
 ```
 
-改现有文件：`create_production_app` 挂路由；`AUTO_RUNTIMES` 与 intent instruct 增加 matrix；`im_assistant` 注册 Runtime；`ARCHITECTURE.md` / `README.md` 补账本。
+改现有文件：`create_production_app` 挂路由；`AUTO_RUNTIMES` 与 intent instruct 增加 matrix；`im_assistant` 注册 Runtime；`README.md` 补账本。
 
 不建：共享检索微服务、PolicyEngine、通用 TaskService。不让 `matrix` import `question.analysis`。YAML 人设不注册成 Skill 意图器。问数 stores 先复制，Result 同构再抽。
 

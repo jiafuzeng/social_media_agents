@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import Protocol
 
 from sqlalchemy import delete, event, inspect, select, text
@@ -24,10 +23,11 @@ from .models import (
     TurnRow,
     UserRow,
 )
+from .settings import IdentityDbSettings
 
 
 class IdentityRepository(Protocol):
-    """用户注册与 token 的异步持久化接口。默认 SQLAlchemy AsyncSession + SQLite。"""
+    """用户注册与 token 的异步持久化接口。默认 SQLAlchemy AsyncSession。"""
 
     async def get_user_by_id(self, user_id: str) -> StoredUser | None: ...
 
@@ -175,12 +175,13 @@ def _stored_collection_item(row: CollectionItemRow) -> StoredCollectionItem:
 
 
 class SqlAlchemyIdentityRepository:
-    def __init__(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.path = path
-        self._engine = create_async_engine(
-            f"sqlite+aiosqlite:///{path}",
-        )
+    def __init__(self, settings: IdentityDbSettings) -> None:
+        self.settings = settings
+        self.url = settings.async_url
+        self._sqlite = settings.backend == "sqlite"
+        if self._sqlite and settings.sqlite_path is not None:
+            settings.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        self._engine = create_async_engine(self.url, pool_pre_ping=True)
         self._Session = async_sessionmaker(
             self._engine,
             expire_on_commit=False,
@@ -189,13 +190,15 @@ class SqlAlchemyIdentityRepository:
         self._ready = False
         self._init_lock = asyncio.Lock()
 
-        @event.listens_for(self._engine.sync_engine, "connect")
-        def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA busy_timeout=5000")
-            cursor.close()
+        if self._sqlite:
+
+            @event.listens_for(self._engine.sync_engine, "connect")
+            def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA busy_timeout=5000")
+                cursor.close()
 
     async def _ensure(self) -> None:
         if self._ready:
@@ -209,6 +212,8 @@ class SqlAlchemyIdentityRepository:
             self._ready = True
 
     async def _migrate(self, connection) -> None:
+        if not self._sqlite:
+            return
         def existing_columns(sync_connection):
             inspector = inspect(sync_connection)
             if "users" not in inspector.get_table_names():

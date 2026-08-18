@@ -16,6 +16,7 @@ from .db import (
     ROLE_USER,
     ROLES,
     IdentityDbError,
+    IdentityDbSettings,
     IdentityRepository,
     SqlAlchemyIdentityRepository,
     StoredCollection,
@@ -23,6 +24,7 @@ from .db import (
     StoredSession,
     StoredTurn,
     StoredUser,
+    sqlite_settings,
 )
 from .models import DomainModel
 
@@ -230,19 +232,20 @@ def _is_admin(user: StoredUser) -> bool:
 
 
 class IdentityStore:
-    """host 用户注册/登录。持久化走异步 IdentityRepository，默认 SQLAlchemy AsyncSession + SQLite。"""
+    """host 用户注册/登录。持久化走异步 IdentityRepository，默认 SQLAlchemy AsyncSession。"""
 
     def __init__(
         self,
         root: Path,
         *,
         repository: IdentityRepository | None = None,
+        settings: IdentityDbSettings | None = None,
     ) -> None:
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
         self._lock = asyncio.Lock()
         self.repository = repository or SqlAlchemyIdentityRepository(
-            self.root / "identity.sqlite"
+            settings or sqlite_settings(self.root / "identity.sqlite")
         )
 
     async def register(self, username: str, password: str) -> AuthOut:
@@ -687,12 +690,14 @@ class IdentityStore:
                 return located, False
         if not needle:
             return None, False
-        parent = CollectionItemIn(
-            key=f"comment-{uuid4().hex}",
-            text=needle,
-            platform_key="x-twitter",
-            scenario="reply",
-            task_type="reply_comment",
+        parent = CollectionItemIn.model_validate(
+            {
+                "key": f"comment-{uuid4().hex}",
+                "text": needle,
+                "platform_key": "x-twitter",
+                "scenario": "reply",
+                "task_type": "reply_comment",
+            }
         )
         stored = await self._insert_item_row(
             collection_id=collection.collection_id,

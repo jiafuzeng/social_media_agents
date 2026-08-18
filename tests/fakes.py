@@ -166,10 +166,6 @@ def install_scripted_ask(monkeypatch, model) -> None:
         return FakeAgent(str(name or ""))
 
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.analysis.capability.load_model_settings",
-        lambda: None,
-    )
-    monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.analysis.workflows.chunks.compose.pipeline.Agently.create_agent",
         fake_create_agent,
     )

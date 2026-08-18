@@ -12,7 +12,6 @@ from agently import Agently
 from agently.builtins.actions import Browse, Search
 from agently.core import SkillLibrary
 
-from integrated_agent.config import load_model_settings
 from integrated_agent.gateway import GatewayEvent, GatewayRequest
 from integrated_agent.storage import ArtifactStore, StoredArtifact
 
@@ -46,7 +45,6 @@ class AgentlyAgentRuntime:
         )
         self.file_service = file_service or WorkspaceFileService(workspace_root)
         self.agent_factory = agent_factory or Agently.create_agent
-        self._uses_default_agent_factory = agent_factory is None
         self.sandbox: SandboxMode = sandbox
         self.document_action = DocumentArtifactAction(artifact_store)
         self.skill_library = SkillLibrary(self.registry_root)
@@ -80,8 +78,6 @@ class AgentlyAgentRuntime:
         )
 
     def _build_agent(self, session_id: str) -> Any:
-        if self._uses_default_agent_factory:
-            load_model_settings()
         agent = self.agent_factory(
             f"enterprise-agent-{self._safe_session_id(session_id)}"
         )

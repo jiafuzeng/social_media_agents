@@ -69,7 +69,7 @@ runtimes/matrix/analysis → 不依赖 HTTP、企业微信、Gateway、question.
 | `gateway/intent.py` | instruct 增加写帖/评理 | 同上 |
 | `bootstrap/im_assistant.py` | 注册 `MatrixServiceRuntime` | 启动组装测试 |
 | `bootstrap/question_service.py` | `create_production_app` include matrix 路由 | 问数 `/v1/tasks` 行为不变 |
-| `ARCHITECTURE.md` / `README.md` | 补第四 Runtime | 文档评审 |
+| `README.md` | 补第四 Runtime | 文档评审 |
 
 ---
 

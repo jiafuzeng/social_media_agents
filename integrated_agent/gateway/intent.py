@@ -2,15 +2,10 @@ from __future__ import annotations
 
 from agently import Agently
 
-from integrated_agent.config import load_model_settings
-
 from .contracts import RouteDecision
 
 
 class DeepSeekIntentModel:
-    def __init__(self) -> None:
-        load_model_settings()
-
     async def classify(
         self,
         *,

@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from integrated_agent.config import PROJECT_ROOT, load_model_settings
+from integrated_agent.config import PROJECT_ROOT
 
 from .workflows.main_flow import run_question as run_flow
 
@@ -26,7 +26,6 @@ async def run_question(
 ) -> dict[str, Any]:
     """使用 v2 完成一次问数并保存 Trace。"""
 
-    load_model_settings()
     return await run_flow(
         question,
         task_id=task_id,

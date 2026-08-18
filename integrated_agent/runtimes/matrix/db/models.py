@@ -2,8 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+ID_LEN = 64
+NAME_LEN = 32
+HASH_LEN = 128
+TITLE_LEN = 255
+STATUS_LEN = 32
+SCENARIO_LEN = 32
+ROLE_LEN = 16
 
 
 ROLE_ADMIN = "admin"
@@ -77,13 +85,13 @@ class Base(DeclarativeBase):
 class UserRow(Base):
     __tablename__ = "users"
 
-    user_id: Mapped[str] = mapped_column(String, primary_key=True)
-    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    password_salt: Mapped[str] = mapped_column(String, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String, nullable=False)
-    role: Mapped[str] = mapped_column(String, nullable=False, default=ROLE_USER)
-    created_at: Mapped[str] = mapped_column(String, nullable=False)
-    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(ID_LEN), primary_key=True)
+    username: Mapped[str] = mapped_column(String(NAME_LEN), unique=True, nullable=False)
+    password_salt: Mapped[str] = mapped_column(String(HASH_LEN), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(HASH_LEN), nullable=False)
+    role: Mapped[str] = mapped_column(String(ROLE_LEN), nullable=False, default=ROLE_USER)
+    created_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
 
     tokens: Mapped[list[TokenRow]] = relationship(
         back_populates="user",
@@ -106,7 +114,7 @@ class TokenRow(Base):
     __tablename__ = "tokens"
     __table_args__ = (Index("idx_tokens_user", "user_id"),)
 
-    token_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(HASH_LEN), primary_key=True)
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
@@ -119,17 +127,17 @@ class SessionRow(Base):
     __tablename__ = "sessions"
     __table_args__ = (Index("idx_sessions_user", "user_id", "last_active_at"),)
 
-    session_id: Mapped[str] = mapped_column(String, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(ID_LEN), primary_key=True)
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
     )
-    title: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
-    last_scenario: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[str] = mapped_column(String, nullable=False)
-    updated_at: Mapped[str] = mapped_column(String, nullable=False)
-    last_active_at: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
+    status: Mapped[str] = mapped_column(String(STATUS_LEN), nullable=False, default="active")
+    last_scenario: Mapped[str | None] = mapped_column(String(SCENARIO_LEN), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
+    last_active_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
 
     user: Mapped[UserRow] = relationship(back_populates="sessions")
     turns: Mapped[list[TurnRow]] = relationship(
@@ -143,16 +151,16 @@ class TurnRow(Base):
     __tablename__ = "session_turns"
     __table_args__ = (Index("idx_session_turns_session", "session_id", "created_at"),)
 
-    turn_id: Mapped[str] = mapped_column(String, primary_key=True)
+    turn_id: Mapped[str] = mapped_column(String(ID_LEN), primary_key=True)
     session_id: Mapped[str] = mapped_column(
         ForeignKey("sessions.session_id", ondelete="CASCADE"),
         nullable=False,
     )
-    role: Mapped[str] = mapped_column(String, nullable=False)
-    text: Mapped[str] = mapped_column(String, nullable=False)
-    task_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    extra_json: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String(ROLE_LEN), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    task_id: Mapped[str | None] = mapped_column(String(ID_LEN), nullable=True)
+    extra_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
 
     session: Mapped[SessionRow] = relationship(back_populates="turns")
 
@@ -164,14 +172,14 @@ class CollectionRow(Base):
         Index("idx_collections_user", "user_id", "created_at"),
     )
 
-    collection_id: Mapped[str] = mapped_column(String, primary_key=True)
+    collection_id: Mapped[str] = mapped_column(String(ID_LEN), primary_key=True)
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
     )
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    created_at: Mapped[str] = mapped_column(String, nullable=False)
-    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
+    updated_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
 
     user: Mapped[UserRow] = relationship(back_populates="collections")
     items: Mapped[list[CollectionItemRow]] = relationship(
@@ -187,7 +195,7 @@ class CollectionItemRow(Base):
         Index("idx_collection_items_folder", "collection_id", "parent_item_id", "created_at"),
     )
 
-    item_id: Mapped[str] = mapped_column(String, primary_key=True)
+    item_id: Mapped[str] = mapped_column(String(ID_LEN), primary_key=True)
     collection_id: Mapped[str] = mapped_column(
         ForeignKey("collections.collection_id", ondelete="CASCADE"),
         nullable=False,
@@ -196,9 +204,9 @@ class CollectionItemRow(Base):
         ForeignKey("collection_items.item_id", ondelete="CASCADE"),
         nullable=True,
     )
-    text: Mapped[str] = mapped_column(String, nullable=False)
-    extra_json: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    extra_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String(TITLE_LEN), nullable=False)
 
     collection: Mapped[CollectionRow] = relationship(back_populates="items")
     parent: Mapped[CollectionItemRow | None] = relationship(

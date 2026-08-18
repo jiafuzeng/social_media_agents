@@ -6,6 +6,8 @@ PyYAML>=6.0,<7.0
 pydantic>=2.10,<3.0
 sqlalchemy>=2.0,<3.0
 aiosqlite>=0.20,<1.0
+asyncmy>=0.2.9,<1.0
+pymysql>=1.1,<2.0
 alembic>=1.13,<2.0
 httpx>=0.28,<1.0
 agent-client-protocol==0.10.1

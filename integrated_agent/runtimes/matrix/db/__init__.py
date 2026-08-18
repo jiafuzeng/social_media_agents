@@ -21,6 +21,7 @@ from .repository import (
     SqlAlchemyIdentityRepository,
     SqliteIdentityRepository,
 )
+from .settings import IdentityDbSettings, load_identity_db_settings, sqlite_settings
 
 __all__ = [
     "ROLE_ADMIN",
@@ -34,6 +35,9 @@ __all__ = [
     "SessionRow",
     "SqlAlchemyIdentityRepository",
     "SqliteIdentityRepository",
+    "IdentityDbSettings",
+    "load_identity_db_settings",
+    "sqlite_settings",
     "StoredCollection",
     "StoredCollectionItem",
     "StoredSession",

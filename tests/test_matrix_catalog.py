@@ -16,7 +16,10 @@ def _app(tmp_path: Path, monkeypatch):
     data_root = tmp_path / "matrix"
     shutil.copytree(PROJECT_ROOT / "data" / "matrix", data_root)
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
-    service = build_matrix_service(PROJECT_ROOT)
+    service = build_matrix_service(
+        PROJECT_ROOT,
+        identity_root=tmp_path / "identity",
+    )
     return create_matrix_api(service, data_root=data_root), data_root
 
 
@@ -212,7 +215,7 @@ def test_matrix_page_includes_catalog_editor(tmp_path: Path, monkeypatch) -> Non
     shutil.copytree(PROJECT_ROOT / "data" / "matrix", data_root)
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     app = create_matrix_api(
-        build_matrix_service(PROJECT_ROOT),
+        build_matrix_service(PROJECT_ROOT, identity_root=tmp_path / "identity"),
         static_root=PROJECT_ROOT / "static",
         data_root=data_root,
     )

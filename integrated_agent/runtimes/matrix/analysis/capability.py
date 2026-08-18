@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from integrated_agent.config import load_model_settings
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
 
 from .workflows.compose_flow import run_compose
@@ -42,7 +41,6 @@ async def run_matrix(
 ) -> dict[str, Any]:
     """按入口已绑定的 scenario 分发；compose 与 reply 是两张独立 TriggerFlow。"""
 
-    load_model_settings()
     if request.scenario == "compose":
         return await run_compose(
             request,

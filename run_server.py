@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import uvicorn
-from dotenv import find_dotenv, load_dotenv
 
+from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.bootstrap.service import create_production_app
 
-
-ROOT = Path(__file__).parent
-project_env = ROOT / ".env"
-load_dotenv(
-    project_env if project_env.is_file() else find_dotenv(usecwd=True)
-)
 if not os.environ.get("DEEPSEEK_API_KEY"):
     raise RuntimeError(
         "缺少 DEEPSEEK_API_KEY。请复制 .env.example 为 .env"

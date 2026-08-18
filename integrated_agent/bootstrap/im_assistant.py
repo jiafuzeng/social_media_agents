@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Literal, cast
 
 from aibot import WSClient, WSClientOptions
-from dotenv import find_dotenv, load_dotenv
 
+from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.gateway import AgentGateway
 from integrated_agent.gateway.intent import DeepSeekIntentModel
 from integrated_agent.runtimes.acp import AcpAgentRuntime
@@ -24,14 +24,10 @@ from integrated_agent.transports.wecom import (
 )
 
 
-ROOT = Path(__file__).parents[2]
+ROOT = PROJECT_ROOT
 
 
 def build_im_assistant(root: Path = ROOT) -> WeComAssistant:
-    project_env = root / ".env"
-    load_dotenv(
-        project_env if project_env.is_file() else find_dotenv(usecwd=True)
-    )
     settings = {
         "DEEPSEEK_API_KEY": os.environ.get("DEEPSEEK_API_KEY", ""),
         "WECOM_BOT_ID": os.environ.get("WECOM_BOT_ID", ""),
