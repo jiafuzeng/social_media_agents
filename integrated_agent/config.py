@@ -12,7 +12,8 @@ from dotenv import find_dotenv, load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # 知识库 RecordStore 目录（相对项目根）。该目录即 backend root，库文件为 records.db；
 # 不要交给 RecordStore(路径)，否则会套成 .agently/records。
-KB_RECORD_ROOT = (PROJECT_ROOT / "workspace" / "kb" / "records").resolve()
+KB_RECORD_ROOT = (PROJECT_ROOT / "workspace" / "rag" / "records").resolve()
+KB_FILES_ROOT = (PROJECT_ROOT / "workspace" / "rag" / "files").resolve()
 _env_file = PROJECT_ROOT / ".env"
 load_dotenv(_env_file if _env_file.is_file() else find_dotenv(usecwd=True))
 
@@ -88,6 +89,7 @@ KB_EMBEDDING_AGENTS = {
 __all__ = [
     "PROJECT_ROOT",
     "KB_RECORD_ROOT",
+    "KB_FILES_ROOT",
     "KB_EMBEDDING_PROFILE_IDS",
     "KB_DEFAULT_EMBEDDING_PROFILE",
     "KB_EMBEDDING_AGENTS",

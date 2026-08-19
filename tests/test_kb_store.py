@@ -63,14 +63,21 @@ def test_kb_store_maps_each_profile() -> None:
         )
 
 
+def test_profile_stores_share_sqlite_vectors() -> None:
+    providers = [store.backend.vector_store_provider for store in kb_store.values()]
+    assert providers
+    assert all(provider is providers[0] for provider in providers)
+    assert all(provider.name == "sqlite" for provider in providers)
+
+
 def test_db_path_is_config_root_without_agently() -> None:
     store = kb_store["bge-m3"]
     db_path = Path(store.backend.db_path)
     assert db_path == KB_RECORD_ROOT / "records.db"
     assert db_path == store.backend.root / "records.db"
     assert ".agently" not in db_path.parts
-    assert store.backend.vector_store_provider.name == "chroma"
-    assert (store.backend.root / "vectors" / "chroma").is_dir()
+    assert store.backend.vector_store_provider.name == "sqlite"
+    assert Path(store.backend.vector_store_provider.db_path) == db_path
 
 
 def test_record_store_path_constructor_nests_agently(tmp_path: Path) -> None:
@@ -81,9 +88,53 @@ def test_record_store_path_constructor_nests_agently(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_put_vector_indexes_chroma(tmp_path: Path, monkeypatch) -> None:
+async def test_cross_profile_delete_then_put_keeps_sqlite_writable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(kb_store_mod, "KB_RECORD_ROOT", tmp_path / "kb" / "records")
+    probes = {
+        "openai-small": _ProbeProvider([1.0, 0.0, 0.0]),
+        "bge-m3": _ProbeProvider([0.0, 1.0, 0.0]),
+        "qwen3": _ProbeProvider([0.0, 0.0, 1.0]),
+    }
+
+    def _wrap(agent: object) -> _ProbeProvider:
+        probe = probes[agent._active_model_key]  # type: ignore[attr-defined]
+        probe.agent = agent  # type: ignore[attr-defined]
+        return probe
+
+    monkeypatch.setattr(kb_store_mod, "AgentEmbeddingProvider", _wrap)
+    old_store = kb_store_mod._open_store("bge-m3")
+    new_store = kb_store_mod._open_store("openai-small")
+    assert (
+        old_store.backend.vector_store_provider
+        is new_store.backend.vector_store_provider
+    )
+    old = await old_store.put(
+        "旧退款政策。",
+        collection="kb",
+        kind="chunk",
+        vector=True,
+    )
+    await old_store.backend.vector_store_provider.delete_records([old["id"]])
+    fresh = await new_store.put(
+        "新的发票说明。",
+        collection="kb",
+        kind="chunk",
+        vector=True,
+    )
+    hits = await new_store.backend.vector_store_provider.search_by_embedding(
+        [1.0, 0.0, 0.0],
+        filters={"collection": "kb"},
+        limit=5,
+    )
+    assert any(hit["id"] == fresh["id"] for hit in hits)
+
+
+@pytest.mark.asyncio
+async def test_put_vector_indexes_sqlite(tmp_path: Path, monkeypatch) -> None:
     store, probes = _open(tmp_path, monkeypatch, "openai-small")
-    assert store.backend.vector_store_provider.name == "chroma"
+    assert store.backend.vector_store_provider.name == "sqlite"
     ref = await store.put(
         {"text": "alpha handbook"},
         collection="kb",

@@ -5,6 +5,7 @@ from pathlib import Path
 from integrated_agent.runtimes.matrix.analysis import MatrixAnalysisCapability
 from integrated_agent.runtimes.matrix.db.settings import load_identity_db_settings
 from integrated_agent.runtimes.matrix.identity import IdentityStore
+from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
 from integrated_agent.runtimes.matrix.service import MatrixTaskService
 from integrated_agent.runtimes.matrix.stores import (
     InMemoryEventStore,
@@ -26,6 +27,7 @@ def build_matrix_service(
     queue_capacity: int = 32,
     identity_root: Path | None = None,
     identity: IdentityStore | None = None,
+    knowledge: KnowledgeStore | None = None,
 ) -> MatrixTaskService:
     events = InMemoryEventStore()
     settings = None
@@ -51,4 +53,5 @@ def build_matrix_service(
         worker_count=worker_count,
         queue_capacity=queue_capacity,
         identity=store,
+        knowledge=knowledge,
     )

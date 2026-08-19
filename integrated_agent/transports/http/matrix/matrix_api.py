@@ -31,7 +31,7 @@ def build_matrix_router(
     router.include_router(build_auth_router(service.identity))
     router.include_router(build_session_router(service.identity))
     router.include_router(build_collection_router(service.identity))
-    router.include_router(build_kb_router(service.identity))
+    router.include_router(build_kb_router(service.identity, service.knowledge))
     router.include_router(build_task_router(service, catalog_root=catalog_root))
     router.include_router(build_catalog_router(catalog))
 

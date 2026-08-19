@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -13,7 +14,7 @@ from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.rag.chunking import preview_chunks, split_zh_sentences
 from integrated_agent.rag.clean import clean_document_text
-from integrated_agent.rag.extract import extract_upload
+from integrated_agent.rag.extract import _quiet_pypdf_cmap, extract_upload
 from integrated_agent.rag.models import (
     ChunkPreviewError,
     PreviewChunksIn,
@@ -290,6 +291,15 @@ async def test_unknown_embedding_profile_is_422() -> None:
     assert caught.value.status == 422
 
 
+def test_pdf_extract_swallows_broken_cmap_warnings(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.WARNING)
+    with _quiet_pypdf_cmap():
+        logging.getLogger("pypdf._cmap").warning(
+            "Got invalid hex string: Non-hexadecimal digit found (b'CMapName')"
+        )
+    assert "CMapName" not in caplog.text
+
+
 def test_extract_txt_and_pdf() -> None:
     extracted = extract_upload("note.md", "售后政策：七天无理由。".encode("utf-8"))
     assert "七天无理由" in extracted.text
@@ -437,9 +447,12 @@ def test_http_preview_does_not_write_record_store(
             "/api/kb/extract",
             headers=headers,
             files={"file": ("note.txt", "手册正文。".encode("utf-8"), "text/plain")},
+            data={"embedding_profile_id": "qwen3"},
         )
         assert extracted.status_code == 200
-        assert extracted.json()["text"] == "手册正文。"
+        body = extracted.json()
+        assert body["text"] == "手册正文。"
+        assert "embedding_profile_id" not in body
     blocked.assert_not_called()
 
 
@@ -476,3 +489,9 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert 'id="kbDrop"' in page
         assert "选择数据源" in page
         assert "尚未写入知识库" in page
+        assert "将按以下配置入库" in page
+        assert "召回测试" in page
+        assert 'id="kbViewDocs"' in page
+        assert "保存并处理" in page
+        assert "删除该文档的旧切片记录和向量" in page
+        assert "确认重切" in page

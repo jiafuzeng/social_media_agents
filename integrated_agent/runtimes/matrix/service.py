@@ -6,6 +6,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from .identity import IdentityStore
+from .knowledge import KnowledgeStore
 from .models import (
     MatrixTaskCreate,
     MatrixTaskRequest,
@@ -36,6 +37,7 @@ class MatrixTaskService:
         tasks: InMemoryTaskStore,
         events: InMemoryEventStore,
         identity: IdentityStore,
+        knowledge: KnowledgeStore | None = None,
         worker_count: int = 4,
         queue_capacity: int = 32,
     ) -> None:
@@ -49,6 +51,7 @@ class MatrixTaskService:
         self.worker_count = worker_count
         self.queue_capacity = queue_capacity
         self.identity = identity
+        self.knowledge = knowledge or KnowledgeStore()
         self._queue: asyncio.Queue[MatrixTaskRequest] = asyncio.Queue(
             maxsize=queue_capacity
         )

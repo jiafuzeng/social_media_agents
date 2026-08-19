@@ -2,20 +2,33 @@
 
 库文件在 KB_RECORD_ROOT/records.db。必须先 LocalRecordStore(目录) 再交给 RecordStore：
 RecordStore(路径) 会套成 目录/.agently/records/records.db。
-向量用 Chroma（records/vectors/chroma）。
+向量钉在同一 records.db 的 record_store_vectors（禁止 chroma auto）。
 embeddings 配在全局 model_pool；按 profile_id 取对应 RecordStore。
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from agently.core.storage import (
     AgentEmbeddingProvider,
-    ChromaVectorStoreProvider,
     LocalRecordStore,
     RecordStore,
+    SQLiteVectorStoreProvider,
 )
 
 from integrated_agent.config import KB_EMBEDDING_AGENTS, KB_RECORD_ROOT
+
+_vector_providers: dict[str, SQLiteVectorStoreProvider] = {}
+
+
+def _sqlite_vectors(db_path: Path) -> SQLiteVectorStoreProvider:
+    key = str(Path(db_path).expanduser().resolve())
+    provider = _vector_providers.get(key)
+    if provider is None:
+        provider = SQLiteVectorStoreProvider(key, create=True)
+        _vector_providers[key] = provider
+    return provider
 
 
 def _open_store(profile_id: str) -> RecordStore:
@@ -26,12 +39,7 @@ def _open_store(profile_id: str) -> RecordStore:
     store.backend.embedding_provider = AgentEmbeddingProvider(
         KB_EMBEDDING_AGENTS[profile_id]
     )
-    store.backend.vector_store_provider = ChromaVectorStoreProvider(
-        store.backend.root / "vectors" / "chroma",
-        create=True,
-        mode="read_write",
-        collection_name=f"kb_{profile_id}",
-    )
+    store.backend.vector_store_provider = _sqlite_vectors(Path(store.backend.db_path))
     store.backend.ensure_vector_index()
     return store
 

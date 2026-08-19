@@ -13,7 +13,8 @@
     } catch (_) {}
   </script>
   <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/matrix.css?v=kb-wizard-1">
+  <link rel="stylesheet" href="/static/matrix.css?v=kb-ui-28">
+  <link rel="stylesheet" href="/static/matrix-kb.css?v=kb-ui-28">
 </head>
 <body class="matrix-app auth-locked" data-workspace="task" data-board="home">
   <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
@@ -236,11 +237,64 @@
     </section>
 
     <section class="kb-stage" id="kbWorkspace" hidden>
-      <header class="kb-head">
-        <div>
-          <strong>知识库</strong>
-          <small>导入与切分预览，本页不入库</small>
+      <aside class="kb-side">
+        <header class="kb-side-head">
+          <span class="kb-brand-mark" aria-hidden="true"></span>
+          <div>
+            <strong>知识库</strong>
+            <small>手册 · 分段 · 召回</small>
+          </div>
+        </header>
+        <div class="kb-side-tags">
+          <span class="kb-chip">通用</span>
+          <span class="kb-chip" id="kbSideProfile" hidden></span>
+          <span class="kb-chip kb-chip-accent">向量检索</span>
         </div>
+        <nav class="kb-side-nav" id="kbSubnav">
+          <button type="button" class="kb-nav-item active" data-kb-view="docs">
+            <svg class="kb-nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 4h12a2 2 0 012 2v14H8a2 2 0 01-2-2V4zm2 2v12h10V6H8zM4 7h2v11a1 1 0 001 1H5a1 1 0 01-1-1V7z"/></svg>
+            文档
+          </button>
+          <button type="button" class="kb-nav-item" data-kb-view="recall">
+            <svg class="kb-nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3a7 7 0 110 14 7 7 0 010-14zm0 3a4 4 0 100 8 4 4 0 000-8zm0 2.2a1.8 1.8 0 110 3.6 1.8 1.8 0 010-3.6z"/></svg>
+            召回测试
+          </button>
+        </nav>
+        <footer class="kb-side-foot">
+          <span id="kbSideStats">0 文档</span>
+        </footer>
+      </aside>
+
+      <div class="kb-main">
+      <header class="kb-head">
+        <p class="kb-head-note" id="kbHeadNote">先导入或打开文档。向量模型在分段入库和召回测试时再选。</p>
+        <label class="foot-select kb-profile" id="kbProfileWrap" hidden>
+          <span>当前模型</span>
+          <span id="kbEmbedMountHead" class="kb-embed-mount-head"></span>
+        </label>
+      </header>
+
+      <div class="kb-view" id="kbViewDocs">
+        <div class="kb-docs-toolbar">
+          <div>
+            <h2 class="kb-section-title">文档</h2>
+            <p class="kb-hint" id="kbDocsHint">每行显示该文档入库时用的模型。</p>
+          </div>
+          <div class="kb-docs-actions">
+            <label class="kb-check" id="kbFilterCurrentWrap" hidden>
+              <input type="checkbox" id="kbFilterCurrent"> 只看当前模型
+            </label>
+            <button type="button" class="send-btn" id="kbImportBtn">导入文档</button>
+          </div>
+        </div>
+        <p class="kb-status" id="kbDocsStatus" hidden></p>
+        <ol class="kb-doc-list" id="kbDocList"></ol>
+        <p class="kb-empty kb-empty-hero" id="kbDocEmpty">还没有文档。点「导入文档」上传或粘贴手册。</p>
+      </div>
+
+      <div class="kb-view" id="kbViewWizard" hidden>
+      <header class="kb-wizard-head">
+        <button type="button" class="ghost" id="kbWizardBack">← 返回文档</button>
         <ol class="kb-steps" id="kbSteps">
           <li class="active" data-kb-step="1"><span>STEP 1</span>选择数据源</li>
           <li data-kb-step="2"><span>2</span>文本分段与清洗</li>
@@ -253,10 +307,16 @@
           <h2 class="kb-section-title">选择数据源</h2>
           <div class="kb-source-cards">
             <button type="button" class="kb-source-card active" id="kbModeUpload" data-kb-mode="upload">
+              <span class="kb-source-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zm0 1.5L18.5 9H14z"/></svg>
+              </span>
               <strong>导入已有文本</strong>
               <small>上传本地文件，按扩展名抽取正文</small>
             </button>
             <button type="button" class="kb-source-card" id="kbModePaste" data-kb-mode="paste">
+              <span class="kb-source-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8 3h8v2h3v16H5V5h3zm2 0v2h4V3zM7 9h10v2H7zm0 4h10v2H7z"/></svg>
+              </span>
               <strong>粘贴文本</strong>
               <small>直接贴入手册或示例 Markdown</small>
             </button>
@@ -266,9 +326,19 @@
             <h3 class="kb-section-title">上传文本文件</h3>
             <div class="kb-drop" id="kbDrop">
               <input id="kbFile" type="file" accept=".txt,.md,.markdown,.pdf,.docx,.pptx,.html,.htm,text/plain,text/markdown,text/html,application/pdf">
+              <span class="kb-drop-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zm-7 14h14v2H5z"/></svg>
+              </span>
               <p class="kb-drop-lead">拖拽文件至此，或者 <button type="button" class="kb-link" id="kbPickFile">选择文件</button></p>
               <p class="kb-formats">MD、MARKDOWN、PDF、DOCX、PPTX、HTML、HTM、TXT</p>
-              <p class="kb-limits">每批最多 1 个文件，每个文件不超过 15 MB</p>
+              <p class="kb-limits">每批最多 1 个文件，每个文件不超过 50 MB</p>
+              <div class="kb-extract-busy" id="kbExtractBusy" hidden>
+                <span class="kb-split-spinner" aria-hidden="true"></span>
+                <strong>正在抽取<span class="kb-dots" aria-hidden="true"><i></i><i></i><i></i></span></strong>
+                <p class="kb-split-elapsed" id="kbExtractElapsed">开始抽取</p>
+                <p class="kb-extract-name" id="kbExtractName"></p>
+                <div class="kb-split-bar" aria-hidden="true"><span></span></div>
+              </div>
             </div>
             <div class="kb-file-card" id="kbFileCard" hidden>
               <span class="kb-file-badge" id="kbFileBadge">MD</span>
@@ -331,13 +401,13 @@
             <p class="kb-kicker">文本预处理</p>
             <label class="kb-check"><input type="checkbox" checked disabled> 已自动清洗控制符、多余空白；Markdown / HTML 保住结构</label>
             <p class="kb-kicker">Embedding 模型</p>
-            <label class="foot-select kb-profile">
-              <span>当前模型</span>
+            <div id="kbEmbedMountStep2" class="kb-embed-slot">
               <select id="kbEmbedding" aria-label="当前 embedding 模型"></select>
-            </label>
+            </div>
+            <p class="kb-hint">本步选择入库模型。semantic 预览必须带它；入库后切片锁定该模型。</p>
             <div class="kb-preview-actions">
               <button type="button" class="send-btn" id="kbPreviewBtn">预览块</button>
-              <button type="button" class="ghost" id="kbResetParams">重置</button>
+              <button type="button" class="ghost" id="kbResetParams">恢复默认参数</button>
             </div>
             <p class="kb-status" id="kbChunkStatus" hidden></p>
           </aside>
@@ -347,7 +417,7 @@
                 <strong id="kbPreviewTitle">预览</strong>
                 <small id="kbPreviewMeta">点击左侧「预览块」加载全部切片</small>
               </div>
-              <input id="kbChunkSearch" class="kb-chunk-search" type="search" placeholder="搜索分段" hidden>
+              <input id="kbChunkSearch" class="kb-chunk-search" type="search" placeholder="关键词匹配分段" hidden>
             </header>
             <p class="kb-notes" id="kbNotes" hidden></p>
             <div class="kb-chunk-list" id="kbChunks">
@@ -362,16 +432,153 @@
       </div>
 
       <div class="kb-step" id="kbStepDone" hidden>
-        <div class="kb-done">
-          <h2>预览已完成</h2>
-          <p class="kb-hint">切片仅用于预览，尚未写入知识库。</p>
-          <dl class="kb-summary" id="kbSummary"></dl>
-          <p class="kb-status" id="kbDoneStatus" hidden></p>
+        <div class="kb-done kb-ingest-layout">
+          <div class="kb-ingest-main">
+            <header class="kb-done-hero">
+              <h2 id="kbDoneTitle">预览已完成</h2>
+              <p class="kb-hint" id="kbDoneHint">切片仅用于预览，尚未写入知识库。点击「保存并处理」后才会嵌入入库。</p>
+            </header>
+            <label class="kb-title-card">
+              <span class="kb-book-mark" aria-hidden="true"></span>
+              <span class="kb-title-card-fields">
+                <span class="field-label">知识库名称</span>
+                <input id="kbIngestTitle" type="text" maxlength="80" placeholder="可改标题，默认用文件名">
+              </span>
+            </label>
+            <div class="kb-progress" id="kbIngestProgress" hidden>
+              <span class="kb-split-spinner" id="kbIngestSpinner" aria-hidden="true"></span>
+              <div class="kb-progress-copy">
+                <strong id="kbIngestLabel">正在写入并嵌入</strong>
+                <p class="kb-split-elapsed" id="kbIngestElapsed">开始处理</p>
+                <p class="kb-extract-name" id="kbIngestFileName">—</p>
+              </div>
+            </div>
+            <section class="kb-spec-card">
+              <h3 id="kbSpecTitle">将按以下配置入库</h3>
+              <dl class="kb-summary" id="kbSummary"></dl>
+            </section>
+            <p class="kb-status" id="kbDoneStatus" hidden></p>
+          </div>
+          <aside class="kb-next-card">
+            <header class="kb-next-head">
+              <span class="kb-next-ico" aria-hidden="true"></span>
+              <strong>接下来做什么</strong>
+            </header>
+            <ol class="kb-next-steps" id="kbNextSteps">
+              <li>确认名称，再点「保存并处理」才会写入。</li>
+              <li>入库完成后，可以管理分段或停用某一块。</li>
+              <li>也可以去做召回测试。</li>
+            </ol>
+          </aside>
         </div>
         <footer class="kb-step-foot">
           <button type="button" class="ghost" id="kbBackToChunk">上一步</button>
-          <button type="button" class="ghost" id="kbRestart">重新选择数据源</button>
+          <div class="kb-done-actions">
+            <button type="button" class="ghost" id="kbRestart">重新选择数据源</button>
+            <button type="button" class="send-btn" id="kbIngestBtn">保存并处理</button>
+            <button type="button" class="send-btn" id="kbGoDocs" hidden>前往文档 →</button>
+          </div>
         </footer>
+      </div>
+      </div>
+
+      <div class="kb-view" id="kbViewDoc" hidden>
+        <div class="kb-doc-shell">
+          <header class="kb-doc-head">
+            <button type="button" class="ghost" id="kbDocBack">← 文档</button>
+            <input id="kbDocTitle" class="kb-doc-title" maxlength="80" aria-label="文档标题">
+            <div class="kb-doc-tools">
+              <span class="kb-badge" id="kbDocProfile"></span>
+              <label class="kb-switch">
+                <input type="checkbox" id="kbDocEnabled">
+                <span class="kb-switch-ui" aria-hidden="true"></span>
+                可用
+              </label>
+              <button type="button" class="ghost" id="kbDocDownload" hidden>下载原件</button>
+              <button type="button" class="ghost kb-doc-delete" id="kbDocDelete">删除</button>
+            </div>
+          </header>
+          <p class="kb-mismatch" id="kbDocMismatch" hidden></p>
+          <p class="kb-status" id="kbDocStatus" hidden></p>
+          <div class="kb-doc-grid">
+            <section class="kb-seg-pane">
+              <header class="kb-seg-toolbar">
+                <strong id="kbSegCount">0 分段</strong>
+                <input id="kbSegSearch" class="kb-chunk-search" type="search" placeholder="关键词匹配分段">
+                <button type="button" class="send-btn" id="kbAddSeg">+ 添加分段</button>
+              </header>
+              <div class="kb-add-seg" id="kbAddSegBox" hidden>
+                <textarea id="kbAddSegText" rows="4" placeholder="新分段正文"></textarea>
+                <div class="kb-seg-actions">
+                  <button type="button" class="ghost" id="kbAddSegCancel">取消</button>
+                  <button type="button" class="send-btn" id="kbAddSegSave">保存并入库</button>
+                </div>
+                <div class="kb-add-progress" id="kbAddSegProgress" hidden>
+                  <span class="kb-split-spinner" aria-hidden="true"></span>
+                  <div class="kb-progress-copy">
+                    <strong id="kbAddSegLabel">正在入库</strong>
+                    <p class="kb-split-elapsed" id="kbAddSegElapsed">开始处理</p>
+                  </div>
+                </div>
+              </div>
+              <div class="kb-chunk-list" id="kbSegList"></div>
+            </section>
+            <aside class="kb-meta-pane">
+              <div class="kb-meta-block">
+                <h3>文档信息</h3>
+                <dl class="kb-summary" id="kbDocMeta"></dl>
+              </div>
+              <div class="kb-reindex">
+                <h3>换模型重新索引</h3>
+                <p class="kb-hint">确认后会删除该文档的旧切片记录和向量，再按新模型写入新 chunk；不会静默改徽章。</p>
+                <label class="kb-reindex-field">
+                  <span>新模型</span>
+                  <select id="kbReindexProfile" aria-label="重新索引所用 embedding 模型"></select>
+                </label>
+                <button type="button" class="ghost kb-reindex-btn" id="kbReindexBtn">确认重切</button>
+                <div class="kb-reindex-progress" id="kbReindexProgress" hidden>
+                  <span class="kb-split-spinner" aria-hidden="true"></span>
+                  <div class="kb-progress-copy">
+                    <strong id="kbReindexLabel">正在删除旧记录并写入新切片</strong>
+                    <p class="kb-split-elapsed" id="kbReindexElapsed">开始处理</p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <div class="kb-view" id="kbViewRecall" hidden>
+        <div class="kb-recall">
+          <section class="kb-recall-form">
+            <h2 class="kb-section-title">召回测试</h2>
+            <p class="kb-hint">根据给定的查询文本测试知识的召回效果。请求必须带顶栏当前模型。</p>
+            <div class="kb-recall-box">
+              <header>
+                <span>源文本</span>
+                <span class="kb-badge" id="kbRecallProfile"></span>
+                <small id="kbRecallCount">0/200</small>
+              </header>
+              <textarea id="kbRecallQuery" rows="6" maxlength="200" placeholder="请输入文本，建议使用简短的陈述句。"></textarea>
+              <button type="button" class="send-btn kb-recall-run" id="kbRecallBtn" disabled title="测试" aria-label="测试">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>
+              </button>
+            </div>
+            <p class="kb-status" id="kbRecallStatus" hidden></p>
+            <div class="kb-recall-records">
+              <h3>记录</h3>
+              <ol class="kb-history" id="kbRecallHistory"></ol>
+              <p class="kb-empty" id="kbRecallHistoryEmpty">最近无查询结果</p>
+            </div>
+          </section>
+          <section class="kb-recall-hits" id="kbRecallHits">
+            <div class="kb-empty-hero">
+              <p class="kb-empty">召回测试结果将展示在这里</p>
+            </div>
+          </section>
+        </div>
+      </div>
       </div>
     </section>
   </div>
@@ -478,9 +685,9 @@
       </div>
     </div>
   </div>
-  <script src="/static/matrix-auth.js?v=kb-wizard-1"></script>
+  <script src="/static/matrix-auth.js?v=kb-ui-28"></script>
   <script src="/static/matrix.js?v=kb-wizard-1"></script>
   <script src="/static/matrix-catalog.js?v=kb-preview-8"></script>
-  <script src="/static/matrix-kb.js?v=kb-wizard-2"></script>
+  <script src="/static/matrix-kb.js?v=kb-ui-28"></script>
 </body>
 </html>

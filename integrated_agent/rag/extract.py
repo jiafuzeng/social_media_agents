@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 
 from integrated_agent.rag.clean import clean_document_text
 from integrated_agent.rag.models import ExtractError, ExtractOut
@@ -42,6 +44,19 @@ def _read_html(data: bytes) -> _Loaded:
     return _Loaded(str(root), True)
 
 
+@contextmanager
+def _quiet_pypdf_cmap() -> Iterator[None]:
+    """部分中文 PDF 的 ToUnicode CMap 不规范，pypdf 仍能抽出正文但会刷 WARNING。"""
+
+    logger = logging.getLogger("pypdf._cmap")
+    previous = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        logger.setLevel(previous)
+
+
 def _read_pdf(data: bytes) -> _Loaded:
     try:
         from pypdf import PdfReader
@@ -51,7 +66,8 @@ def _read_pdf(data: bytes) -> _Loaded:
         reader = PdfReader(BytesIO(data))
     except Exception as exc:
         raise ExtractError(422, "invalid pdf") from exc
-    pages = [(page.extract_text() or "") for page in reader.pages]
+    with _quiet_pypdf_cmap():
+        pages = [(page.extract_text() or "") for page in reader.pages]
     return _Loaded("\n\n".join(pages), False)
 
 
@@ -102,7 +118,7 @@ def _read_pptx(data: bytes) -> _Loaded:
     return _Loaded("\n\n".join(parts), False)
 
 
-MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 # 对齐 SimpleDirectoryReader.file_extractor：后缀 → Reader。切块仍由用户选 Parser。
 FILE_EXTRACTORS: dict[str, Callable[[bytes], _Loaded]] = {
@@ -131,7 +147,7 @@ def extract_upload(
     data: bytes,
     content_type: str | None = None,
 ) -> ExtractOut:
-    """按后缀选 Reader 抽出纯文本并清洗。不落冷文件、不入库。"""
+    """按后缀选 Reader 抽出纯文本并清洗。不绑定 embedding、不落冷文件、不入库。"""
     name = (filename or "upload").strip() or "upload"
     mime = (content_type or "").split(";")[0].strip().lower()
     suffix = Path(name).suffix.lower()

@@ -25,9 +25,9 @@
 
 | # | 议题 | 决定 |
 |---|---|---|
-| A1 | 换文件 / 重切 | 覆盖同一产品 `doc_id`。旧 chunk 归档，新 chunk `put`。页面仍是一行。 |
+| A1 | 换文件 / 重切 | 覆盖同一产品 `doc_id`。先归档旧 chunk（避免新旧同时可检索），新 chunk `put` **成功后硬删**旧记录行与向量。失败则旧行仍为 archived。页面仍是一行。 |
 | A2 | 切片独立 CRUD | **每一块可单独**增、改、停用、删并**当场入库**（embed + RecordStore `put`）。操作一块不重写、不重 embed 兄弟块。整篇重切只是便捷，不是唯一入库路径。 |
-| A3 | 删除文档 | 先归档（检索不可见），再删冷文件。RecordStore **不硬删**记录行。 |
+| A3 | 删除文档 | 硬删该 `doc_id` 的 document / chunk 行、FTS、向量和冷文件。列表立即为空。 |
 | A4 | 身份库 | 只解析 `user_id`。不建 `kb_documents` 表。 |
 | A5 | 与案例 RAG | 分库、分 `collection`、分引用 token。功效门仍只认 `[[ref:]]`。 |
 | A6 | RecordStore 落盘 | 目录固定 `workspace/kb/records/`（可用 env `MATRIX_KB_RECORD_ROOT` 覆盖）。库文件就是该目录下的 `records.db`。禁止框架默认的 `…/.agently/records/records.db`。 |
@@ -334,20 +334,18 @@ P0 列表与召回**不**靠 walk link 当权威；权威是 `meta.status` + `me
 | 启用 / 停用整篇 | 不动 | document.meta.enabled；**所有**该 `doc_id` 且 `status=active` 的 chunk 回写 `doc_enabled` |
 | 停用 / 启用某一块 | 不动 | 该 chunk `meta.enabled`；更新 document.`chunk_count` |
 | 改正文 | 不动 | 绑定**文档已有** profile 后新 `put` chunk；不得换空间 |
-| 换文件或重切 | 新 `artifact_id`（或覆盖后新 sha256） | 默认沿用文档 profile；请求若带**不同** profile 则整篇按新 Agent 重切（旧 chunk 归档） |
+| 换文件或重切 | 新 `artifact_id`（或覆盖后新 sha256） | 默认沿用文档 profile；请求若带**不同** profile 则整篇按新 Agent 重切。旧 chunk 先归档，新块写入成功后**删除**旧 record 行 |
 | 只改 embedding profile | 不动 | 不允许只 PATCH id；必须走重切 |
 
-换文件不换 `doc_id`。进行中 document=`ingesting`，完成前 RetrieveKb 仍只看见尚未归档且 `doc_status=ready` 的块；建议先归档旧块再切新块，避免新旧同时可检索。
+换文件不换 `doc_id`。进行中 document=`ingesting`，完成前 RetrieveKb 仍只看见尚未归档且 `doc_status=ready` 的块；先归档旧块再切新块，避免新旧同时可检索。新块写入成功后硬删旧 chunk 行（RecordStore 无公开 `delete`，由宿主删 sqlite / FTS / 向量）。失败则保留 archived 旧行，不删。
 
 ### 5.4 删
 
-1. document `status=archived`，`enabled=false`
-2. 该 `doc_id` 全部 chunk `status=archived`，向量 `delete_records`
+1. 该 `doc_id` 的 document 与全部 chunk **硬删** sqlite 行（含 FTS / links）
+2. 向量 `delete_records`
 3. 删除该文档名下冷文件目录
 
-列表与 RetrieveKb 立刻不可见。记录行保留作审计。删单块见 §5.5，不删冷文件。
-
-恢复不在 P0（归档即产品删除）。
+列表与 RetrieveKb 立刻不可见，记录行也不再保留。删单块同样硬删该 chunk，不删冷文件。
 
 ### 5.5 切片独立入库（A2）
 
@@ -360,16 +358,16 @@ P0 列表与召回**不**靠 walk link 当权威；权威是 `meta.status` + `me
 → 该块 embed_texts([本块 text 或 window 规则下的索引文本])
 → put kind=chunk, indexed+vector, meta 继承文档 profile / doc_status / doc_enabled
 → link contains（新增）或 replaces（改正文）
-→ 改正文/删除时：旧 record 归档 + delete_records([旧id])
+→ 改正文：新 `put` 成功后硬删旧 chunk 行 + 向量；删除：硬删该 `chunk_id` 全部世代（含归档）+ 向量
 → 更新 document.chunk_count
 ```
 
 | 单块动作 | 入库 | 兄弟块 |
 |---|---|---|
 | 新增（预览采纳、手写、从某一 Node 保存） | 本块 `put` + 向量 | 不动 |
-| 改正文后保存 | 新 `put` + 新向量；旧块归档 | 不动 |
+| 改正文后保存 | 新 `put` + 新向量；成功后硬删旧行 | 不动 |
 | 停用 / 启用 | 只 `put_record` enabled；向量保留 | 不动 |
-| 删除 | 本块归档 + 清向量 | 不动 |
+| 删除 | 该 `chunk_id` 硬删 sqlite 行（含改正文留下的旧行）+ 清向量 | 不动 |
 
 失败：该请求 4xx/5xx，本块不标 `active`（改正文则旧块仍 active，避免正文和检索一起丢）。其它块的检索不受影响。document 不因此变 `failed`。
 
