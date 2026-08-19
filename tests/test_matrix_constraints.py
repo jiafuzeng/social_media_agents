@@ -202,6 +202,58 @@ async def test_t04_unknown_evidence_id_skips_or_fails() -> None:
 
 
 @pytest.mark.asyncio
+async def test_empty_rag_drops_hallucinated_e1_for_format() -> None:
+    gated = await apply_constraint_gate(
+        work_item_id="w1",
+        kind="compose_post",
+        platform_key="x-twitter",
+        source_comment_key=None,
+        text="七夕夜市灯刚亮，来逛一圈[[ref:e1]]。",
+        rationale="空检索仍写了 e1",
+        evidence_ids=["e1"],
+        risk_flags=[],
+        claim_types=["format"],
+        reply_decision=None,
+        proposed_degrade=None,
+        max_chars=280,
+        matcher=AhoCorasickMatcher([]),
+        offered_refs=[],
+        retrieval_state="empty",
+        templates=[],
+    )
+    assert gated.degrade_op == "pass"
+    assert gated.status == "ready"
+    assert gated.evidence_ids == []
+    assert "unknown_ref" not in gated.issues
+    assert "[[ref:" not in gated.text
+
+
+@pytest.mark.asyncio
+async def test_empty_rag_efficacy_still_fails_with_hallucinated_e1() -> None:
+    gated = await apply_constraint_gate(
+        work_item_id="w1",
+        kind="compose_post",
+        platform_key="x-twitter",
+        source_comment_key=None,
+        text="成分温和，日常护理更轻松。",
+        rationale="功效且空检索",
+        evidence_ids=["e1"],
+        risk_flags=[],
+        claim_types=["efficacy"],
+        reply_decision=None,
+        proposed_degrade=None,
+        max_chars=280,
+        matcher=AhoCorasickMatcher([]),
+        offered_refs=[],
+        retrieval_state="empty",
+        templates=[],
+    )
+    assert gated.degrade_op != "pass"
+    assert "missing_ref_on_empty_rag" in gated.issues
+    assert "unknown_ref" not in gated.issues
+
+
+@pytest.mark.asyncio
 async def test_t05_empty_rag_efficacy_cannot_pass() -> None:
     gated = await apply_constraint_gate(
         work_item_id="w1",

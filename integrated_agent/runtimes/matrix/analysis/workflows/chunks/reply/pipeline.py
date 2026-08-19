@@ -218,7 +218,7 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
                     "先裁 reply、acknowledge 或 skip，再写正文。遵循 info.context.interaction.skip_guidance；人身攻击、仇恨或无法核实的诱导默认 skip。",
                     "用 info.context.interaction 的 voice_summary 与 must_do / must_not 回复，不要导关注或报名，不要换成别的身份。",
                     "skip 时 draft_text 必须是空串。不得输出 escalate。",
-                    "证据只能引用 info.context.offered_refs 的 ref_id；手册只能引用 offered_kbs 的 kb_id，正文写成 [[kb:k1]]，不得占用 [[ref:]]。",
+                    "证据只能引用 info.context.offered_refs 的 ref_id；手册只能引用 offered_kbs 的 kb_id，正文写成 [[kb:k1]]，不得占用 [[ref:]]。offered_refs 为空时 evidence_ids 必须是 []，不得编造 e1。",
                     "功效类主张必须引用案例；只引手册不能代替案例。不得承诺稳赚或治愈。",
                     "正文长度不得超过 info.context.max_chars。",
                 ]

@@ -29,6 +29,7 @@ ALLOWED_DEGRADE_OPS: frozenset[str] = frozenset(
 )
 HARD_ISSUE_PREFIXES = ("forbidden_term:", "missing_ref_on_empty_rag")
 KB_CITE_RE = re.compile(r"\[\[kb:([^\]]+)\]\]")
+REF_CITE_RE = re.compile(r"\[\[ref:([^\]]+)\]\]")
 
 
 class AhoCorasickMatcher:
@@ -87,6 +88,34 @@ class _Node:
 
 def requires_citation(claim_types: Sequence[str]) -> bool:
     return bool(CITATION_CLAIM_TYPES.intersection(claim_types))
+
+
+def _sanitize_unoffered_cites(
+    *,
+    text: str,
+    evidence_ids: Sequence[str],
+    offered_refs: Sequence[str],
+    offered_kbs: Sequence[str],
+) -> tuple[str, list[str]]:
+    """空检索时丢掉编造的 e1/k1；有签发卡时仍把未知 id 留给 unknown_ref / unknown_kb。"""
+
+    offered_ref_set = set(offered_refs)
+    offered_kb_set = set(offered_kbs)
+    kept: list[str] = []
+    for ref_id in evidence_ids:
+        if ref_id in offered_ref_set:
+            kept.append(ref_id)
+            continue
+        if ref_id in offered_kb_set:
+            continue
+        if offered_ref_set:
+            kept.append(ref_id)
+    cleaned = text or ""
+    if not offered_ref_set:
+        cleaned = REF_CITE_RE.sub("", cleaned)
+    if not offered_kb_set:
+        cleaned = KB_CITE_RE.sub("", cleaned)
+    return cleaned, kept
 
 
 def collect_issues(
@@ -195,6 +224,12 @@ async def apply_constraint_gate(
 ) -> GatedDraft:
     if proposed_degrade not in ALLOWED_DEGRADE_OPS:
         proposed_degrade = None
+    text, evidence_ids = _sanitize_unoffered_cites(
+        text=text,
+        evidence_ids=evidence_ids,
+        offered_refs=offered_refs,
+        offered_kbs=offered_kbs,
+    )
     issues = collect_issues(
         text=text,
         kind=kind,
