@@ -353,3 +353,37 @@ class SearchKbOut(RagModel):
     empty_reason: SearchEmptyReason = ""
     profile_doc_count: int = 0  # 当前模型下可检索文档数
     other_profile_doc_count: int = 0  # 其他模型的文档数，提示去换顶栏而非融合检索
+
+
+class ChatKbTurn(RagModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=800)
+
+
+class ChatKbIn(RagModel):
+    """工作区召回聊天。检索契约与 search 相同；history 只作指代，证据仍以本次 hits 为准。"""
+
+    query: str = Field(min_length=1, max_length=2000)
+    embedding_profile_id: str = Field(min_length=1)
+    history: list[ChatKbTurn] = Field(default_factory=list, max_length=8)
+
+
+class ChatKbHit(SearchKbHit):
+    kb_id: str
+    source_query: str | None = None
+    hit_text: str | None = None  # 兼容旧字段；引用锚点以 text 为准
+    context: str | None = None  # 补全后的阅读上下文，不作为独立引用
+
+
+class ChatKbOut(RagModel):
+    query: str
+    embedding_profile_id: str
+    answer: str
+    hits: list[ChatKbHit]
+    cited_kb_ids: list[str] = Field(default_factory=list)
+    rewritten_query: str = ""
+    retrieval_queries: list[str] = Field(default_factory=list)
+    empty_reason: SearchEmptyReason = ""
+    profile_doc_count: int = 0
+    other_profile_doc_count: int = 0
+    limitations: list[str] = Field(default_factory=list)

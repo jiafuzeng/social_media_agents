@@ -324,6 +324,34 @@ class KnowledgeStore:
                 refs.append(ref)
         return refs
 
+    async def retrieve_draft_cards(
+        self,
+        user_id: str,
+        query: str,
+        embedding_profile_id: str | None = None,
+        *,
+        top_n: int = 4,
+    ) -> list[dict[str, Any]]:
+        """写稿投影：k1…kN。RecordStore id 不出卡片。"""
+        refs = await self.retrieve(
+            user_id, query, embedding_profile_id, top_n=top_n
+        )
+        cards: list[dict[str, Any]] = []
+        for index, ref in enumerate(refs, start=1):
+            chunk = await self._chunk_out(ref)
+            cards.append(
+                {
+                    "kb_id": f"k{index}",
+                    "chunk_id": chunk.chunk_id,
+                    "doc_id": chunk.doc_id,
+                    "text": chunk.text,
+                    "window": chunk.window,
+                    "header_path": chunk.header_path,
+                    "embedding_profile_id": chunk.embedding_profile_id,
+                }
+            )
+        return cards
+
     async def search(
         self, user_id: str, command: SearchKbIn
     ) -> SearchKbOut:

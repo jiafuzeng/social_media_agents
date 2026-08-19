@@ -2293,7 +2293,27 @@ function draftCount() {
   return raw;
 }
 
+function currentDraftKbProfile() {
+  const select = document.querySelector("#kbEmbedding");
+  if (select?.value) return select.value;
+  try {
+    return sessionStorage.getItem("matrix.kb.embedding_profile_id") || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function refreshKbDraftHint() {
+  const node = document.querySelector("#kbDraftProfile");
+  if (!node) return;
+  const profile = currentDraftKbProfile();
+  node.hidden = !profile;
+  node.textContent = profile ? `将按 ${profile} 检索手册` : "";
+}
+window.refreshKbDraftHint = refreshKbDraftHint;
+
 function payloadForSubmit(replyComments) {
+  const profile = currentDraftKbProfile();
   if (scenario === "reply") {
     const comments = (replyComments || []).map(item => ({
       text: item.text.trim(),
@@ -2310,19 +2330,19 @@ function payloadForSubmit(replyComments) {
     };
     if (comments.length === 1) body.reply_count = draftCount();
     if (activeThreadId) body.session_id = activeThreadId;
+    if (profile) body.embedding_profile_id = profile;
     return { url: "/api/reply", body };
   }
-  return {
-    url: "/api/create",
-    body: {
-      text: document.querySelector("#composeText").value.trim(),
-      need_trends: document.querySelector("#needTrends").checked,
-      post_count: draftCount(),
-      account_key: selectedAccount().account_key,
-      channel: "web",
-      session_id: activeThreadId
-    }
+  const body = {
+    text: document.querySelector("#composeText").value.trim(),
+    need_trends: document.querySelector("#needTrends").checked,
+    post_count: draftCount(),
+    account_key: selectedAccount().account_key,
+    channel: "web",
+    session_id: activeThreadId
   };
+  if (profile) body.embedding_profile_id = profile;
+  return { url: "/api/create", body };
 }
 
 async function newReplyThread(title) {
@@ -2582,5 +2602,8 @@ syncChatHeader();
 window.addEventListener("matrix-auth-changed", () => {
   loadSessions().catch(() => {});
   loadArchive().catch(() => {});
+  refreshKbDraftHint();
 });
 loadSessions().catch(() => {});
+refreshKbDraftHint();
+document.querySelector("#kbEmbedding")?.addEventListener("change", refreshKbDraftHint);

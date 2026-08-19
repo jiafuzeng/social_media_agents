@@ -29,12 +29,13 @@ from integrated_agent.runtimes.question.worker import (
     WorkerDependencies,
 )
 from integrated_agent.transports.http import create_http_app, create_matrix_api
-from tests.fakes import fake_question_runner, install_scripted_ask
+from tests.fakes import EmptyKnowledgeStore, fake_question_runner, install_scripted_ask
 
 
 def _matrix_service(monkeypatch, tmp_path: Path, **kwargs) -> MatrixTaskService:
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     kwargs.setdefault("identity_root", tmp_path / "identity")
+    kwargs.setdefault("knowledge", EmptyKnowledgeStore())
     return build_matrix_service(
         PROJECT_ROOT,
         **kwargs,

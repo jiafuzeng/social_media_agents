@@ -15,7 +15,7 @@ from integrated_agent.runtimes.matrix.models import (
     WorkItem,
 )
 
-from ....constraints import AhoCorasickMatcher, apply_constraint_gate
+from ....constraints import AhoCorasickMatcher, KB_CITE_RE, apply_constraint_gate
 from ....drafting import apply_review, retrieve_and_gate_draft, rollup_status
 from ....snapshots import (
     OFFERED_CLAIM_TYPES,
@@ -180,7 +180,10 @@ async def retrieve_and_compose_draft(data: TriggerFlowRuntimeData) -> dict[str, 
                     "为这一条平台稿写正文和评理，不要输出 reply_decision。",
                     "用 info.context.account 的声量写：voice_summary、must_do、must_not；优先服务涨粉与关注引导，同时守住行业职责；不要自称其他品牌或公权力。",
                     "必须避开 info.context.forbidden_topics。",
-                    "不得承诺稳赚、治愈、保本或未授权最高级；证据只能引用 info.context.offered_refs 的 ref_id。",
+                    "不得承诺稳赚、治愈、保本或未授权最高级。",
+                    "案例证据只能引用 info.context.offered_refs 的 ref_id，写进 evidence_ids，正文可用 [[ref:e1]]。",
+                    "手册证据只能引用 info.context.offered_kbs 的 kb_id，正文写成 [[kb:k1]]，不要写进 evidence_ids，也不要占用 [[ref:]]。",
+                    "功效、医疗、收益类主张必须引用案例 ref；只引手册不能代替案例。",
                     "正文长度不得超过 info.context.max_chars。",
                     "skip 时正文必须空串。若 repair.issues 含 over_limit，删减卖点直到不超限。",
                     "评理必须说明依据和未写的内容。",
@@ -206,14 +209,23 @@ async def retrieve_and_compose_draft(data: TriggerFlowRuntimeData) -> dict[str, 
         )
         return ComposeDraftOut.model_validate(result)
 
-    gated, cards = await retrieve_and_gate_draft(
+    gated, cards, kb_notes = await retrieve_and_gate_draft(
         work_item=work_item,
         snapshot=snapshot,
         data_root=data.require_resource("data_root"),
         draft_once=compose_draft,
         trace=cast(TraceLog, data.require_resource("trace")),
         kind="compose_post",
+        knowledge=data.require_resource("knowledge"),
+        user_id=str(data.require_resource("kb_user_id") or "") or None,
+        embedding_profile_id=str(data.require_resource("kb_profile_id") or "") or None,
     )
+    if kb_notes:
+        limitations = list(cast(list[str], data.get_state("limitations") or []))
+        for note in kb_notes:
+            if note not in limitations:
+                limitations.append(note)
+        await data.async_set_state("limitations", limitations, emit=False)
     await data.async_append_state("drafts", gated.model_dump(mode="json"), emit=False)
     for card in cards:
         await data.async_append_state("evidence_cards", card, emit=False)
@@ -283,7 +295,7 @@ async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     async def re_gate(current: GatedDraft, revised_text: str) -> GatedDraft:
         """Review 改写后的正文再过硬门，禁止用修订绕过禁词、字数和证据约束。"""
         platform = snapshot.platform
-        return await apply_constraint_gate(
+        gated = await apply_constraint_gate(
             work_item_id=current.draft_key.removeprefix("d-"),
             kind=current.kind,
             platform_key=current.platform_key,
@@ -298,9 +310,17 @@ async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             max_chars=platform.max_chars,
             matcher=matcher,
             offered_refs=list(current.evidence_ids),
+            offered_kbs=list(current.kb_ids),
             retrieval_state="hits" if current.evidence_ids else "empty",
             templates=[item.model_dump(mode="json") for item in snapshot.templates],
         )
+        offered = list(current.kb_ids)
+        cited = [
+            token
+            for token in KB_CITE_RE.findall(gated.text or revised_text)
+            if token in offered
+        ]
+        return gated.model_copy(update={"kb_ids": cited})
 
     drafts, extra = await apply_review(drafts, review, re_gate=re_gate)
     status = rollup_status(drafts)

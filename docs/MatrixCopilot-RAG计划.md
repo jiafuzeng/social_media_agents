@@ -7,7 +7,7 @@
 | 产品 | MatrixCopilot 私有知识库 |
 | 顺序 | **Step 1 → 2 → 3 → 4 → 5 → 6**（不可跳步） |
 | 文档日期 | 2026-08-19 |
-| 状态 | **已拍板，待开发** |
+| 状态 | **Step 1–6 已落地** |
 
 配套：
 
@@ -16,7 +16,7 @@
 - 产品总案：[MatrixCopilot-项目方案.md](./MatrixCopilot-项目方案.md)
 - 工程评审：[MatrixCopilot-工程方案-技术评审.md](./MatrixCopilot-工程方案-技术评审.md)
 
-未完成 Step 6 时，compose / reply 行为不变。
+写稿 RetrieveKb 落在 `retrieve_and_gate_draft`：案例失败仍 skip；知识库失败记 `kb_retrieve_failed` 继续写；只引 `[[kb:]]` 不能过功效空案例门。
 
 ---
 

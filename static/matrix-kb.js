@@ -91,6 +91,8 @@ let kbUploadFile = null;
 let kbDraftDoc = null;
 let kbIngestedDoc = null;
 let kbProfilesPromise = null;
+let kbChatTurns = [];
+let kbChatBusy = false;
 
 function kbAuthHeaders() {
   return window.matrixAuth?.headers() || {};
@@ -330,6 +332,7 @@ function fillKbProfiles(payload) {
     payload.default
   );
   syncKbChrome();
+  window.refreshKbDraftHint?.();
 }
 
 function kbPreviewBody() {
@@ -654,7 +657,7 @@ function ensureKbProfiles() {
 }
 
 function kbProfileNeeded() {
-  return kbView === "recall" || (kbView === "wizard" && kbUiStep >= 2);
+  return kbView === "recall" || kbView === "chat" || (kbView === "wizard" && kbUiStep >= 2);
 }
 
 function updateKbHeadNote() {
@@ -669,7 +672,8 @@ function updateKbHeadNote() {
           ? "在左侧选择入库模型。改模型会丢掉未保存预览。"
           : "当前模型只约束本次预览和新建。改模型会丢掉未保存预览。",
     doc: "分段改删锁定文档徽章上的模型，不跟顶栏走。",
-    recall: "检索必须带当前模型，不会和其他模型的文档融合。"
+    recall: "检索必须带当前模型，不会和其他模型的文档融合。",
+    chat: "回答里只在相关句后标 [[kb:k1]]，完整段落在右侧引用块。"
   };
   note.textContent = notes[kbView] || notes.docs;
 }
@@ -986,7 +990,7 @@ async function openKbWorkspace() {
       kbOpened = true;
       setKbStep(1);
     }
-    if (kbView === "docs" || kbView === "recall") {
+    if (kbView === "docs" || kbView === "recall" || kbView === "chat") {
       await loadKbDocuments();
     }
     showKbView(kbView === "wizard" ? "wizard" : kbView);
@@ -1001,6 +1005,8 @@ function syncKbChrome() {
   if (side) side.textContent = profile || "—";
   const recallBadge = document.querySelector("#kbRecallProfile");
   if (recallBadge) recallBadge.textContent = profile ? `向量检索 · ${profile}` : "向量检索";
+  const chatBadge = document.querySelector("#kbChatProfile");
+  if (chatBadge) chatBadge.textContent = profile ? `向量检索 · ${profile}` : "向量检索";
   const stats = document.querySelector("#kbSideStats");
   if (stats) stats.textContent = `${kbDocuments.length} 文档`;
 }
@@ -1011,7 +1017,8 @@ function showKbView(name) {
     docs: document.querySelector("#kbViewDocs"),
     wizard: document.querySelector("#kbViewWizard"),
     doc: document.querySelector("#kbViewDoc"),
-    recall: document.querySelector("#kbViewRecall")
+    recall: document.querySelector("#kbViewRecall"),
+    chat: document.querySelector("#kbViewChat")
   };
   Object.entries(views).forEach(([key, node]) => {
     if (node) node.hidden = key !== name;
@@ -1021,6 +1028,10 @@ function showKbView(name) {
     tab.classList.toggle("active", on);
   });
   if (name === "recall") renderRecallHistory();
+  if (name === "chat") {
+    renderKbChatThread();
+    syncChatButton();
+  }
   syncKbProfileChrome();
 }
 
@@ -1905,6 +1916,208 @@ function renderKbRecall(payload) {
   setNamedStatus("#kbRecallStatus", message, "warn");
 }
 
+function syncChatButton() {
+  const query = document.querySelector("#kbChatInput")?.value.trim() || "";
+  const count = document.querySelector("#kbChatCount");
+  if (count) count.textContent = `${query.length}/2000`;
+  const button = document.querySelector("#kbChatSend");
+  if (button) button.disabled = kbChatBusy || !query || !currentKbProfile();
+}
+
+function kbChatHistory() {
+  return kbChatTurns.slice(-8).map(item => ({ role: item.role, text: item.text }));
+}
+
+function fillChatAnswer(node, text) {
+  node.replaceChildren();
+  const src = String(text || "");
+  const pattern = /\[\[kb:([^\]]+)\]\]/g;
+  let last = 0;
+  let match = pattern.exec(src);
+  while (match) {
+    if (match.index > last) node.append(src.slice(last, match.index));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "kb-chat-cite";
+    button.textContent = match[0];
+    button.title = "查看右侧引用块";
+    const kbId = match[1];
+    button.addEventListener("click", () => highlightChatHit(kbId));
+    node.append(button);
+    last = match.index + match[0].length;
+    match = pattern.exec(src);
+  }
+  if (last < src.length) node.append(src.slice(last));
+}
+
+function highlightChatHit(kbId) {
+  document.querySelectorAll("#kbChatHits .kb-hit").forEach(card => {
+    card.classList.toggle("is-active", card.dataset.kbId === kbId);
+  });
+  document.querySelector(`#kbChatHits .kb-hit[data-kb-id="${kbId}"]`)?.scrollIntoView({
+    block: "nearest"
+  });
+}
+
+function renderKbChatThread() {
+  const host = document.querySelector("#kbChatThread");
+  if (!host) return;
+  if (!kbChatTurns.length) {
+    host.replaceChildren(kbRecallEmpty("先问一句手册里的规定，例如退款时限。"));
+    const empty = host.querySelector(".kb-empty-hero");
+    if (empty) empty.id = "kbChatEmpty";
+    return;
+  }
+  host.replaceChildren(
+    ...kbChatTurns.map(item => {
+      const bubble = document.createElement("div");
+      bubble.className = `kb-chat-msg ${item.role}`;
+      if (item.role === "assistant") fillChatAnswer(bubble, item.text);
+      else bubble.textContent = item.text;
+      return bubble;
+    })
+  );
+  host.lastElementChild?.scrollIntoView({ block: "end" });
+}
+
+function renderKbChatPlan(payload) {
+  const node = document.querySelector("#kbChatPlan");
+  if (!node) return;
+  const rewritten = String(payload?.rewritten_query || "").trim();
+  const queries = (payload?.retrieval_queries || []).filter(item => String(item || "").trim());
+  if (!rewritten && !queries.length) {
+    node.hidden = true;
+    node.replaceChildren();
+    return;
+  }
+  node.hidden = false;
+  const title = document.createElement("strong");
+  title.textContent = "检索计划";
+  const rewrite = document.createElement("p");
+  rewrite.textContent = rewritten ? `改写：${rewritten}` : "改写：与原问相同";
+  node.replaceChildren(title, rewrite);
+  if (queries.length) {
+    const list = document.createElement("ol");
+    queries.forEach(item => {
+      const row = document.createElement("li");
+      row.textContent = item;
+      list.append(row);
+    });
+    node.append(list);
+  }
+}
+
+function renderKbChatHits(payload) {
+  renderKbChatPlan(payload);
+  const host = document.querySelector("#kbChatHits");
+  if (!host) return;
+  const hits = payload?.hits || [];
+  if (!hits.length) {
+    const other = payload?.other_profile_doc_count || 0;
+    let message = "没有命中手册段落。";
+    if (payload?.empty_reason === "library_empty") {
+      message = "知识库还是空的，先导入文档。";
+    } else if (payload?.empty_reason === "no_docs_for_profile") {
+      message = other
+        ? `当前模型下没有可检索文档，另有 ${other} 篇用了其他模型。可在顶栏切换模型，而不是融合检索。`
+        : "当前模型下没有可检索文档。";
+    } else if (payload?.profile_doc_count) {
+      message = `没有命中。当前模型下有 ${payload.profile_doc_count} 篇文档。`;
+    }
+    host.replaceChildren(kbRecallEmpty(message));
+    return;
+  }
+  host.replaceChildren(
+    ...hits.map(hit => {
+      const card = document.createElement("article");
+      card.className = "kb-hit";
+      card.dataset.kbId = hit.kb_id || "";
+      const head = document.createElement("header");
+      const ord = document.createElement("strong");
+      ord.textContent = hit.kb_id || "命中";
+      const meta = document.createElement("small");
+      const docTitle = kbDocuments.find(item => item.doc_id === hit.doc_id)?.title;
+      meta.textContent = hit.header_path || docTitle || hit.chunk_id;
+      head.append(ord, meta);
+      if (hit.context && hit.context !== hit.text) {
+        const expanded = document.createElement("small");
+        expanded.className = "kb-hit-expanded";
+        expanded.textContent = "已补全相邻段落";
+        head.append(expanded);
+      }
+      if (hit.score != null) {
+        const score = document.createElement("span");
+        score.className = "kb-score";
+        score.textContent = Number(hit.score).toFixed(3);
+        head.append(score);
+      }
+      const text = document.createElement("p");
+      text.className = "kb-chunk-text";
+      text.textContent = hit.text;
+      card.append(head, text);
+      return card;
+    })
+  );
+}
+
+function clearKbChat() {
+  kbChatTurns = [];
+  renderKbChatThread();
+  renderKbChatHits(null);
+  setNamedStatus("#kbChatStatus", "");
+  const box = document.querySelector("#kbChatInput");
+  if (box) box.value = "";
+  syncChatButton();
+}
+
+async function runKbChat() {
+  const box = document.querySelector("#kbChatInput");
+  const query = box?.value.trim() || "";
+  const profile = currentKbProfile();
+  if (!query || !profile || kbChatBusy) {
+    setNamedStatus("#kbChatStatus", "提问必须填写文本并选择当前模型。", "error");
+    return;
+  }
+  kbChatBusy = true;
+  syncChatButton();
+  setNamedStatus("#kbChatStatus", "正在检索并生成回答…");
+  const history = kbChatHistory();
+  kbChatTurns.push({ role: "user", text: query });
+  renderKbChatThread();
+  if (box) box.value = "";
+  try {
+    const payload = await kbRequest("/api/kb/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        query,
+        embedding_profile_id: profile,
+        history
+      })
+    });
+    kbChatTurns.push({ role: "assistant", text: payload.answer || "" });
+    renderKbChatThread();
+    renderKbChatHits(payload);
+    const notes = payload.limitations || [];
+    if (notes.includes("kb_chat_failed")) {
+      setNamedStatus("#kbChatStatus", "生成回答失败，右侧仍是本次召回。", "warn");
+    } else if (notes.includes("unknown_kb") || notes.includes("mixed_ref")) {
+      setNamedStatus("#kbChatStatus", "回答已按签发的 k1… 校正引用。", "warn");
+    } else if (!payload.hits?.length) {
+      setNamedStatus("#kbChatStatus", "没有检索到手册段落。", "warn");
+    } else {
+      const n = (payload.retrieval_queries || []).length || 1;
+      setNamedStatus("#kbChatStatus", `拆成 ${n} 个检索问题，命中 ${payload.hits.length} 块。`);
+    }
+  } catch (error) {
+    kbChatTurns.pop();
+    renderKbChatThread();
+    setNamedStatus("#kbChatStatus", error.message, "error");
+  } finally {
+    kbChatBusy = false;
+    syncChatButton();
+  }
+}
+
 function onWorkspaceProfileChange() {
   persistKbProfile(currentKbProfile());
   kbLastPreview = null;
@@ -1919,6 +2132,7 @@ function onWorkspaceProfileChange() {
   renderKbDocuments();
   renderDocMismatch();
   syncRecallButton();
+  syncChatButton();
   syncKbChrome();
 }
 
@@ -1975,6 +2189,7 @@ function bindKbWorkspace() {
   });
   document.querySelector("#kbEmbedding")?.addEventListener("change", () => {
     onWorkspaceProfileChange();
+    window.refreshKbDraftHint?.();
   });
   document.querySelector("#kbStrategy")?.addEventListener("change", event => {
     selectKbStrategy(event.target.value, { fromUser: true });
@@ -2035,6 +2250,13 @@ function bindKbWorkspace() {
           syncRecallButton();
         })
         .catch(error => setNamedStatus("#kbRecallStatus", error.message, "error"));
+    } else if (view === "chat") {
+      loadKbDocuments()
+        .then(() => {
+          showKbView("chat");
+          syncChatButton();
+        })
+        .catch(error => setNamedStatus("#kbChatStatus", error.message, "error"));
     }
   });
   document.querySelector("#kbFilterCurrent")?.addEventListener("change", renderKbDocuments);
@@ -2074,6 +2296,16 @@ function bindKbWorkspace() {
   document.querySelector("#kbRecallBtn")?.addEventListener("click", () => {
     runKbRecall().catch(error => setNamedStatus("#kbRecallStatus", error.message, "error"));
   });
+  document.querySelector("#kbChatInput")?.addEventListener("input", syncChatButton);
+  document.querySelector("#kbChatInput")?.addEventListener("keydown", event => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    runKbChat().catch(error => setNamedStatus("#kbChatStatus", error.message, "error"));
+  });
+  document.querySelector("#kbChatSend")?.addEventListener("click", () => {
+    runKbChat().catch(error => setNamedStatus("#kbChatStatus", error.message, "error"));
+  });
+  document.querySelector("#kbChatClear")?.addEventListener("click", clearKbChat);
   bindDropzone();
   fillKbStrategies({ default: "sentence", strategies: FALLBACK_STRATEGIES });
   renderRecallHistory();

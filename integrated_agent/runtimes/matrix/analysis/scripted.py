@@ -213,6 +213,36 @@ class ScriptedMatrixModel:
             limitations=list(package.get("limitations") or []),
         )
 
+    async def kb_chat_rewrite(
+        self, *, query: str, history: list | None = None
+    ) -> dict:
+        del history
+        return {"rewritten_query": str(query or "").strip()}
+
+    async def kb_chat_split(
+        self, *, rewritten_query: str, history: list | None = None
+    ) -> dict:
+        del history
+        text = str(rewritten_query or "").strip()
+        return {"retrieval_queries": [text] if text else []}
+
+    async def kb_chat(
+        self, *, query: str, info: dict, history: list | None = None
+    ) -> dict:
+        del query, history
+        offered = list(info.get("offered_kbs") or [])
+        if not offered:
+            return {
+                "answer": "当前模型下没有检索到可用手册段落，无法根据知识库作答。",
+                "cited_kb_ids": [],
+            }
+        card = offered[0]
+        kb_id = str(card.get("kb_id") or "k1")
+        return {
+            "answer": f"手册规定相关条款按检索结果办理[[kb:{kb_id}]]。",
+            "cited_kb_ids": [kb_id],
+        }
+
 
 def _is_attack(text: str) -> bool:
     return any(marker in text for marker in _ATTACK_MARKERS)

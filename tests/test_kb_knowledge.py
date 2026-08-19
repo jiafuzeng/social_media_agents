@@ -100,6 +100,12 @@ async def test_paste_document_is_listed_and_retrievable(tmp_path: Path, monkeypa
     assert any((item.get("scope") or {}).get("doc_id") == doc.doc_id for item in hits)
     other_profile = await knowledge.retrieve("user-a", "退款", "openai-small")
     assert other_profile == []
+    cards = await knowledge.retrieve_draft_cards("user-a", "退款", "bge-m3")
+    assert cards
+    assert cards[0]["kb_id"] == "k1"
+    assert "record_id" not in cards[0]
+    assert cards[0]["chunk_id"]
+    assert cards[0]["doc_id"] == doc.doc_id
 
 
 @pytest.mark.asyncio

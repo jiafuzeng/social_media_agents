@@ -1,0 +1,479 @@
+"""KB_CHAT_FLOW：改写问题 → 拆检索问句 → 并行 RetrieveKb → 汇总回答。"""
+
+from __future__ import annotations
+
+import re
+from typing import Any, cast
+
+from agently import Agently, TriggerFlowRuntimeData
+
+from integrated_agent.rag.models import (
+    ChatKbHit,
+    ChatKbIn,
+    ChatKbOut,
+    ChatKbTurn,
+    KbChunkOut,
+    SearchKbIn,
+)
+from integrated_agent.runtimes.matrix.analysis.constraints import KB_CITE_RE
+from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
+
+REF_CITE_RE = re.compile(r"\[\[ref:([^\]]+)\]\]")
+EMPTY_ANSWER = "当前模型下没有检索到可用手册段落，无法根据知识库作答。"
+FAILED_ANSWER = "生成回答失败，下方仍列出本次召回的手册段落。"
+MAX_RETRIEVAL_QUERIES = 4
+MAX_MERGED_HITS = 8
+MAX_CONTEXT_CHARS = 1200
+MAX_GROW_SPAN = 3
+
+
+def _as_dict(result: Any) -> dict[str, Any]:
+    if isinstance(result, dict):
+        return result
+    dump = getattr(result, "model_dump", None)
+    if callable(dump):
+        payload = dump()
+        if isinstance(payload, dict):
+            return payload
+    return {"answer": str(result or "")}
+
+
+def _clip_history(turns: list[ChatKbTurn]) -> list[dict[str, str]]:
+    clipped: list[dict[str, str]] = []
+    for turn in turns[-8:]:
+        text = turn.text.strip()[:800]
+        if text:
+            clipped.append({"role": turn.role, "text": text})
+    return clipped
+
+
+async def _note(data: TriggerFlowRuntimeData, code: str) -> None:
+    notes = list(cast(list[str], data.get_state("limitations") or []))
+    if code not in notes:
+        notes.append(code)
+        await data.async_set_state("limitations", notes, emit=False)
+
+
+def _sanitize_answer(answer: str, offered: list[str]) -> tuple[str, list[str], list[str]]:
+    text = (answer or "").strip()
+    limitations: list[str] = []
+    if REF_CITE_RE.search(text):
+        limitations.append("mixed_ref")
+        text = REF_CITE_RE.sub("", text).strip()
+    offered_set = set(offered)
+    cited_in_text = KB_CITE_RE.findall(text)
+    if any(token not in offered_set for token in cited_in_text):
+        limitations.append("unknown_kb")
+    cited = [token for token in cited_in_text if token in offered_set]
+    return text, cited, limitations
+
+
+def _normalize_queries(raw: Any, fallback: str) -> list[str]:
+    values = raw if isinstance(raw, list) else [raw]
+    queries: list[str] = []
+    for item in values:
+        text = str(item or "").strip()
+        if text and text not in queries:
+            queries.append(text)
+        if len(queries) >= MAX_RETRIEVAL_QUERIES:
+            break
+    return queries or [fallback]
+
+
+def _merge_hits(raw_hits: list[dict[str, Any]]) -> list[ChatKbHit]:
+    best: dict[str, dict[str, Any]] = {}
+    for item in raw_hits:
+        chunk_id = str(item.get("chunk_id") or "")
+        if not chunk_id:
+            continue
+        current = best.get(chunk_id)
+        if current is None or (item.get("score") or 0) > (current.get("score") or 0):
+            best[chunk_id] = item
+    ranked = sorted(
+        best.values(),
+        key=lambda row: float(row.get("score") or 0),
+        reverse=True,
+    )[:MAX_MERGED_HITS]
+    cards: list[ChatKbHit] = []
+    for index, row in enumerate(ranked, start=1):
+        payload = dict(row)
+        payload.pop("kb_id", None)
+        payload["kb_id"] = f"k{index}"
+        cards.append(ChatKbHit.model_validate(payload))
+    return cards
+
+
+def _join_chunk_texts(chunks: list[KbChunkOut]) -> str:
+    parts = [item.text.strip() for item in chunks if (item.text or "").strip()]
+    return "\n\n".join(parts)
+
+
+def _grow_around(
+    chunks: list[KbChunkOut], index: int, *, max_chars: int, max_span: int = MAX_GROW_SPAN
+) -> list[KbChunkOut]:
+    lo = hi = index
+    while (hi - lo + 1) < max_span:
+        grew = False
+        if (
+            lo > 0
+            and (hi - (lo - 1) + 1) <= max_span
+            and len(_join_chunk_texts(chunks[lo - 1 : hi + 1])) <= max_chars
+        ):
+            lo -= 1
+            grew = True
+        if (
+            hi + 1 < len(chunks)
+            and ((hi + 1) - lo + 1) <= max_span
+            and len(_join_chunk_texts(chunks[lo : hi + 2])) <= max_chars
+        ):
+            hi += 1
+            grew = True
+        if not grew:
+            break
+    return chunks[lo : hi + 1]
+
+
+def _complete_passage(
+    hit: ChatKbHit, siblings: list[KbChunkOut]
+) -> tuple[str, str]:
+    """补全检索块：window → 同标题节 → 相邻 ordinal。返回 (上下文, 原始命中句)。"""
+
+    original = (hit.text or "").strip()
+    live = sorted(
+        [item for item in siblings if item.enabled],
+        key=lambda item: (item.ordinal, item.chunk_id),
+    )
+    current = next((item for item in live if item.chunk_id == hit.chunk_id), None)
+    if current is None:
+        window = (hit.window or "").strip()
+        if window and len(window) > len(original):
+            return window[:MAX_CONTEXT_CHARS], original
+        return original, original
+    original = (current.text or "").strip() or original
+    window = (current.window or hit.window or "").strip()
+    if window and len(window) > len(original):
+        return window[:MAX_CONTEXT_CHARS], original
+    if current.header_path:
+        section = [
+            item for item in live if item.header_path == current.header_path
+        ]
+        if len(section) > 1:
+            index = next(
+                i for i, item in enumerate(section) if item.chunk_id == current.chunk_id
+            )
+            grown = _grow_around(section, index, max_chars=MAX_CONTEXT_CHARS)
+            return _join_chunk_texts(grown)[:MAX_CONTEXT_CHARS], original
+    index = next(i for i, item in enumerate(live) if item.chunk_id == current.chunk_id)
+    grown = _grow_around(live, index, max_chars=MAX_CONTEXT_CHARS)
+    return _join_chunk_texts(grown)[:MAX_CONTEXT_CHARS], original
+
+
+def _dedupe_expanded(cards: list[ChatKbHit]) -> list[ChatKbHit]:
+    """保留不同命中块的 kb_id；只丢掉空正文。"""
+
+    kept: list[ChatKbHit] = []
+    seen: set[str] = set()
+    for card in cards:
+        chunk_id = (card.chunk_id or "").strip()
+        if not chunk_id or chunk_id in seen:
+            continue
+        if not (card.text or "").strip():
+            continue
+        seen.add(chunk_id)
+        kept.append(card)
+    return [
+        card.model_copy(update={"kb_id": f"k{index}"})
+        for index, card in enumerate(kept, start=1)
+    ]
+
+
+async def _expand_cards(
+    knowledge: KnowledgeStore,
+    user_id: str,
+    cards: list[ChatKbHit],
+) -> tuple[list[ChatKbHit], bool]:
+    by_doc: dict[str, list[KbChunkOut]] = {}
+    expanded: list[ChatKbHit] = []
+    failed = False
+    for card in cards:
+        siblings = by_doc.get(card.doc_id)
+        if siblings is None:
+            try:
+                listed = await knowledge.list_chunks(user_id, card.doc_id)
+                siblings = list(listed.chunks)
+            except Exception:
+                siblings = []
+                failed = True
+            by_doc[card.doc_id] = siblings
+        passage, original = _complete_passage(card, siblings)
+        needle = original or card.text
+        payload = card.model_dump()
+        payload["text"] = needle
+        payload["hit_text"] = None
+        payload["context"] = (
+            passage if passage and passage != needle else None
+        )
+        expanded.append(ChatKbHit.model_validate(payload))
+    return _dedupe_expanded(expanded), failed
+
+
+def _offered_for_summarize(card: ChatKbHit) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "kb_id": card.kb_id,
+        "text": card.text,
+        "header_path": card.header_path,
+    }
+    if card.context:
+        row["context"] = card.context
+    return row
+
+
+async def kb_chat_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """绑定请求、校验 profile，并判断空库是否跳过检索。"""
+
+    payload = cast(dict[str, Any], data.input)
+    command = ChatKbIn.model_validate(payload["command"])
+    knowledge = cast(KnowledgeStore, data.require_resource("knowledge"))
+    user_id = str(data.require_resource("kb_user_id"))
+    profile_id = knowledge._require_profile(command.embedding_profile_id)
+    listed = await knowledge.list_documents(user_id)
+    live = [
+        item
+        for item in listed.documents
+        if item.status == "ready" and item.enabled
+    ]
+    profile_docs = [
+        item for item in live if item.embedding_profile_id == profile_id
+    ]
+    other_docs = [
+        item for item in live if item.embedding_profile_id != profile_id
+    ]
+    empty_reason = ""
+    if not live:
+        empty_reason = "library_empty"
+    elif not profile_docs:
+        empty_reason = "no_docs_for_profile"
+    await data.async_set_state("query", command.query.strip(), emit=False)
+    await data.async_set_state("history", _clip_history(command.history), emit=False)
+    await data.async_set_state("embedding_profile_id", profile_id, emit=False)
+    await data.async_set_state("empty_reason", empty_reason, emit=False)
+    await data.async_set_state("profile_doc_count", len(profile_docs), emit=False)
+    await data.async_set_state("other_profile_doc_count", len(other_docs), emit=False)
+    await data.async_set_state("skip_retrieve", bool(empty_reason), emit=False)
+    await data.async_set_state("limitations", [], emit=False)
+    await data.async_set_state("raw_hits", [], emit=False)
+    return payload
+
+
+async def kb_chat_rewrite(data: TriggerFlowRuntimeData) -> str:
+    """把用户原话改写成可检索的完整问题。失败则退回原问。"""
+
+    query = str(data.get_state("query") or "")
+    if data.get_state("skip_retrieve"):
+        await data.async_set_state("rewritten_query", query, emit=False)
+        return query
+    history = list(cast(list[dict[str, str]], data.get_state("history") or []))
+    rewritten = query
+    try:
+        result = await (
+            Agently.create_agent(name="matrix-kb-chat-rewrite")
+            .input({"query": query, "history": history})
+            .instruct(
+                [
+                    "把用户问题改写成一句完整、可检索的中文问句。",
+                    "补全省略主语和指代，不要回答问题，不要编造手册没有的条件。",
+                    "先前对话只帮助理解指代。",
+                ]
+            )
+            .output({"rewritten_query": (str, "not_null")}, format="json")
+            .async_start()
+        )
+        text = str(_as_dict(result).get("rewritten_query") or "").strip()
+        if text:
+            rewritten = text
+    except Exception:
+        await _note(data, "kb_rewrite_failed")
+    await data.async_set_state("rewritten_query", rewritten, emit=False)
+    return rewritten
+
+
+async def kb_chat_split(data: TriggerFlowRuntimeData) -> list[dict[str, str]]:
+    """把改写后的问题拆成若干检索问句，供 for_each 并行召回。"""
+
+    rewritten = str(data.get_state("rewritten_query") or data.get_state("query") or "")
+    if data.get_state("skip_retrieve"):
+        await data.async_set_state("retrieval_queries", [], emit=False)
+        return []
+    history = list(cast(list[dict[str, str]], data.get_state("history") or []))
+    queries = [rewritten]
+    try:
+        result = await (
+            Agently.create_agent(name="matrix-kb-chat-split")
+            .input(
+                {
+                    "query": data.get_state("query"),
+                    "rewritten_query": rewritten,
+                    "history": history,
+                }
+            )
+            .instruct(
+                [
+                    "把改写后的问题拆成 1 到 4 个需要分别检索手册的问句。",
+                    "每个问句只覆盖一个事实点，不要重复，不要回答。",
+                    f"retrieval_queries 最多 {MAX_RETRIEVAL_QUERIES} 条。",
+                ]
+            )
+            .output({"retrieval_queries": [str]}, format="json")
+            .async_start()
+        )
+        queries = _normalize_queries(
+            _as_dict(result).get("retrieval_queries"), rewritten
+        )
+    except Exception:
+        await _note(data, "kb_split_failed")
+        queries = [rewritten]
+    await data.async_set_state("retrieval_queries", queries, emit=False)
+    return [{"query": item} for item in queries]
+
+
+async def kb_chat_retrieve(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """for_each 的每一条：按同一 profile hybrid 检索，不跨模型融合。"""
+
+    item = data.input
+    query = str(item.get("query") if isinstance(item, dict) else item or "").strip()
+    if not query:
+        return {"query": "", "hits": []}
+    knowledge = cast(KnowledgeStore, data.require_resource("knowledge"))
+    user_id = str(data.require_resource("kb_user_id"))
+    profile_id = str(data.get_state("embedding_profile_id") or "")
+    try:
+        retrieved = await knowledge.search(
+            user_id,
+            SearchKbIn(query=query, embedding_profile_id=profile_id),
+        )
+    except Exception:
+        await data.async_append_state("limitations", "kb_retrieve_failed", emit=False)
+        return {"query": query, "hits": []}
+    for hit in retrieved.hits:
+        payload = hit.model_dump()
+        payload["source_query"] = query
+        await data.async_append_state("raw_hits", payload, emit=False)
+    return {"query": query, "hit_count": len(retrieved.hits)}
+
+
+async def kb_chat_expand(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
+    """把命中块扩成完整段落（window / 同标题节 / 相邻块），再写入总结上下文。"""
+
+    merged = _merge_hits(list(cast(list[dict[str, Any]], data.get_state("raw_hits") or [])))
+    if not merged:
+        await data.async_set_state("cards", [], emit=False)
+        return []
+    knowledge = cast(KnowledgeStore, data.require_resource("knowledge"))
+    user_id = str(data.require_resource("kb_user_id"))
+    try:
+        cards, failed = await _expand_cards(knowledge, user_id, merged)
+    except Exception:
+        await _note(data, "kb_expand_failed")
+        cards, failed = merged, False
+    if failed:
+        await _note(data, "kb_expand_failed")
+    dumped = [item.model_dump(mode="json") for item in cards]
+    await data.async_set_state("cards", dumped, emit=False)
+    return dumped
+
+
+async def kb_chat_summarize(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """按补全后的手册段落总结回答。签发 k1… 不得占用 [[ref:]]。"""
+
+    stored = list(cast(list[dict[str, Any]], data.get_state("cards") or []))
+    cards = (
+        [ChatKbHit.model_validate(item) for item in stored]
+        if stored
+        else _merge_hits(list(cast(list[dict[str, Any]], data.get_state("raw_hits") or [])))
+    )
+    offered = [card.kb_id for card in cards]
+    reason = str(data.get_state("empty_reason") or "")
+    if cards:
+        reason = ""
+    elif reason not in {"library_empty", "no_docs_for_profile"}:
+        reason = "no_match"
+    limitations = list(
+        dict.fromkeys(cast(list[str], data.get_state("limitations") or []))
+    )
+    query = str(data.get_state("query") or "")
+    rewritten = str(data.get_state("rewritten_query") or query)
+    retrieval_queries = list(cast(list[str], data.get_state("retrieval_queries") or []))
+    history = list(cast(list[dict[str, str]], data.get_state("history") or []))
+    answer = EMPTY_ANSWER
+    cited: list[str] = []
+    if cards:
+        try:
+            result = await (
+                Agently.create_agent(name="matrix-kb-chat-summarize")
+                .input(
+                    {
+                        "query": query,
+                        "rewritten_query": rewritten,
+                        "retrieval_queries": retrieval_queries,
+                        "history": history,
+                    }
+                )
+                .info({"offered_kbs": [_offered_for_summarize(card) for card in cards]})
+                .instruct(
+                    [
+                        "根据本次检索到的手册命中句回答用户原问题。",
+                        "info.offered_kbs.text 是该 kb_id 的引用锚点；context 只帮助理解，不是另一条引用。",
+                        "把回答拆成短句，每句只写一条事实，用句号收口，不要用顿号把多条红线连成一句。",
+                        "有依据的句子末尾紧跟对应锚点，写成：句子1[[kb:k1]]。句子2[[kb:k3]]。",
+                        "[[kb:kN]] 必须对应该卡 text，禁止多条事实共用一个标记，禁止整段末尾只标一次。",
+                        "不要粘贴或复述手册原文；完整切片由界面在右侧按 k1、k2… 列出。",
+                        "只能引用 info.offered_kbs 的 kb_id，不得占用 [[ref:]]，不得编造未检索到的规定。",
+                        "cited_kb_ids 列出正文里用到的 kb_id。",
+                        "先前对话只帮助理解指代，证据仍以本次 offered_kbs 为准。",
+                    ]
+                )
+                .output(
+                    {
+                        "answer": (str, "not_null"),
+                        "cited_kb_ids": [str],
+                    },
+                    format="json",
+                )
+                .async_start()
+            )
+            payload = _as_dict(result)
+            answer, cited, extra = _sanitize_answer(
+                str(payload.get("answer") or ""), offered
+            )
+            limitations.extend(
+                item for item in extra if item not in limitations
+            )
+            for item in payload.get("cited_kb_ids") or []:
+                token = str(item)
+                if token in offered and token not in cited:
+                    cited.append(token)
+            if not answer:
+                answer = FAILED_ANSWER
+                if "kb_chat_failed" not in limitations:
+                    limitations.append("kb_chat_failed")
+        except Exception:
+            answer = FAILED_ANSWER
+            cited = []
+            if "kb_chat_failed" not in limitations:
+                limitations.append("kb_chat_failed")
+    package = ChatKbOut(
+        query=query,
+        embedding_profile_id=str(data.get_state("embedding_profile_id") or ""),
+        answer=answer,
+        hits=cards,
+        cited_kb_ids=cited,
+        rewritten_query=rewritten,
+        retrieval_queries=retrieval_queries,
+        empty_reason=reason,
+        profile_doc_count=int(data.get_state("profile_doc_count") or 0),
+        other_profile_doc_count=int(data.get_state("other_profile_doc_count") or 0),
+        limitations=limitations,
+    )
+    dumped = package.model_dump(mode="json")
+    await data.async_set_state("package", dumped, emit=False)
+    return dumped

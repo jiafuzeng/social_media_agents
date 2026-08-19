@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
+from integrated_agent.config import KB_DEFAULT_EMBEDDING_PROFILE
 from integrated_agent.runtimes.matrix.models import (
     ComposeDraftOut,
     GatedDraft,
@@ -12,7 +13,7 @@ from integrated_agent.runtimes.matrix.models import (
     WorkItemKind,
 )
 
-from .constraints import AhoCorasickMatcher, apply_constraint_gate
+from .constraints import AhoCorasickMatcher, KB_CITE_RE, apply_constraint_gate
 from .retrieval import RetrieveQuery, retrieve_cases
 from .snapshots import Snapshot, merged_forbidden_topics
 from .trace_log import TraceLog
@@ -30,7 +31,10 @@ async def retrieve_and_gate_draft(
     trace: TraceLog,
     kind: WorkItemKind,
     comment: dict[str, Any] | None = None,
-) -> tuple[GatedDraft, list[dict[str, Any]]]:
+    knowledge: Any | None = None,
+    user_id: str | None = None,
+    embedding_profile_id: str | None = None,
+) -> tuple[GatedDraft, list[dict[str, Any]], list[str]]:
     query = RetrieveQuery(
         work_item_id=work_item.work_item_id,
         platform_key=work_item.platform_key,
@@ -64,16 +68,51 @@ async def retrieve_and_gate_draft(
             status="failed",
             issues=["retrieval_failed"],
         )
-        return skipped, []
+        return skipped, [], []
+
+    kb_cards: list[dict[str, Any]] = []
+    limitations: list[str] = []
+    profile_id = (embedding_profile_id or KB_DEFAULT_EMBEDDING_PROFILE).strip()
+    if knowledge is not None and user_id:
+        kb_query = " ".join(
+            part for part in [work_item.goal, *work_item.talking_points] if part
+        ).strip() or work_item.goal
+        try:
+            kb_cards = await knowledge.retrieve_draft_cards(
+                user_id,
+                kb_query,
+                profile_id,
+            )
+            trace.log(
+                layer="business",
+                event_type="business.matrix.kb_retrieved",
+                status="completed",
+                subject_id=work_item.work_item_id,
+                output={"card_count": len(kb_cards), "embedding_profile_id": profile_id},
+                facts={"card_count": len(kb_cards), "embedding_profile_id": profile_id},
+            )
+        except Exception as exc:
+            limitations.append("kb_retrieve_failed")
+            trace.log(
+                layer="business",
+                event_type="business.matrix.kb_retrieved",
+                status="failed",
+                subject_id=work_item.work_item_id,
+                error=exc,
+                facts={"embedding_profile_id": profile_id},
+            )
 
     platform = snapshot.platform
     matcher = AhoCorasickMatcher(snapshot.policy.terms)
+    offered_kb_ids = [str(card.get("kb_id") or "") for card in kb_cards]
     info: dict[str, Any] = {
         "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
         "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
         "max_chars": platform.max_chars,
         "mention_rules": platform.mention_rules,
         "offered_refs": cards,
+        "offered_kbs": kb_cards,
+        "embedding_profile_id": profile_id,
         "policy": {
             "term_list_id": snapshot.policy.term_list_id,
             "ac_ready": snapshot.policy.ac_ready,
@@ -131,10 +170,20 @@ async def retrieve_and_gate_draft(
         max_chars=platform.max_chars,
         matcher=matcher,
         offered_refs=[card["ref_id"] for card in cards],
+        offered_kbs=offered_kb_ids,
         retrieval_state=retrieved.state,
         templates=[item.model_dump(mode="json") for item in snapshot.templates],
         rewrite_once=rewrite_once,
     )
+    cited = [
+        token
+        for token in KB_CITE_RE.findall(gated.text or text)
+        if token in offered_kb_ids
+    ]
+    for item in evidence_ids:
+        if item in offered_kb_ids and item not in cited:
+            cited.append(item)
+    gated = gated.model_copy(update={"kb_ids": cited})
     trace.log(
         layer="business",
         event_type="business.matrix.gated",
@@ -143,7 +192,7 @@ async def retrieve_and_gate_draft(
         output=gated.model_dump(mode="json"),
         facts={"degrade_op": gated.degrade_op, "issues": gated.issues},
     )
-    return gated, cards
+    return gated, cards, limitations
 
 
 def rollup_status(drafts: list[GatedDraft]) -> str:

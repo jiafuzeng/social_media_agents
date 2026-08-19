@@ -85,10 +85,13 @@ class MatrixTaskService:
     async def join(self) -> None:
         await self._queue.join()
 
-    async def submit(self, command: MatrixTaskCreate) -> TaskAccepted:
+    async def submit(
+        self, command: MatrixTaskCreate, *, user_id: str | None = None
+    ) -> TaskAccepted:
         task_id = uuid4().hex
         request = MatrixTaskRequest(
             task_id=task_id,
+            user_id=user_id,
             **command.model_dump(mode="json"),
         )
         await self.tasks.create(task_id)

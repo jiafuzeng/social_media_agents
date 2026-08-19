@@ -72,6 +72,10 @@ class MatrixTaskCreate(DomainModel):
     requester: str = Field(default="course-user", description="提交者，仅审计/日志，不参与拆解")
     channel: str = Field(default="web", description="来源通道 web 或 gateway，不改流程")
     session_id: str = Field(min_length=1, description="host 对话 id，与 Agently Session.id 相同")
+    embedding_profile_id: str | None = Field(
+        default=None,
+        description="写稿 RetrieveKb 所用 embedding；省略则 yaml default。不参与案例 RAG",
+    )
 
     @model_validator(mode="after")
     def bind_entry_invariants(self) -> "MatrixTaskCreate":
@@ -98,6 +102,10 @@ class MatrixTaskCreate(DomainModel):
 
 class MatrixTaskRequest(MatrixTaskCreate):
     task_id: str = Field(min_length=1)
+    user_id: str | None = Field(
+        default=None,
+        description="宿主填写，只给知识库检索；客户端 Create 不得带此字段",
+    )
 
 
 class TaskAccepted(DomainModel):
@@ -124,6 +132,7 @@ class GatedDraft(DomainModel):
     rationale: str = ""
     decision: GatedDecision
     evidence_ids: list[str] = Field(default_factory=list)
+    kb_ids: list[str] = Field(default_factory=list)
     risk_flags: list[str] = Field(default_factory=list)
     status: DraftStatus
     issues: list[str] = Field(default_factory=list)

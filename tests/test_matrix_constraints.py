@@ -225,6 +225,59 @@ async def test_t05_empty_rag_efficacy_cannot_pass() -> None:
     assert "missing_ref_on_empty_rag" in gated.issues
 
 
+@pytest.mark.asyncio
+async def test_kb_only_citation_cannot_pass_empty_rag() -> None:
+    gated = await apply_constraint_gate(
+        work_item_id="w1",
+        kind="compose_post",
+        platform_key="x-twitter",
+        source_comment_key=None,
+        text="手册写了退款规则[[kb:k1]]。",
+        rationale="只引知识库",
+        evidence_ids=["k1"],
+        risk_flags=[],
+        claim_types=["efficacy"],
+        reply_decision=None,
+        proposed_degrade=None,
+        max_chars=280,
+        matcher=AhoCorasickMatcher(["治愈"]),
+        offered_refs=[],
+        offered_kbs=["k1"],
+        retrieval_state="empty",
+        templates=[],
+    )
+    assert gated.degrade_op != "pass"
+    assert "missing_ref_on_empty_rag" in gated.issues
+    assert "unknown_ref" not in gated.issues
+    assert "unknown_kb" not in gated.issues
+
+
+@pytest.mark.asyncio
+async def test_unknown_kb_is_fail_closed() -> None:
+    gated = await apply_constraint_gate(
+        work_item_id="w1",
+        kind="compose_post",
+        platform_key="x-twitter",
+        source_comment_key=None,
+        text="见手册[[kb:k9]]。",
+        rationale="未知 kb",
+        evidence_ids=[],
+        risk_flags=[],
+        claim_types=["format"],
+        reply_decision=None,
+        proposed_degrade=None,
+        max_chars=280,
+        matcher=AhoCorasickMatcher([]),
+        offered_refs=["e1"],
+        offered_kbs=["k1"],
+        retrieval_state="hits",
+        templates=[{"text": "模板", "claim_types": ["format"]}],
+    )
+    assert gated.degrade_op == "skip"
+    assert gated.status == "failed"
+    assert "unknown_kb" in gated.issues
+
+
 def test_collect_issues_over_limit() -> None:
     issues = collect_issues(
         text="x" * 300,

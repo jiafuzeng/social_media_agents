@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import deque
 from collections.abc import Callable, Sequence
 from typing import Awaitable
@@ -27,6 +28,7 @@ ALLOWED_DEGRADE_OPS: frozenset[str] = frozenset(
     {"pass", "rewrite_safe", "template_fallback", "skip"}
 )
 HARD_ISSUE_PREFIXES = ("forbidden_term:", "missing_ref_on_empty_rag")
+KB_CITE_RE = re.compile(r"\[\[kb:([^\]]+)\]\]")
 
 
 class AhoCorasickMatcher:
@@ -98,6 +100,7 @@ def collect_issues(
     offered_refs: Sequence[str],
     claim_types: Sequence[str],
     retrieval_state: str,
+    offered_kbs: Sequence[str] = (),
 ) -> list[str]:
     issues: list[str] = []
     if reply_decision == "skip" and text.strip():
@@ -108,12 +111,21 @@ def collect_issues(
         issues.append("over_limit")
     for term in matcher.find(text):
         issues.append(f"forbidden_term:{term}")
-    offered = set(offered_refs)
+    offered_ref_set = set(offered_refs)
+    offered_kb_set = set(offered_kbs)
+    case_ids: list[str] = []
     for ref_id in evidence_ids:
-        if ref_id not in offered:
-            issues.append("unknown_ref")
-            break
-    if requires_citation(claim_types) and not evidence_ids:
+        if ref_id in offered_ref_set:
+            case_ids.append(ref_id)
+            continue
+        if ref_id in offered_kb_set:
+            continue
+        issues.append("unknown_ref")
+        break
+    cited_kbs = KB_CITE_RE.findall(text or "")
+    if any(token not in offered_kb_set for token in cited_kbs):
+        issues.append("unknown_kb")
+    if requires_citation(claim_types) and not case_ids:
         if retrieval_state == "empty":
             issues.append("missing_ref_on_empty_rag")
     return issues
@@ -149,7 +161,7 @@ def _decision_for(
 
 
 def _status_for(degrade_op: DegradeOp, issues: Sequence[str]) -> DraftStatus:
-    if "unknown_ref" in issues and degrade_op == "skip":
+    if ("unknown_ref" in issues or "unknown_kb" in issues) and degrade_op == "skip":
         return "failed"
     if degrade_op == "skip":
         return "skipped"
@@ -179,6 +191,7 @@ async def apply_constraint_gate(
     rewrite_once: Callable[[list[str]], Awaitable[str]] | None = None,
     attempt: int = 1,
     degrade_trace: list[DegradeStep] | None = None,
+    offered_kbs: Sequence[str] = (),
 ) -> GatedDraft:
     if proposed_degrade not in ALLOWED_DEGRADE_OPS:
         proposed_degrade = None
@@ -192,6 +205,7 @@ async def apply_constraint_gate(
         offered_refs=offered_refs,
         claim_types=claim_types,
         retrieval_state=retrieval_state,
+        offered_kbs=offered_kbs,
     )
     trace = list(degrade_trace or [])
 
@@ -268,11 +282,13 @@ async def apply_constraint_gate(
             rewrite_once=None,
             attempt=2,
             degrade_trace=trace,
+            offered_kbs=offered_kbs,
         )
 
-    if _has_hard_issue(issues) or "unknown_ref" in issues:
+    unknown_cite = "unknown_ref" in issues or "unknown_kb" in issues
+    if _has_hard_issue(issues) or unknown_cite:
         template_text = _pick_template(templates, claim_types)
-        if template_text and "unknown_ref" not in issues:
+        if template_text and not unknown_cite:
             op = "template_fallback"
             trace.append(DegradeStep(op=op, issues=list(issues), attempt=attempt))
             gated_text = template_text[:max_chars]
@@ -296,7 +312,7 @@ async def apply_constraint_gate(
                 issues=list(issues),
             )
         op = "skip"
-        status: DraftStatus = "failed" if "unknown_ref" in issues else "skipped"
+        status: DraftStatus = "failed" if unknown_cite else "skipped"
         trace.append(DegradeStep(op=op, issues=list(issues), attempt=attempt))
         return GatedDraft(
             draft_key=f"d-{work_item_id}",
@@ -308,7 +324,7 @@ async def apply_constraint_gate(
             text="",
             rationale=rationale,
             decision="skip",
-            evidence_ids=list(evidence_ids) if "unknown_ref" not in issues else [],
+            evidence_ids=[] if unknown_cite else list(evidence_ids),
             risk_flags=list(risk_flags),
             status=status,
             issues=list(issues),

@@ -37,11 +37,13 @@ def build_matrix_service(
         identity_root or (root / "workspace" / "identity"),
         settings=settings,
     )
+    knowledge_store = knowledge or KnowledgeStore()
     worker = MatrixWorkflowWorker(
         WorkerDependencies(
             matrix_analysis=MatrixAnalysisCapability(
                 logs_root=root / "logs" / "matrix",
                 data_root=root / "data" / "matrix",
+                knowledge=knowledge_store,
             ),
             events=events,
         )
@@ -53,5 +55,5 @@ def build_matrix_service(
         worker_count=worker_count,
         queue_capacity=queue_capacity,
         identity=store,
-        knowledge=knowledge,
+        knowledge=knowledge_store,
     )

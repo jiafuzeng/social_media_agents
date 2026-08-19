@@ -12,6 +12,8 @@ from integrated_agent.rag.embeddings import list_embedding_profiles
 from integrated_agent.rag.extract import extract_upload
 from integrated_agent.rag.models import (
     CHUNK_STRATEGY_CATALOG,
+    ChatKbIn,
+    ChatKbOut,
     ChunkPreviewError,
     ChunkStrategyListOut,
     CreateChunkIn,
@@ -37,6 +39,7 @@ from integrated_agent.runtimes.matrix.identity import (
     UserOut,
     parse_bearer_token,
 )
+from integrated_agent.runtimes.matrix.kb_chat import answer_kb_chat
 from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
 
 _LOG = logging.getLogger(__name__)
@@ -152,6 +155,19 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.search(user.user_id, command)
+        except KnowledgeError as error:
+            _raise_knowledge(error)
+            raise
+
+    @router.post("/api/kb/chat", response_model=ChatKbOut)
+    async def chat_kb(
+        command: ChatKbIn,
+        authorization: str | None = Header(default=None),
+        x_user_token: str | None = Header(default=None, alias="X-User-Token"),
+    ) -> ChatKbOut:
+        user = await _require_user(authorization, x_user_token)
+        try:
+            return await answer_kb_chat(knowledge, user.user_id, command)
         except KnowledgeError as error:
             _raise_knowledge(error)
             raise

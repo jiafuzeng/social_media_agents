@@ -998,11 +998,13 @@ html:has(.matrix-app),
   padding: 10px 12px;
   min-height: 64px;
 }
-.dock-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
+.kb-draft-profile {
+  color: #9ca3af;
+  font-size: 12px;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .composer-toolbar {
   display: flex;

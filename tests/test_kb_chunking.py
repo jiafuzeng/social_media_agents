@@ -483,6 +483,8 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert 'id="kbStrategies"' in page
         assert 'id="kbStrategy"' in page
         assert 'id="kbEmbedding"' in page
+        assert page.count('id="kbEmbedding"') == 1
+        assert 'id="kbDraftProfile"' in page
         assert "/static/matrix-kb.js" in page
         assert ">知识库<" in page or "aria-label=\"知识库\"" in page
         assert 'id="kbStepSource"' in page
@@ -491,7 +493,14 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert "尚未写入知识库" in page
         assert "将按以下配置入库" in page
         assert "召回测试" in page
+        assert "召回聊天" in page
         assert 'id="kbViewDocs"' in page
+        assert 'id="kbViewChat"' in page
+        assert page.count('id="kbViewChat"') == 1
+        assert 'id="kbChatThread"' in page
+        assert 'id="kbChatPlan"' in page
+        assert page.count('id="kbChatPlan"') == 1
+        assert "回答只在相关句后标 [[kb:k1]]" in page
         assert "保存并处理" in page
         assert "删除该文档的旧切片记录和向量" in page
         assert "确认重切" in page

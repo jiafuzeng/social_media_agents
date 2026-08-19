@@ -5,6 +5,14 @@ from typing import Any
 
 from integrated_agent.runtimes.matrix.models import CommentIn
 
+class EmptyKnowledgeStore:
+    """HTTP / Flow 测试用：写稿 RetrieveKb 返回空卡，避免打真实 embedding。"""
+
+    async def retrieve_draft_cards(self, *args, **kwargs):
+        del args, kwargs
+        return []
+
+
 DEMO_REPLY_COMMENTS = [
     CommentIn(
         comment_key="c1",
@@ -154,6 +162,22 @@ def install_scripted_ask(monkeypatch, model) -> None:
                 return await model.reply_review(
                     package=input_data["package"], info=snapshot
                 )
+            if name == "matrix-kb-chat-rewrite":
+                return await model.kb_chat_rewrite(
+                    query=input_data.get("query") or "",
+                    history=input_data.get("history") or [],
+                )
+            if name == "matrix-kb-chat-split":
+                return await model.kb_chat_split(
+                    rewritten_query=input_data.get("rewritten_query") or "",
+                    history=input_data.get("history") or [],
+                )
+            if name in {"matrix-kb-chat-summarize", "matrix-kb-chat"}:
+                return await model.kb_chat(
+                    query=input_data.get("query") or "",
+                    info=info if isinstance(info, dict) else {},
+                    history=input_data.get("history") or [],
+                )
             raise AssertionError(f"unexpected Agently agent name: {name}")
 
     def fake_create_agent(*args, **kwargs):
@@ -171,5 +195,9 @@ def install_scripted_ask(monkeypatch, model) -> None:
     )
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.analysis.workflows.chunks.reply.pipeline.Agently.create_agent",
+        fake_create_agent,
+    )
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.analysis.workflows.chunks.kb_chat.pipeline.Agently.create_agent",
         fake_create_agent,
     )

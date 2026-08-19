@@ -5,15 +5,20 @@ import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import Field
 
+from integrated_agent.config import KB_DEFAULT_EMBEDDING_PROFILE, KB_EMBEDDING_AGENTS
 from integrated_agent.runtimes.matrix.analysis.snapshots import (
     AccountCard,
     InteractionCard,
     list_account_catalog,
     list_interaction_catalog,
+)
+from integrated_agent.runtimes.matrix.identity import (
+    IdentityError,
+    parse_bearer_token,
 )
 from integrated_agent.runtimes.matrix.models import (
     MAX_COMPOSE_POSTS,
@@ -48,6 +53,7 @@ class ComposeHttpIn(DomainModel):
     requester: str = "course-user"
     channel: str = "web"
     session_id: str = Field(min_length=1)
+    embedding_profile_id: str | None = None
 
 
 class ReplyHttpIn(DomainModel):
@@ -62,6 +68,7 @@ class ReplyHttpIn(DomainModel):
     requester: str = "course-user"
     channel: str = "web"
     session_id: str = Field(min_length=1)
+    embedding_profile_id: str | None = None
 
 
 def event_to_sse(event: TaskEvent) -> str:
@@ -86,6 +93,35 @@ def build_task_router(
 
     router = APIRouter(tags=["matrix-task"])
 
+    def _token(
+        authorization: str | None,
+        x_user_token: str | None,
+    ) -> str | None:
+        return parse_bearer_token(authorization, x_user_token)
+
+    def _raise_identity(error: IdentityError) -> None:
+        raise HTTPException(status_code=error.status, detail=str(error)) from error
+
+    def _resolve_profile(raw: str | None) -> str:
+        profile = (raw or KB_DEFAULT_EMBEDDING_PROFILE).strip() or KB_DEFAULT_EMBEDDING_PROFILE
+        if profile not in KB_EMBEDDING_AGENTS:
+            raise HTTPException(status_code=422, detail="unknown embedding_profile_id")
+        return profile
+
+    async def _web_user(
+        command: ComposeHttpIn | ReplyHttpIn,
+        authorization: str | None,
+        x_user_token: str | None,
+    ):
+        try:
+            token = _token(authorization, x_user_token)
+            user = await service.identity.user_for_token(token)
+            await service.identity.get_session(token, command.session_id)
+            return user
+        except IdentityError as error:
+            _raise_identity(error)
+            raise
+
     @router.get("/api/accounts", response_model=AccountCatalogOut)
     async def list_accounts() -> AccountCatalogOut:
         return AccountCatalogOut(accounts=list_account_catalog(catalog_root))
@@ -95,9 +131,17 @@ def build_task_router(
         return InteractionCatalogOut(interactions=list_interaction_catalog(catalog_root))
 
     @router.post("/api/create", response_model=TaskAccepted, status_code=202)
-    async def create_compose(command: ComposeHttpIn) -> TaskAccepted:
+    async def create_compose(
+        command: ComposeHttpIn,
+        authorization: str | None = Header(default=None),
+        x_user_token: str | None = Header(default=None, alias="X-User-Token"),
+    ) -> TaskAccepted:
+        user = await _web_user(command, authorization, x_user_token)
+        payload = command.model_dump()
+        payload["embedding_profile_id"] = _resolve_profile(command.embedding_profile_id)
         accepted = await service.submit(
-            MatrixTaskCreate(scenario="compose", **command.model_dump())
+            MatrixTaskCreate(scenario="compose", **payload),
+            user_id=user.user_id,
         )
         await service.identity.append_turn(
             command.session_id,
@@ -108,15 +152,24 @@ def build_task_router(
                 "account_key": command.account_key,
                 "post_count": command.post_count,
                 "need_trends": command.need_trends,
+                "embedding_profile_id": payload["embedding_profile_id"],
             },
             last_scenario="compose",
         )
         return accepted
 
     @router.post("/api/reply", response_model=TaskAccepted, status_code=202)
-    async def create_reply(command: ReplyHttpIn) -> TaskAccepted:
+    async def create_reply(
+        command: ReplyHttpIn,
+        authorization: str | None = Header(default=None),
+        x_user_token: str | None = Header(default=None, alias="X-User-Token"),
+    ) -> TaskAccepted:
+        user = await _web_user(command, authorization, x_user_token)
+        payload = command.model_dump()
+        payload["embedding_profile_id"] = _resolve_profile(command.embedding_profile_id)
         accepted = await service.submit(
-            MatrixTaskCreate(scenario="reply", **command.model_dump())
+            MatrixTaskCreate(scenario="reply", **payload),
+            user_id=user.user_id,
         )
         await service.identity.append_turn(
             command.session_id,
@@ -126,6 +179,7 @@ def build_task_router(
                 "scenario": "reply",
                 "interaction_key": command.interaction_key,
                 "reply_count": command.reply_count,
+                "embedding_profile_id": payload["embedding_profile_id"],
             },
             last_scenario="reply",
         )

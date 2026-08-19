@@ -17,9 +17,11 @@ class MatrixAnalysisCapability:
         *,
         logs_root: Path,
         data_root: Path,
+        knowledge: Any | None = None,
     ) -> None:
         self.logs_root = logs_root  # 每单 Trace：logs_root / task_id
         self.data_root = data_root  # 账号、平台、模板、案例夹具
+        self.knowledge = knowledge
 
     async def analyze(self, request: MatrixTaskRequest) -> dict[str, Any]:
         output_directory = self.logs_root / request.task_id
@@ -27,6 +29,7 @@ class MatrixAnalysisCapability:
             request,
             data_root=self.data_root,
             output_directory=output_directory,
+            knowledge=self.knowledge,
         )
         # Worker / SSE 用这条 URI 回指本单 run.json，不把 Trace 对象带出分析层。
         run["trace_ref"] = (output_directory / "run.json").resolve().as_uri()
@@ -38,6 +41,7 @@ async def run_matrix(
     *,
     data_root: Path,
     output_directory: Path,
+    knowledge: Any | None = None,
 ) -> dict[str, Any]:
     """按入口已绑定的 scenario 分发；compose 与 reply 是两张独立 TriggerFlow。"""
 
@@ -46,11 +50,13 @@ async def run_matrix(
             request,
             data_root=data_root,
             output_directory=output_directory,
+            knowledge=knowledge,
         )
     return await run_reply(
         request,
         data_root=data_root,
         output_directory=output_directory,
+        knowledge=knowledge,
     )
 
 
