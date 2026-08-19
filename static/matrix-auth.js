@@ -27,6 +27,17 @@ const AUTH_ERRORS = {
   "collection item not found": "收藏条目不存在",
   "folder name already exists": "已有同名文件夹",
   "folder name must not be empty": "请填写文件夹名称",
+  "unknown embedding_profile_id": "未知的 embedding 模型",
+  "embedding_profile_id is required for semantic": "按语义切分需要当前 embedding 模型",
+  "text is empty": "请先填写文本",
+  "unsupported file type": "只支持 txt / markdown / pdf / docx / pptx / html",
+  "file too large": "单个文件不超过 15 MB",
+  "extracted text is empty": "没抽出文本",
+  "text file is not valid utf-8": "文本不是合法 UTF-8",
+  "invalid pdf": "无法读取这个 PDF",
+  "invalid docx": "无法读取这个 Word",
+  "invalid pptx": "无法读取这个 PPT",
+  "chunk_overlap must be less than chunk_size": "overlap 必须小于 chunk_size",
   "status must be active or archived": "会话状态无效",
   "title must not be empty": "会话标题不能为空"
 };
@@ -401,5 +412,12 @@ bindAuth();
 window.matrixAuth = {
   headers: authHeaders,
   user: () => currentUser,
-  errorText: message => AUTH_ERRORS[message] || message
+  errorText: message => {
+    const text = String(message || "");
+    if (AUTH_ERRORS[text]) return AUTH_ERRORS[text];
+    const key = Object.keys(AUTH_ERRORS).find(
+      item => text === item || text.startsWith(`${item}:`) || text.startsWith(`${item} `)
+    );
+    return key ? AUTH_ERRORS[key] : text;
+  }
 };

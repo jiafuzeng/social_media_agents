@@ -260,9 +260,11 @@ function syncNav() {
   const workspace = document.body.dataset.workspace;
   const board = document.body.dataset.board;
   document.querySelectorAll(".nav-item[data-workspace]").forEach(btn => {
+    const target = btn.dataset.workspace;
     const onNewTask = workspace === "task" && board === "home" && btn.id === "newTaskBtn";
-    const onCatalog = workspace === "catalog" && btn.dataset.workspace === "catalog";
-    btn.classList.toggle("active", onNewTask || onCatalog);
+    const onCatalog = workspace === "catalog" && target === "catalog";
+    const onKb = workspace === "kb" && target === "kb";
+    btn.classList.toggle("active", onNewTask || onCatalog || onKb);
   });
 }
 
@@ -314,15 +316,20 @@ function setAssistTab(name) {
 
 function setWorkspace(name) {
   document.body.dataset.workspace = name;
-  const task = name === "task";
-  document.querySelector("#taskStage").hidden = !task;
-  document.querySelector("#catalogEditor").hidden = task;
-  if (name === "catalog") {
-    syncNav();
-    return;
-  }
+  const task = document.querySelector("#taskStage");
+  const catalog = document.querySelector("#catalogEditor");
+  const kb = document.querySelector("#kbWorkspace");
+  if (task) task.hidden = name !== "task";
+  if (catalog) catalog.hidden = name !== "catalog";
+  if (kb) kb.hidden = name !== "kb";
+  syncNav();
+  if (name === "catalog") return;
   const drawer = document.querySelector("#catalogDrawer");
   if (drawer) drawer.hidden = true;
+  if (name === "kb") {
+    window.matrixKb?.open?.();
+    return;
+  }
   setBoard(document.body.dataset.board || "home");
 }
 

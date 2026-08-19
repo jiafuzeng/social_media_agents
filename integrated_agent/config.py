@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Final
 
 from agently import Agently
 from agently.utils.ModelPool import resolve_model_pool_settings
@@ -35,8 +36,8 @@ Agently.set_settings(
             "provider": "OpenAICompatible",
             "model_type": "embeddings",
             "model": "text-embedding-3-small",
-            "base_url": os.environ.get("EMBEDDING_OPENAI_BASE_URL", ""),
-            "api_key": os.environ.get("EMBEDDING_OPENAI_API_KEY", ""),
+            "base_url": os.environ.get("OPENAI_SMALL_EMBEDDING_BASE_URL", ""),
+            "api_key": os.environ.get("OPENAI_SMALL_EMBEDDING_API_KEY", ""),
             "stream": False,
             "path_mapping": {"embeddings": "/embeddings"},
         },
@@ -44,8 +45,8 @@ Agently.set_settings(
             "provider": "OpenAICompatible",
             "model_type": "embeddings",
             "model": "bge-m3",
-            "base_url": os.environ.get("EMBEDDING_BGE_BASE_URL", ""),
-            "auth": os.environ.get("EMBEDDING_BGE_AUTH", "nothing"),
+            "base_url": os.environ.get("BGE_M3_EMBEDDING_BASE_URL", ""),
+            "auth": "nothing",
             "stream": False,
             "path_mapping": {"embeddings": "/embeddings"},
         },
@@ -53,8 +54,8 @@ Agently.set_settings(
             "provider": "OpenAICompatible",
             "model_type": "embeddings",
             "model": "qwen3-embedding:0.6b",
-            "base_url": os.environ.get("EMBEDDING_QWEN_BASE_URL", ""),
-            "auth": os.environ.get("EMBEDDING_QWEN_AUTH", "nothing"),
+            "base_url": os.environ.get("QWEN3_EMBEDDING_BASE_URL", ""),
+            "auth": "nothing",
             "stream": False,
             "path_mapping": {"embeddings": "/embeddings"},
         },
@@ -62,7 +63,32 @@ Agently.set_settings(
 )
 resolve_model_pool_settings("deepseek", Agently.settings)
 
+
+def _kb_embedding_agent(profile_id: str):
+    """Embedding Agent 不能继承全局 deepseek 的 chat request_options。
+
+    Agently Settings 对 dict 是 merge；profile 里写 request_options: {} 清不掉父级。
+    带 thinking/temperature/max_tokens 的 /embeddings 会被网关当 chat 计费。
+    """
+    agent = Agently.create_agent(f"matrix-kb-embed:{profile_id}")
+    snapshot = agent.settings.get()
+    agent.settings.parent = None
+    if isinstance(snapshot, dict):
+        agent.settings.update(snapshot)
+    agent.settings.set("plugins.ModelRequester.OpenAICompatible.request_options", {})
+    return agent.activate_model(profile_id)
+
+
+KB_EMBEDDING_PROFILE_IDS: Final[tuple[str, ...]] = ("openai-small", "bge-m3", "qwen3")
+KB_DEFAULT_EMBEDDING_PROFILE: Final[str] = "bge-m3"
 KB_EMBEDDING_AGENTS = {
-    profile_id: Agently.create_agent(f"matrix-kb-embed:{profile_id}").activate_model(profile_id)
-    for profile_id in ("openai-small", "bge-m3", "qwen3")
+    profile_id: _kb_embedding_agent(profile_id) for profile_id in KB_EMBEDDING_PROFILE_IDS
 }
+
+__all__ = [
+    "PROJECT_ROOT",
+    "KB_RECORD_ROOT",
+    "KB_EMBEDDING_PROFILE_IDS",
+    "KB_DEFAULT_EMBEDDING_PROFILE",
+    "KB_EMBEDDING_AGENTS",
+]

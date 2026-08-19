@@ -13,7 +13,7 @@
     } catch (_) {}
   </script>
   <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/matrix.css?v=desk-split-3">
+  <link rel="stylesheet" href="/static/matrix.css?v=kb-wizard-1">
 </head>
 <body class="matrix-app auth-locked" data-workspace="task" data-board="home">
   <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
@@ -29,6 +29,9 @@
           </button>
           <button type="button" class="nav-item" data-workspace="catalog" aria-label="配置" title="配置">
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 00.12-.64l-1.92-3.32a.5.5 0 00-.6.22l-2.39.96a7.03 7.03 0 00-1.63-.94l-.36-2.54a.5.5 0 00-.5-.42h-3.84a.5.5 0 00-.5.42l-.36 2.54c-.59.24-1.13.55-1.63.94l-2.39-.96a.5.5 0 00-.6.22L2.71 8.84a.5.5 0 00.12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 00-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.39 1.04.7 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.55 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 00-.12-.64l-2.03-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/></svg>
+          </button>
+          <button type="button" class="nav-item" data-workspace="kb" aria-label="知识库" title="知识库">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M6 4h11.5A1.5 1.5 0 0119 5.5V20H8a2 2 0 01-2-2V4zm2 2v12h9V6H8zm-4 .5A1.5 1.5 0 015.5 5H6v13a1 1 0 001 1H4.5A1.5 1.5 0 013 17.5v-11z"/></svg>
           </button>
           <a class="nav-item" href="/question" aria-label="问数" title="问数">
             <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-10h8V3h-8z"/></svg>
@@ -231,6 +234,146 @@
           <p id="catalogStatus" class="hint"></p>
         </div>
     </section>
+
+    <section class="kb-stage" id="kbWorkspace" hidden>
+      <header class="kb-head">
+        <div>
+          <strong>知识库</strong>
+          <small>导入与切分预览，本页不入库</small>
+        </div>
+        <ol class="kb-steps" id="kbSteps">
+          <li class="active" data-kb-step="1"><span>STEP 1</span>选择数据源</li>
+          <li data-kb-step="2"><span>2</span>文本分段与清洗</li>
+          <li data-kb-step="3"><span>3</span>处理并完成</li>
+        </ol>
+      </header>
+
+      <div class="kb-step" id="kbStepSource">
+        <div class="kb-step-body">
+          <h2 class="kb-section-title">选择数据源</h2>
+          <div class="kb-source-cards">
+            <button type="button" class="kb-source-card active" id="kbModeUpload" data-kb-mode="upload">
+              <strong>导入已有文本</strong>
+              <small>上传本地文件，按扩展名抽取正文</small>
+            </button>
+            <button type="button" class="kb-source-card" id="kbModePaste" data-kb-mode="paste">
+              <strong>粘贴文本</strong>
+              <small>直接贴入手册或示例 Markdown</small>
+            </button>
+          </div>
+
+          <div id="kbUploadPanel">
+            <h3 class="kb-section-title">上传文本文件</h3>
+            <div class="kb-drop" id="kbDrop">
+              <input id="kbFile" type="file" accept=".txt,.md,.markdown,.pdf,.docx,.pptx,.html,.htm,text/plain,text/markdown,text/html,application/pdf">
+              <p class="kb-drop-lead">拖拽文件至此，或者 <button type="button" class="kb-link" id="kbPickFile">选择文件</button></p>
+              <p class="kb-formats">MD、MARKDOWN、PDF、DOCX、PPTX、HTML、HTM、TXT</p>
+              <p class="kb-limits">每批最多 1 个文件，每个文件不超过 15 MB</p>
+            </div>
+            <div class="kb-file-card" id="kbFileCard" hidden>
+              <span class="kb-file-badge" id="kbFileBadge">MD</span>
+              <div>
+                <strong id="kbFileName">未选择</strong>
+                <small id="kbFileMeta">—</small>
+              </div>
+              <button type="button" class="ghost kb-file-remove" id="kbFileRemove" aria-label="移除文件">删除</button>
+            </div>
+          </div>
+
+          <div id="kbPastePanel" hidden>
+            <h3 class="kb-section-title">粘贴文本</h3>
+            <textarea id="kbSource" rows="14" placeholder="粘贴手册 Markdown，或点下方填入示例"></textarea>
+            <div class="kb-source-actions">
+              <button type="button" class="ghost" id="kbSampleBtn">填入示例</button>
+            </div>
+          </div>
+          <p class="kb-status" id="kbStatus" hidden></p>
+        </div>
+        <footer class="kb-step-foot">
+          <span></span>
+          <button type="button" class="send-btn" id="kbNextToChunk">下一步 →</button>
+        </footer>
+      </div>
+
+      <div class="kb-step" id="kbStepChunk" hidden>
+        <div class="kb-desk">
+          <aside class="kb-composer">
+            <h2 class="kb-section-title">分段设置</h2>
+            <p class="kb-kicker">切分策略（点「预览块」后按当前选择请求）</p>
+            <label class="foot-select kb-profile kb-sr-select">
+              <span>切分策略</span>
+              <select id="kbStrategy" aria-label="切分策略"></select>
+            </label>
+            <div class="kb-strategy-grid" id="kbStrategies" role="list"></div>
+            <div class="kb-params" id="kbParams">
+              <label class="field compact" data-kb-param="length">
+                <span class="field-label">分段最大长度（token）</span>
+                <input id="kbChunkSize" type="number" min="1" value="512">
+              </label>
+              <label class="field compact" data-kb-param="length">
+                <span class="field-label">分段重叠长度</span>
+                <input id="kbChunkOverlap" type="number" min="0" value="64">
+              </label>
+              <label class="field compact" data-kb-param="semantic" hidden>
+                <span class="field-label">breakpoint</span>
+                <input id="kbBreakpoint" type="number" min="0" max="100" value="95">
+              </label>
+              <label class="field compact" data-kb-param="semantic" hidden>
+                <span class="field-label">buffer</span>
+                <input id="kbBuffer" type="number" min="1" value="1">
+              </label>
+              <label class="field compact" data-kb-param="window" hidden>
+                <span class="field-label">window_size</span>
+                <input id="kbWindowSize" type="number" min="1" value="3">
+              </label>
+            </div>
+            <p class="kb-hint" id="kbParamHint">长度单位是 token。overlap 必须小于 chunk_size。</p>
+            <p class="kb-kicker">文本预处理</p>
+            <label class="kb-check"><input type="checkbox" checked disabled> 已自动清洗控制符、多余空白；Markdown / HTML 保住结构</label>
+            <p class="kb-kicker">Embedding 模型</p>
+            <label class="foot-select kb-profile">
+              <span>当前模型</span>
+              <select id="kbEmbedding" aria-label="当前 embedding 模型"></select>
+            </label>
+            <div class="kb-preview-actions">
+              <button type="button" class="send-btn" id="kbPreviewBtn">预览块</button>
+              <button type="button" class="ghost" id="kbResetParams">重置</button>
+            </div>
+            <p class="kb-status" id="kbChunkStatus" hidden></p>
+          </aside>
+          <section class="kb-preview">
+            <header class="kb-preview-head">
+              <div>
+                <strong id="kbPreviewTitle">预览</strong>
+                <small id="kbPreviewMeta">点击左侧「预览块」加载全部切片</small>
+              </div>
+              <input id="kbChunkSearch" class="kb-chunk-search" type="search" placeholder="搜索分段" hidden>
+            </header>
+            <p class="kb-notes" id="kbNotes" hidden></p>
+            <div class="kb-chunk-list" id="kbChunks">
+              <p class="kb-empty" id="kbChunkEmpty">点击左侧的「预览块」按钮来加载预览</p>
+            </div>
+          </section>
+        </div>
+        <footer class="kb-step-foot">
+          <button type="button" class="ghost" id="kbBackToSource">上一步</button>
+          <button type="button" class="send-btn" id="kbNextToDone">下一步 →</button>
+        </footer>
+      </div>
+
+      <div class="kb-step" id="kbStepDone" hidden>
+        <div class="kb-done">
+          <h2>预览已完成</h2>
+          <p class="kb-hint">切片仅用于预览，尚未写入知识库。</p>
+          <dl class="kb-summary" id="kbSummary"></dl>
+          <p class="kb-status" id="kbDoneStatus" hidden></p>
+        </div>
+        <footer class="kb-step-foot">
+          <button type="button" class="ghost" id="kbBackToChunk">上一步</button>
+          <button type="button" class="ghost" id="kbRestart">重新选择数据源</button>
+        </footer>
+      </div>
+    </section>
   </div>
   <div class="user-menu" id="userMenu" role="menu" hidden>
             <p class="user-menu-id">
@@ -335,8 +478,9 @@
       </div>
     </div>
   </div>
-  <script src="/static/matrix-auth.js?v=desk-split-3"></script>
-  <script src="/static/matrix.js?v=desk-split-3"></script>
-  <script src="/static/matrix-catalog.js?v=desk-split-3"></script>
+  <script src="/static/matrix-auth.js?v=kb-wizard-1"></script>
+  <script src="/static/matrix.js?v=kb-wizard-1"></script>
+  <script src="/static/matrix-catalog.js?v=kb-preview-8"></script>
+  <script src="/static/matrix-kb.js?v=kb-wizard-2"></script>
 </body>
 </html>

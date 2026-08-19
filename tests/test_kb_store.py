@@ -3,10 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import yaml
 from agently.core.storage import RecordStore
 
-from integrated_agent.config import KB_EMBEDDING_AGENTS, KB_RECORD_ROOT, PROJECT_ROOT
+from integrated_agent.config import (
+    KB_DEFAULT_EMBEDDING_PROFILE,
+    KB_EMBEDDING_AGENTS,
+    KB_RECORD_ROOT,
+)
+from integrated_agent.rag.embeddings import list_embedding_profiles
 from integrated_agent.runtimes.matrix import kb_store as kb_store_mod
 from integrated_agent.runtimes.matrix.kb_store import kb_store
 
@@ -38,12 +42,10 @@ def _open(tmp_path: Path, monkeypatch, profile_id: str = "bge-m3") -> tuple[Reco
     return kb_store_mod._open_store(profile_id), probes
 
 
-def test_committed_profiles_yaml_shape() -> None:
-    payload = yaml.safe_load(
-        (PROJECT_ROOT / "data/matrix/embedding_profiles.yaml").read_text(encoding="utf-8")
-    )
-    assert payload["default"] in payload["profiles"]
-    assert set(payload["profiles"]) == set(KB_EMBEDDING_AGENTS)
+def test_embedding_profiles_are_agent_ids() -> None:
+    payload = list_embedding_profiles()
+    assert payload.default == KB_DEFAULT_EMBEDDING_PROFILE
+    assert payload.profiles == list(KB_EMBEDDING_AGENTS)
 
 
 def test_kb_record_root_is_config_dir_without_agently() -> None:
