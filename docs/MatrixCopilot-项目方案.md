@@ -16,6 +16,9 @@
 - 架构总图：Cursor Canvas `matrix-architecture.canvas.tsx`
 - 工程图：`matrix-engineering-diagram.canvas.tsx`
 - 演示案例：`data/matrix/cases/x-twitter.json`
+- 知识库切分：[MatrixCopilot-知识库切分策略.md](./MatrixCopilot-知识库切分策略.md)
+- 知识库制品 CRUD / RecordStore：[MatrixCopilot-知识库制品管理.md](./MatrixCopilot-知识库制品管理.md)
+- 知识库 RAG 计划表：[MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md)
 
 ---
 
@@ -317,7 +320,7 @@ Brief.work_item
 
 ### 7.2 不进 RAG
 
-违禁词表、品牌人设 YAML、核准模板全文、实时爆款、评论原文、用户 UID。
+违禁词表、品牌人设 YAML、核准模板全文、实时爆款、评论原文、用户 UID、私有知识库块（另库，见 [知识库制品管理](./MatrixCopilot-知识库制品管理.md)）。
 
 ### 7.3 数据从哪来
 

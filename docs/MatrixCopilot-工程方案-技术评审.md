@@ -4,6 +4,8 @@
 |---|---|
 | 评审对象 | P0 工程落地，不含发送 |
 | 产品方案 | [MatrixCopilot-项目方案.md](./MatrixCopilot-项目方案.md) |
+| 知识库制品 | [MatrixCopilot-知识库制品管理.md](./MatrixCopilot-知识库制品管理.md) |
+| RAG 计划表 | [MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md) |
 | 参照实现 | `integrated_agent/runtimes/question/` |
 | 框架 | `agently==4.1.4.4`（与现仓库锁定一致） |
 | 评审日期 | 2026-08-15 |
@@ -23,6 +25,7 @@
 | D4 | 降级是否允许 Review 回抬 | 否。skip/template 不可被 Review 改成可发正文 | Review 可推翻 Gate |  |
 | D5 | 问数 stores 是否先抽取 | 否。先复制，Result 同构再抽 | 立刻抽通用 TaskService |  |
 | D6 | Gateway auto 是否加入 matrix | 是。附件仍钉 agent，codex 仍显式 | 仅 `/agent matrix` |  |
+| D7 | 知识库制品如何持久化 | 冷文件 + 独立 RecordStore；门面 CRUD；删改=归档/`put`，不硬删 records | 身份库存文档；`put_artifact_ref` | 已定，见 [知识库制品管理](./MatrixCopilot-知识库制品管理.md) |
 
 否决项（写入纪要即可，不讨论翻案）：代码执行双引擎、四层事后约束、用 RAG 放行、P0 发送、关键词判断该不该回。
 

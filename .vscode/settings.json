@@ -2,6 +2,13 @@
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
     "python.defaultInterpreterPath": "/Users/gg/miniconda3/envs/agent-zh/bin/python",
-    "python.analysis.extraPaths": [],
-    "python.analysis.typeCheckingMode": "standard"
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "python.analysis.typeCheckingMode": "standard",
+    "python.envFile": "${workspaceFolder}/.env",
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "${workspaceFolder}"
+    }
 }

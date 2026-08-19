@@ -13,6 +13,8 @@
 配套：
 
 - 产品总案：[MatrixCopilot-项目方案.md](./MatrixCopilot-项目方案.md)（§7 案例 RAG 与知识库并列，不互相替换）
+- 制品 CRUD 与 RecordStore：[MatrixCopilot-知识库制品管理.md](./MatrixCopilot-知识库制品管理.md)
+- RAG 计划表：[MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md)
 - 工程评审：[MatrixCopilot-工程方案-技术评审.md](./MatrixCopilot-工程方案-技术评审.md)
 
 已作废、不再使用的旧策略名：`chars` / `paragraphs` / `structure` / `semantic`（旧义）/ `unstructured`。不以别名兼容。
@@ -80,7 +82,7 @@ LlamaIndex 没有另一套名为 Chunking Strategy 的一等枚举。
 | `sentence_window` | `window_size` | 3（不调 `chunk_size`） |
 | `markdown` | 标题深度 | 到三级 |
 
-`semantic` 的 embedding 与以后 RecordStore 入库用同一套网关。失败则降级为 `sentence`，预览 `notes` 写明，页面仍出块。
+`semantic` 的 embedding 与**该次入库所选** `embedding_profile_id` 的 Agent 共用 `embed_texts`。失败则降级为 `sentence`，预览 `notes` 写明。入库向量绑定见制品管理 A8。
 
 ### 3.2 `sentence_window` 入库约定
 
@@ -135,7 +137,7 @@ element_type    ← markdown_element / 以后 unstructured 的类型
 window          ← 仅 sentence_window
 ```
 
-入库（后续文档）：`collection=kb`，`kind=chunk`，`indexed+vector`，`scope.user_id + doc_id`。过滤只靠 `scope.user_id`。标题路径可展示，不当检索硬过滤。
+入库：[知识库制品管理](./MatrixCopilot-知识库制品管理.md)。`collection=kb`，`kind=chunk`，`indexed+vector`，`scope.user_id + doc_id`。过滤只靠 `scope.user_id` 与块/文档的 `meta.status`、`enabled`。标题路径可展示，不当检索硬过滤。预览不入库。
 
 ---
 
@@ -151,17 +153,13 @@ POST /api/kb/preview-chunks
 
 `strategy` 枚举仅限 §3 六个值。
 
-前端：左侧导航知识库工作区。左栏选策略与参数，右栏展示后端返回的每一块（序号、长度、标题路径、正文；窗口策略另显示 window）。进入工作区后用示例 Markdown 自动预览一次。
+前端：左侧导航知识库工作区。顶栏选 **当前 embedding 模型**（只用于未入库预览与新建）。左栏选切分策略与参数，右栏展示块。`semantic` 预览必须带当前 `embedding_profile_id`。已保存文档的切分/分段操作锁定该文档模型，规则见 [知识库制品管理 §6.1](./MatrixCopilot-知识库制品管理.md)。进入工作区后用示例 Markdown 自动预览一次。
 
 ---
 
 ## 8. 落地顺序
 
-1. `llama-index-core` + `sentence` / `token` + 预览 API 与页面  
-2. `markdown`、`markdown_element`  
-3. `semantic`（embedding 可用后）  
-4. `sentence_window`（预览两列；写稿扩窗可同批或紧随入库）  
-5. P1：`unstructured_element` / `html` / `hierarchical`
+切分预览在 RAG 计划表 **Step 2**（六卡 Parser 一次到位；`hierarchical` 仍为本轮不做）。全链路顺序见 [MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md)。
 
 ---
 
