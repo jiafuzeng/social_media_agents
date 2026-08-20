@@ -99,87 +99,42 @@ async def fake_question_runner(
     }
 
 
-def install_scripted_ask(monkeypatch, model) -> None:
-    """把 chunk 里的 Agently.create_agent 接到 ScriptedMatrixModel，避免测试打真实模型。"""
+class _ScriptedAgent:
+    """测试替身：只转发 input / info，由 install_* 决定接到哪套模型。"""
 
-    class FakeAgent:
-        def __init__(self, name: str) -> None:
-            self._name = name
-            self._input: Any = None
-            self._info: Any = None
+    def __init__(self, name: str, dispatch) -> None:
+        self._name = name
+        self._dispatch = dispatch
+        self._input: Any = None
+        self._info: Any = None
 
-        def input(self, data):
-            self._input = data
-            return self
+    def input(self, data):
+        self._input = data
+        return self
 
-        def info(self, data):
-            self._info = data
-            return self
+    def info(self, data):
+        self._info = data
+        return self
 
-        def instruct(self, instruct):
-            del instruct
-            return self
+    def instruct(self, instruct):
+        del instruct
+        return self
 
-        def output(self, schema, format="json"):
-            del schema, format
-            return self
+    def output(self, schema, format="json"):
+        del schema, format
+        return self
 
-        def activate_session(self, *, session_id: str | None = None):
-            self.session_id = session_id
-            return self
+    def activate_session(self, *, session_id: str | None = None):
+        self.session_id = session_id
+        return self
 
-        async def async_start(self):
-            input_data = self._input or {}
-            info = self._info or {}
-            snapshot = info.get("snapshot") if isinstance(info, dict) else info
-            context = info.get("context") if isinstance(info, dict) else info
-            name = self._name
-            if name == "matrix-compose-brief":
-                return await model.compose_brief(
-                    text=input_data["text"], info=snapshot
-                )
-            if name == "matrix-compose-draft":
-                return await model.compose_draft(
-                    work_item=input_data["work_item"],
-                    info=context,
-                    repair=input_data.get("repair") or None,
-                )
-            if name == "matrix-compose-review":
-                return await model.compose_review(
-                    package=input_data["package"], info=snapshot
-                )
-            if name == "matrix-reply-brief":
-                return await model.reply_brief(
-                    text=input_data["text"], info=snapshot
-                )
-            if name == "matrix-reply-draft":
-                return await model.reply_draft(
-                    work_item=input_data["work_item"],
-                    info=context,
-                    repair=input_data.get("repair") or None,
-                )
-            if name == "matrix-reply-review":
-                return await model.reply_review(
-                    package=input_data["package"], info=snapshot
-                )
-            if name == "matrix-kb-chat-rewrite":
-                return await model.kb_chat_rewrite(
-                    query=input_data.get("query") or "",
-                    history=input_data.get("history") or [],
-                )
-            if name == "matrix-kb-chat-split":
-                return await model.kb_chat_split(
-                    rewritten_query=input_data.get("rewritten_query") or "",
-                    history=input_data.get("history") or [],
-                )
-            if name in {"matrix-kb-chat-summarize", "matrix-kb-chat"}:
-                return await model.kb_chat(
-                    query=input_data.get("query") or "",
-                    info=info if isinstance(info, dict) else {},
-                    history=input_data.get("history") or [],
-                )
-            raise AssertionError(f"unexpected Agently agent name: {name}")
+    async def async_start(self):
+        return await self._dispatch(
+            self._name, self._input or {}, self._info or {}
+        )
 
+
+def _fake_create_agent(dispatch):
     def fake_create_agent(*args, **kwargs):
         name = kwargs.get("name")
         if not name:
@@ -187,8 +142,75 @@ def install_scripted_ask(monkeypatch, model) -> None:
                 if isinstance(item, str):
                     name = item
                     break
-        return FakeAgent(str(name or ""))
+        return _ScriptedAgent(str(name or ""), dispatch)
 
+    return fake_create_agent
+
+
+async def _dispatch_compose_reply(model, name: str, input_data: Any, info: Any):
+    snapshot = info.get("snapshot") if isinstance(info, dict) else info
+    context = info.get("context") if isinstance(info, dict) else info
+    if name == "matrix-compose-brief":
+        return await model.compose_brief(text=input_data["text"], info=snapshot)
+    if name == "matrix-compose-draft":
+        return await model.compose_draft(
+            work_item=input_data["work_item"],
+            info=context,
+            repair=input_data.get("repair") or None,
+        )
+    if name == "matrix-compose-review":
+        return await model.compose_review(
+            package=input_data["package"], info=snapshot
+        )
+    if name == "matrix-reply-brief":
+        return await model.reply_brief(text=input_data["text"], info=snapshot)
+    if name == "matrix-reply-draft":
+        return await model.reply_draft(
+            work_item=input_data["work_item"],
+            info=context,
+            repair=input_data.get("repair") or None,
+        )
+    if name == "matrix-reply-review":
+        return await model.reply_review(
+            package=input_data["package"], info=snapshot
+        )
+    raise AssertionError(f"unexpected Agently agent name: {name}")
+
+
+async def _dispatch_kb_chat(model, name: str, input_data: Any, info: Any):
+    if name == "kb-chat-rewrite":
+        return await model.kb_chat_rewrite(
+            query=input_data.get("query") or "",
+            history=input_data.get("history") or [],
+        )
+    if name == "kb-chat-split":
+        return await model.kb_chat_split(
+            rewritten_query=input_data.get("rewritten_query") or "",
+            history=input_data.get("history") or [],
+        )
+    if name == "kb-chat-analyze":
+        return await model.kb_chat_analyze(
+            query=input_data.get("query") or "",
+            info=info if isinstance(info, dict) else {},
+            history=input_data.get("history") or [],
+        )
+    if name in {"kb-chat-summarize", "kb-chat"}:
+        return await model.kb_chat(
+            query=input_data.get("query") or "",
+            info=info if isinstance(info, dict) else {},
+            history=input_data.get("history") or [],
+            analysis=input_data.get("analysis") or {},
+        )
+    raise AssertionError(f"unexpected Agently agent name: {name}")
+
+
+def install_scripted_ask(monkeypatch, model) -> None:
+    """只替换写帖 / 回评 chunk 的 Agently.create_agent，不碰召回聊天。"""
+
+    async def dispatch(name: str, input_data: Any, info: Any):
+        return await _dispatch_compose_reply(model, name, input_data, info)
+
+    fake_create_agent = _fake_create_agent(dispatch)
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.analysis.workflows.chunks.compose.pipeline.Agently.create_agent",
         fake_create_agent,
@@ -197,7 +219,15 @@ def install_scripted_ask(monkeypatch, model) -> None:
         "integrated_agent.runtimes.matrix.analysis.workflows.chunks.reply.pipeline.Agently.create_agent",
         fake_create_agent,
     )
+
+
+def install_kb_chat_ask(monkeypatch, model) -> None:
+    """只替换召回聊天 pipeline 的 Agently.create_agent，不碰写帖 / 回评。"""
+
+    async def dispatch(name: str, input_data: Any, info: Any):
+        return await _dispatch_kb_chat(model, name, input_data, info)
+
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.analysis.workflows.chunks.kb_chat.pipeline.Agently.create_agent",
-        fake_create_agent,
+        "integrated_agent.runtimes.matrix.kb_chat.pipeline.Agently.create_agent",
+        _fake_create_agent(dispatch),
     )

@@ -1857,10 +1857,11 @@
 .kb-chat-plan[hidden] { display: none; }
 .kb-chat-plan strong {
   display: block;
-  margin: 0 0 6px;
+  margin: 10px 0 6px;
   font-size: 12px;
   color: #9eb0ff;
 }
+.kb-chat-plan strong:first-child { margin-top: 0; }
 .kb-chat-plan ol {
   margin: 6px 0 0;
   padding-left: 18px;

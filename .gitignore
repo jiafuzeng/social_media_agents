@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 *logs/
 workspace/identity/
-workspace/kb/
+workspace/rag/
 # C extensions
 *.so
 

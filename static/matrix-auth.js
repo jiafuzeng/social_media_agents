@@ -39,6 +39,8 @@ const AUTH_ERRORS = {
   "text is required to rechunk": "重新切分需要正文或原件",
   "embedding_profile_id is required": "检索必须选择 embedding 模型",
   "kb_chat_failed": "生成回答失败，召回结果仍可用",
+  "kb_analyze_failed": "召回要点分析失败，已按切片原文作答",
+  "collapsed_cite": "回答未覆盖全部切片，已按要点重写引用",
   "embedding_profile_id is required for semantic": "按语义切分需要当前 embedding 模型",
   "text is empty": "请先填写文本",
   "unsupported file type": "只支持 txt / markdown / pdf / docx / pptx / html",

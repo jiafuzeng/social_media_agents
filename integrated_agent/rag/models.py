@@ -372,7 +372,15 @@ class ChatKbHit(SearchKbHit):
     kb_id: str
     source_query: str | None = None
     hit_text: str | None = None  # 兼容旧字段；引用锚点以 text 为准
-    context: str | None = None  # 补全后的阅读上下文，不作为独立引用
+    context: str | None = None  # 同块 window；相邻段已升成独立 hit
+
+
+class ChatKbPoint(RagModel):
+    """召回分析后的一条可答题事实，必须对应一张签发的 kb_id。"""
+
+    point_id: str
+    claim: str
+    kb_id: str
 
 
 class ChatKbOut(RagModel):
@@ -383,6 +391,8 @@ class ChatKbOut(RagModel):
     cited_kb_ids: list[str] = Field(default_factory=list)
     rewritten_query: str = ""
     retrieval_queries: list[str] = Field(default_factory=list)
+    analysis_points: list[ChatKbPoint] = Field(default_factory=list)
+    uncovered: list[str] = Field(default_factory=list)
     empty_reason: SearchEmptyReason = ""
     profile_doc_count: int = 0
     other_profile_doc_count: int = 0

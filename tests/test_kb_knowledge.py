@@ -17,10 +17,11 @@ from integrated_agent.rag.models import (
     UpdateDocumentIn,
 )
 from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
+from integrated_agent.runtimes.matrix.kb_chat.scripted import ScriptedKbChatModel
 from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
 from integrated_agent.runtimes.matrix import kb_store as kb_store_mod
 from integrated_agent.transports.http import create_matrix_api
-from tests.fakes import install_scripted_ask
+from tests.fakes import install_kb_chat_ask, install_scripted_ask
 from tests.test_kb_store import _ProbeProvider
 
 
@@ -72,6 +73,7 @@ def _client(
     tmp_path: Path, monkeypatch
 ) -> tuple[TestClient, KnowledgeStore, dict[str, _ProbeProvider]]:
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
+    install_kb_chat_ask(monkeypatch, ScriptedKbChatModel())
     knowledge, probes = _knowledge(tmp_path, monkeypatch)
     service = build_matrix_service(
         PROJECT_ROOT,

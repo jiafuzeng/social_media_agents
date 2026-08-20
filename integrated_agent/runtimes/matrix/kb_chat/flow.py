@@ -1,3 +1,5 @@
+"""独立召回聊天 TriggerFlow。与 COMPOSE_FLOW / REPLY_FLOW 无节点或契约共享。"""
+
 from __future__ import annotations
 
 from typing import Any, cast
@@ -7,7 +9,8 @@ from agently import TriggerFlow
 from integrated_agent.rag.models import ChatKbIn, ChatKbOut
 from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
 
-from .chunks.kb_chat.pipeline import (
+from .pipeline import (
+    kb_chat_analyze,
     kb_chat_expand,
     kb_chat_prelude,
     kb_chat_retrieve,
@@ -16,9 +19,9 @@ from .chunks.kb_chat.pipeline import (
     kb_chat_summarize,
 )
 
-PIPELINE_VERSION = "matrix-kb-chat-v2"
+PIPELINE_VERSION = "kb-chat-v3"
 
-KB_CHAT_FLOW = TriggerFlow(name="matrix-kb-chat-v2")
+KB_CHAT_FLOW = TriggerFlow(name="kb-chat-v3")
 (
     KB_CHAT_FLOW.to(kb_chat_prelude)
     .to(kb_chat_rewrite)
@@ -27,6 +30,7 @@ KB_CHAT_FLOW = TriggerFlow(name="matrix-kb-chat-v2")
     .to(kb_chat_retrieve)
     .end_for_each()
     .to(kb_chat_expand)
+    .to(kb_chat_analyze)
     .to(kb_chat_summarize)
 )
 

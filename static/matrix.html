@@ -13,8 +13,8 @@
     } catch (_) {}
   </script>
   <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/matrix.css?v=kb-ui-37">
-  <link rel="stylesheet" href="/static/matrix-kb.css?v=kb-ui-37">
+  <link rel="stylesheet" href="/static/matrix.css?v=kb-ui-38">
+  <link rel="stylesheet" href="/static/matrix-kb.css?v=kb-ui-38">
 </head>
 <body class="matrix-app auth-locked" data-workspace="task" data-board="home">
   <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
@@ -589,7 +589,7 @@
         <div class="kb-chat">
           <section class="kb-chat-main">
             <h2 class="kb-section-title">召回聊天</h2>
-            <p class="kb-hint">先改写问题、拆成检索问句，再按当前模型召回并补全相邻段落，最后总结。回答只在相关句后标 [[kb:k1]]，完整切片在右侧罗列，不占用案例 [[ref:]]。这是测试页，不会发帖。</p>
+            <p class="kb-hint">先改写并拆检索问句，召回后把相邻段升成独立切片，再分析要点后作答。一句一个依据，标对应的 [[kb:kN]]，不能整段都挂 k1。这是测试页，不会发帖。</p>
             <div class="kb-chat-thread" id="kbChatThread">
               <div class="kb-empty-hero" id="kbChatEmpty">
                 <p class="kb-empty">先问一句手册里的规定，例如退款时限。</p>
@@ -727,9 +727,9 @@
       </div>
     </div>
   </div>
-  <script src="/static/matrix-auth.js?v=kb-ui-37"></script>
-  <script src="/static/matrix.js?v=kb-ui-37"></script>
+  <script src="/static/matrix-auth.js?v=kb-ui-38"></script>
+  <script src="/static/matrix.js?v=kb-ui-38"></script>
   <script src="/static/matrix-catalog.js?v=kb-preview-8"></script>
-  <script src="/static/matrix-kb.js?v=kb-ui-37"></script>
+  <script src="/static/matrix-kb.js?v=kb-ui-38"></script>
 </body>
 </html>

@@ -1,4 +1,7 @@
-"""KB_CHAT_FLOW：改写问题 → 拆检索问句 → 并行 RetrieveKb → 汇总回答。"""
+"""独立召回聊天阶段：改写问题 → 拆检索问句 → 并行 RetrieveKb → 汇总回答。
+
+不依赖写帖 / 回评 Flow、ConstraintGate 或 MatrixTask 契约。
+"""
 
 from __future__ import annotations
 
@@ -15,9 +18,9 @@ from integrated_agent.rag.models import (
     KbChunkOut,
     SearchKbIn,
 )
-from integrated_agent.runtimes.matrix.analysis.constraints import KB_CITE_RE
 from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
 
+KB_CITE_RE = re.compile(r"\[\[kb:([^\]]+)\]\]")
 REF_CITE_RE = re.compile(r"\[\[ref:([^\]]+)\]\]")
 EMPTY_ANSWER = "当前模型下没有检索到可用手册段落，无法根据知识库作答。"
 FAILED_ANSWER = "生成回答失败，下方仍列出本次召回的手册段落。"
@@ -25,6 +28,7 @@ MAX_RETRIEVAL_QUERIES = 4
 MAX_MERGED_HITS = 8
 MAX_CONTEXT_CHARS = 1200
 MAX_GROW_SPAN = 3
+MAX_ANALYSIS_POINTS = 12
 
 
 def _as_dict(result: Any) -> dict[str, Any]:
@@ -133,10 +137,10 @@ def _grow_around(
     return chunks[lo : hi + 1]
 
 
-def _complete_passage(
+def _select_span(
     hit: ChatKbHit, siblings: list[KbChunkOut]
-) -> tuple[str, str]:
-    """补全检索块：window → 同标题节 → 相邻 ordinal。返回 (上下文, 原始命中句)。"""
+) -> tuple[list[KbChunkOut], str | None, str]:
+    """选出可独立引用的相邻块。window 仍属同一 chunk，不升成新卡。"""
 
     original = (hit.text or "").strip()
     live = sorted(
@@ -147,12 +151,12 @@ def _complete_passage(
     if current is None:
         window = (hit.window or "").strip()
         if window and len(window) > len(original):
-            return window[:MAX_CONTEXT_CHARS], original
-        return original, original
+            return [], window[:MAX_CONTEXT_CHARS], original
+        return [], None, original
     original = (current.text or "").strip() or original
     window = (current.window or hit.window or "").strip()
     if window and len(window) > len(original):
-        return window[:MAX_CONTEXT_CHARS], original
+        return [current], window[:MAX_CONTEXT_CHARS], original
     if current.header_path:
         section = [
             item for item in live if item.header_path == current.header_path
@@ -161,11 +165,30 @@ def _complete_passage(
             index = next(
                 i for i, item in enumerate(section) if item.chunk_id == current.chunk_id
             )
-            grown = _grow_around(section, index, max_chars=MAX_CONTEXT_CHARS)
-            return _join_chunk_texts(grown)[:MAX_CONTEXT_CHARS], original
+            return (
+                _grow_around(section, index, max_chars=MAX_CONTEXT_CHARS),
+                None,
+                original,
+            )
     index = next(i for i, item in enumerate(live) if item.chunk_id == current.chunk_id)
-    grown = _grow_around(live, index, max_chars=MAX_CONTEXT_CHARS)
-    return _join_chunk_texts(grown)[:MAX_CONTEXT_CHARS], original
+    return (
+        _grow_around(live, index, max_chars=MAX_CONTEXT_CHARS),
+        None,
+        original,
+    )
+
+
+def _complete_passage(
+    hit: ChatKbHit, siblings: list[KbChunkOut]
+) -> tuple[str, str]:
+    """补全检索块：window → 同标题节 → 相邻 ordinal。返回 (上下文, 原始命中句)。"""
+
+    span, window, original = _select_span(hit, siblings)
+    if window:
+        return window, original
+    if span:
+        return _join_chunk_texts(span)[:MAX_CONTEXT_CHARS], original
+    return original, original
 
 
 def _dedupe_expanded(cards: list[ChatKbHit]) -> list[ChatKbHit]:
@@ -187,11 +210,33 @@ def _dedupe_expanded(cards: list[ChatKbHit]) -> list[ChatKbHit]:
     ]
 
 
+def _card_from_chunk(
+    seed: ChatKbHit, chunk: KbChunkOut, *, context: str | None
+) -> ChatKbHit:
+    payload = seed.model_dump()
+    payload.update(
+        {
+            "chunk_id": chunk.chunk_id,
+            "doc_id": chunk.doc_id,
+            "text": (chunk.text or "").strip(),
+            "window": chunk.window,
+            "header_path": chunk.header_path,
+            "embedding_profile_id": chunk.embedding_profile_id
+            or seed.embedding_profile_id,
+            "hit_text": None,
+            "context": context if chunk.chunk_id == seed.chunk_id else None,
+        }
+    )
+    return ChatKbHit.model_validate(payload)
+
+
 async def _expand_cards(
     knowledge: KnowledgeStore,
     user_id: str,
     cards: list[ChatKbHit],
 ) -> tuple[list[ChatKbHit], bool]:
+    """命中块的相邻段升成独立 kb_id，避免整节事实都挂在 k1 上。"""
+
     by_doc: dict[str, list[KbChunkOut]] = {}
     expanded: list[ChatKbHit] = []
     failed = False
@@ -205,14 +250,24 @@ async def _expand_cards(
                 siblings = []
                 failed = True
             by_doc[card.doc_id] = siblings
-        passage, original = _complete_passage(card, siblings)
+        span, window, original = _select_span(card, siblings)
+        if span:
+            for chunk in span:
+                if not (chunk.text or "").strip():
+                    continue
+                expanded.append(
+                    _card_from_chunk(
+                        card,
+                        chunk,
+                        context=window if chunk.chunk_id == card.chunk_id else None,
+                    )
+                )
+            continue
         needle = original or card.text
         payload = card.model_dump()
         payload["text"] = needle
         payload["hit_text"] = None
-        payload["context"] = (
-            passage if passage and passage != needle else None
-        )
+        payload["context"] = window if window and window != needle else None
         expanded.append(ChatKbHit.model_validate(payload))
     return _dedupe_expanded(expanded), failed
 
@@ -226,6 +281,90 @@ def _offered_for_summarize(card: ChatKbHit) -> dict[str, Any]:
     if card.context:
         row["context"] = card.context
     return row
+
+
+def _fallback_points(cards: list[ChatKbHit]) -> list[dict[str, str]]:
+    points: list[dict[str, str]] = []
+    for card in cards:
+        claim = (card.text or "").strip()
+        if not claim:
+            continue
+        points.append(
+            {
+                "point_id": f"p{len(points) + 1}",
+                "claim": claim[:400],
+                "kb_id": card.kb_id,
+            }
+        )
+        if len(points) >= MAX_ANALYSIS_POINTS:
+            break
+    return points
+
+
+def _sanitize_points(
+    raw: Any, offered: list[str]
+) -> tuple[list[dict[str, str]], list[str]]:
+    offered_set = set(offered)
+    points: list[dict[str, str]] = []
+    extra: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    values = raw if isinstance(raw, list) else []
+    for item in values:
+        if not isinstance(item, dict):
+            continue
+        kb_id = str(item.get("kb_id") or "").strip()
+        claim = str(item.get("claim") or "").strip()
+        if kb_id not in offered_set:
+            if kb_id:
+                extra.append("unknown_kb")
+            continue
+        if not claim:
+            continue
+        key = (claim, kb_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        points.append(
+            {
+                "point_id": str(item.get("point_id") or f"p{len(points) + 1}"),
+                "claim": claim[:400],
+                "kb_id": kb_id,
+            }
+        )
+        if len(points) >= MAX_ANALYSIS_POINTS:
+            break
+    return points, extra
+
+
+def _assemble_from_points(points: list[dict[str, str]]) -> str:
+    parts: list[str] = []
+    for item in points:
+        claim = item["claim"].rstrip("。.;；,， ")
+        if not claim:
+            continue
+        parts.append(f"{claim}[[kb:{item['kb_id']}]]。")
+    return "".join(parts)
+
+
+def _cited_from_answer(answer: str, offered: list[str]) -> list[str]:
+    offered_set = set(offered)
+    cited: list[str] = []
+    for token in KB_CITE_RE.findall(answer or ""):
+        if token in offered_set and token not in cited:
+            cited.append(token)
+    return cited
+
+
+def _uncovered_list(raw: Any) -> list[str]:
+    values = raw if isinstance(raw, list) else []
+    items: list[str] = []
+    for item in values:
+        text = str(item or "").strip()
+        if text and text not in items:
+            items.append(text[:200])
+        if len(items) >= 6:
+            break
+    return items
 
 
 async def kb_chat_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -276,7 +415,7 @@ async def kb_chat_rewrite(data: TriggerFlowRuntimeData) -> str:
     rewritten = query
     try:
         result = await (
-            Agently.create_agent(name="matrix-kb-chat-rewrite")
+            Agently.create_agent(name="kb-chat-rewrite")
             .input({"query": query, "history": history})
             .instruct(
                 [
@@ -308,7 +447,7 @@ async def kb_chat_split(data: TriggerFlowRuntimeData) -> list[dict[str, str]]:
     queries = [rewritten]
     try:
         result = await (
-            Agently.create_agent(name="matrix-kb-chat-split")
+            Agently.create_agent(name="kb-chat-split")
             .input(
                 {
                     "query": data.get_state("query"),
@@ -382,8 +521,82 @@ async def kb_chat_expand(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     return dumped
 
 
+async def kb_chat_analyze(data: TriggerFlowRuntimeData) -> list[dict[str, str]]:
+    """先把召回切片拆成可引用要点，再交给总结。失败则按每卡一条退回。"""
+
+    stored = list(cast(list[dict[str, Any]], data.get_state("cards") or []))
+    cards = [ChatKbHit.model_validate(item) for item in stored]
+    offered = [card.kb_id for card in cards]
+    if not cards:
+        await data.async_set_state("analysis_points", [], emit=False)
+        await data.async_set_state("uncovered", [], emit=False)
+        return []
+    query = str(data.get_state("query") or "")
+    rewritten = str(data.get_state("rewritten_query") or query)
+    history = list(cast(list[dict[str, str]], data.get_state("history") or []))
+    points = _fallback_points(cards)
+    uncovered: list[str] = []
+    try:
+        result = await (
+            Agently.create_agent(name="kb-chat-analyze")
+            .input(
+                {
+                    "query": query,
+                    "rewritten_query": rewritten,
+                    "history": history,
+                }
+            )
+            .info({"offered_kbs": [_offered_for_summarize(card) for card in cards]})
+            .instruct(
+                [
+                    "阅读本次召回的手册切片，拆成能回答用户原问题的要点。",
+                    "info.offered_kbs.text 是该 kb_id 的唯一事实来源。",
+                    "context 只属于同一张卡的 window，不能把别的切片内容算进这张卡。",
+                    "每条 point 只写一条事实，kb_id 必须来自 offered_kbs。",
+                    "不同切片的事实必须分给不同 kb_id，禁止把 TEMPR、Cara 等不同段落都标成 k1。",
+                    "同一张卡可以有多条 point；不要把多条事实挤进一句。",
+                    "用户问到但这些切片没写的，列入 uncovered，不要编造。",
+                    f"points 最多 {MAX_ANALYSIS_POINTS} 条。",
+                ]
+            )
+            .output(
+                {
+                    "points": (
+                        [
+                            {
+                                "point_id": (str, "not_null"),
+                                "claim": (str, "not_null"),
+                                "kb_id": (str, "not_null"),
+                            }
+                        ],
+                        "not_null",
+                    ),
+                    "uncovered": [str],
+                },
+                format="json",
+            )
+            .async_start()
+        )
+        payload = _as_dict(result)
+        cleaned, extra = _sanitize_points(payload.get("points"), offered)
+        if extra:
+            for code in extra:
+                await _note(data, code)
+        if cleaned:
+            points = cleaned
+        else:
+            await _note(data, "kb_analyze_failed")
+        uncovered = _uncovered_list(payload.get("uncovered"))
+    except Exception:
+        await _note(data, "kb_analyze_failed")
+        points = _fallback_points(cards)
+    await data.async_set_state("analysis_points", points, emit=False)
+    await data.async_set_state("uncovered", uncovered, emit=False)
+    return points
+
+
 async def kb_chat_summarize(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """按补全后的手册段落总结回答。签发 k1… 不得占用 [[ref:]]。"""
+    """按分析要点写回答。多张切片不得塌缩成同一个 [[kb:k1]]。"""
 
     stored = list(cast(list[dict[str, Any]], data.get_state("cards") or []))
     cards = (
@@ -404,32 +617,38 @@ async def kb_chat_summarize(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     rewritten = str(data.get_state("rewritten_query") or query)
     retrieval_queries = list(cast(list[str], data.get_state("retrieval_queries") or []))
     history = list(cast(list[dict[str, str]], data.get_state("history") or []))
+    points = list(
+        cast(list[dict[str, str]], data.get_state("analysis_points") or [])
+    )
+    if not points and cards:
+        points = _fallback_points(cards)
+    uncovered = list(cast(list[str], data.get_state("uncovered") or []))
     answer = EMPTY_ANSWER
     cited: list[str] = []
+    needed = list(dict.fromkeys(item["kb_id"] for item in points))
     if cards:
         try:
             result = await (
-                Agently.create_agent(name="matrix-kb-chat-summarize")
+                Agently.create_agent(name="kb-chat-summarize")
                 .input(
                     {
                         "query": query,
                         "rewritten_query": rewritten,
                         "retrieval_queries": retrieval_queries,
                         "history": history,
+                        "analysis": {"points": points, "uncovered": uncovered},
                     }
                 )
                 .info({"offered_kbs": [_offered_for_summarize(card) for card in cards]})
                 .instruct(
                     [
-                        "根据本次检索到的手册命中句回答用户原问题。",
-                        "info.offered_kbs.text 是该 kb_id 的引用锚点；context 只帮助理解，不是另一条引用。",
-                        "把回答拆成短句，每句只写一条事实，用句号收口，不要用顿号把多条红线连成一句。",
-                        "有依据的句子末尾紧跟对应锚点，写成：句子1[[kb:k1]]。句子2[[kb:k3]]。",
-                        "[[kb:kN]] 必须对应该卡 text，禁止多条事实共用一个标记，禁止整段末尾只标一次。",
-                        "不要粘贴或复述手册原文；完整切片由界面在右侧按 k1、k2… 列出。",
-                        "只能引用 info.offered_kbs 的 kb_id，不得占用 [[ref:]]，不得编造未检索到的规定。",
-                        "cited_kb_ids 列出正文里用到的 kb_id。",
-                        "先前对话只帮助理解指代，证据仍以本次 offered_kbs 为准。",
+                        "只根据 input.analysis.points 回答用户原问题，不要抛开要点自由发挥。",
+                        "每个 point 至少写成一句，句末紧跟该 point 的 kb_id，例如：句子[[kb:k2]]。",
+                        "禁止把不同 kb_id 的要点都标成 [[kb:k1]]。",
+                        "不要粘贴手册原文；完整切片在右侧按 k1、k2… 列出。",
+                        "uncovered 可在末尾用一句说明手册未覆盖，不要加 kb 引用，不要编造。",
+                        "只能引用 analysis.points 和 offered_kbs 里已有的 kb_id，不得占用 [[ref:]]。",
+                        "cited_kb_ids 列出正文用到的 kb_id。",
                     ]
                 )
                 .output(
@@ -453,12 +672,21 @@ async def kb_chat_summarize(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                 if token in offered and token not in cited:
                     cited.append(token)
             if not answer:
-                answer = FAILED_ANSWER
+                answer = _assemble_from_points(points) or FAILED_ANSWER
+                cited = _cited_from_answer(answer, offered)
                 if "kb_chat_failed" not in limitations:
                     limitations.append("kb_chat_failed")
+            elif len(needed) > 1 and len(set(cited).intersection(needed)) < len(needed):
+                rebuilt = _assemble_from_points(points)
+                if rebuilt:
+                    answer = rebuilt
+                    cited = _cited_from_answer(answer, offered)
+                    if "collapsed_cite" not in limitations:
+                        limitations.append("collapsed_cite")
         except Exception:
-            answer = FAILED_ANSWER
-            cited = []
+            rebuilt = _assemble_from_points(points)
+            answer = rebuilt or FAILED_ANSWER
+            cited = _cited_from_answer(answer, offered)
             if "kb_chat_failed" not in limitations:
                 limitations.append("kb_chat_failed")
     package = ChatKbOut(
@@ -469,6 +697,8 @@ async def kb_chat_summarize(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         cited_kb_ids=cited,
         rewritten_query=rewritten,
         retrieval_queries=retrieval_queries,
+        analysis_points=points,
+        uncovered=uncovered,
         empty_reason=reason,
         profile_doc_count=int(data.get_state("profile_doc_count") or 0),
         other_profile_doc_count=int(data.get_state("other_profile_doc_count") or 0),

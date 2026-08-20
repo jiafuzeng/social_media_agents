@@ -2077,14 +2077,16 @@ function renderKbChatPlan(payload) {
   if (!node) return;
   const rewritten = String(payload?.rewritten_query || "").trim();
   const queries = (payload?.retrieval_queries || []).filter(item => String(item || "").trim());
-  if (!rewritten && !queries.length) {
+  const points = (payload?.analysis_points || []).filter(item => item && (item.claim || item.kb_id));
+  const uncovered = (payload?.uncovered || []).filter(item => String(item || "").trim());
+  if (!rewritten && !queries.length && !points.length) {
     node.hidden = true;
     node.replaceChildren();
     return;
   }
   node.hidden = false;
   const title = document.createElement("strong");
-  title.textContent = "检索计划";
+  title.textContent = "检索与要点";
   const rewrite = document.createElement("p");
   rewrite.textContent = rewritten ? `改写：${rewritten}` : "改写：与原问相同";
   node.replaceChildren(title, rewrite);
@@ -2096,6 +2098,29 @@ function renderKbChatPlan(payload) {
       list.append(row);
     });
     node.append(list);
+  }
+  if (points.length) {
+    const heading = document.createElement("strong");
+    heading.textContent = "召回要点";
+    const list = document.createElement("ol");
+    points.forEach(item => {
+      const row = document.createElement("li");
+      const kbId = String(item.kb_id || "").trim();
+      row.textContent = kbId ? `${kbId}：${item.claim || ""}` : String(item.claim || "");
+      list.append(row);
+    });
+    node.append(heading, list);
+  }
+  if (uncovered.length) {
+    const heading = document.createElement("strong");
+    heading.textContent = "未覆盖";
+    const list = document.createElement("ul");
+    uncovered.forEach(item => {
+      const row = document.createElement("li");
+      row.textContent = item;
+      list.append(row);
+    });
+    node.append(heading, list);
   }
 }
 
@@ -2195,14 +2220,22 @@ async function runKbChat() {
     renderKbChatHits(payload);
     const notes = payload.limitations || [];
     if (notes.includes("kb_chat_failed")) {
-      setNamedStatus("#kbChatStatus", "生成回答失败，右侧仍是本次召回。", "warn");
+      setNamedStatus("#kbChatStatus", "生成回答失败，已按召回要点回写。", "warn");
+    } else if (notes.includes("collapsed_cite")) {
+      setNamedStatus("#kbChatStatus", "回答未覆盖全部切片，已按要点重写引用。", "warn");
+    } else if (notes.includes("kb_analyze_failed")) {
+      setNamedStatus("#kbChatStatus", "要点分析失败，已按切片原文作答。", "warn");
     } else if (notes.includes("unknown_kb") || notes.includes("mixed_ref")) {
       setNamedStatus("#kbChatStatus", "回答已按签发的 k1… 校正引用。", "warn");
     } else if (!payload.hits?.length) {
       setNamedStatus("#kbChatStatus", "没有检索到手册段落。", "warn");
     } else {
       const n = (payload.retrieval_queries || []).length || 1;
-      setNamedStatus("#kbChatStatus", `拆成 ${n} 个检索问题，命中 ${payload.hits.length} 块。`);
+      const points = (payload.analysis_points || []).length;
+      setNamedStatus(
+        "#kbChatStatus",
+        `拆成 ${n} 个检索问题，命中 ${payload.hits.length} 块，分析 ${points} 条要点。`
+      );
     }
   } catch (error) {
     kbChatTurns.pop();
