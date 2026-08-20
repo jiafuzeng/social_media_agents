@@ -1,6 +1,5 @@
 const PROFILE_KEY = "matrix.kb.embedding_profile_id";
 const STRATEGY_KEY = "matrix.kb.chunk_strategy";
-const RECALL_HISTORY_KEY = "matrix.kb.recall_history";
 const DOC_STATUS = { ready: "就绪", ingesting: "处理中", failed: "失败" };
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const SAMPLE_MARKDOWN = `# 售后手册
@@ -94,6 +93,7 @@ let kbProfilesPromise = null;
 let kbChatTurns = [];
 let kbChatBusy = false;
 let kbAuthUserId = "";
+let kbApplyingProfile = false;
 
 function kbAuthHeaders() {
   return window.matrixAuth?.headers() || {};
@@ -673,14 +673,14 @@ function ensureKbProfiles() {
 }
 
 function kbProfileNeeded() {
-  return kbView === "recall" || kbView === "chat" || (kbView === "wizard" && kbUiStep >= 2);
+  return kbView === "wizard" && kbUiStep >= 2;
 }
 
 function updateKbHeadNote() {
   const note = document.querySelector("#kbHeadNote");
   if (!note) return;
   const notes = {
-    docs: "先导入或打开文档。向量模型在分段入库和召回测试时再选。",
+    docs: "先导入或打开文档。向量模型在分段入库时再选；召回会按问题自动选择。",
     wizard:
       kbUiStep < 2
         ? "这一步只选数据源，不选向量模型。"
@@ -688,10 +688,38 @@ function updateKbHeadNote() {
           ? "在左侧选择入库模型。改模型会丢掉未保存预览。"
           : "当前模型只约束本次预览和新建。改模型会丢掉未保存预览。",
     doc: "分段改删锁定文档徽章上的模型，不跟顶栏走。",
-    recall: "检索必须带当前模型，不会和其他模型的文档融合。",
-    chat: "回答里只在相关句后标 [[kb:k1]]，完整段落在右侧引用块。"
+    recall: recallHeadNote(),
+    chat: chatHeadNote()
   };
   note.textContent = notes[kbView] || notes.docs;
+  const recallHint = document.querySelector("#kbRecallHint");
+  if (recallHint) recallHint.textContent = recallBodyHint();
+}
+
+function kbLibraryProfileCount() {
+  return new Set(
+    kbDocuments.map(item => item.embedding_profile_id).filter(Boolean)
+  ).size;
+}
+
+function recallHeadNote() {
+  if (kbLibraryProfileCount() > 1) {
+    return "库里有多种向量模型。召回会按问题自动选一个，结果仍只来自该模型，不会混排。";
+  }
+  return "检索会按问题自动选择向量模型。一次只搜一个模型，不会把不同模型的文档混在一起。";
+}
+
+function chatHeadNote() {
+  if (kbLibraryProfileCount() > 1) {
+    return "库里有多种向量模型。提问后会按问题自动选一个再检索，回答里只标 [[kb:k1]]。";
+  }
+  return "回答里只在相关句后标 [[kb:k1]]，完整段落在右侧引用块。";
+}
+
+function recallBodyHint() {
+  return kbLibraryProfileCount() > 1
+    ? "根据查询文本测试召回。系统会按问题自动选择向量模型，不会把不同模型的文档混在一起。"
+    : "根据查询文本测试召回效果。系统会自动选择向量模型。";
 }
 
 function placeKbEmbedding() {
@@ -1050,7 +1078,6 @@ function resetKbWorkspaceState() {
   renderKbDocuments();
   const recallHits = document.querySelector("#kbRecallHits");
   if (recallHits) recallHits.replaceChildren(kbRecallEmpty("召回测试结果将展示在这里"));
-  renderRecallHistory();
   renderKbChatThread();
   renderKbChatHits(null);
   setNamedStatus("#kbRecallStatus", "");
@@ -1078,6 +1105,7 @@ function onKbAuthChanged() {
 async function openKbWorkspace() {
   if (!window.matrixAuth?.user()) return;
   try {
+    await ensureKbProfiles();
     await loadKbCatalog();
     if (!kbOpened) {
       kbOpened = true;
@@ -1092,16 +1120,29 @@ async function openKbWorkspace() {
   }
 }
 
+function kbProfileDocStats() {
+  const current = currentKbProfile();
+  const mine = kbDocuments.filter(item => item.embedding_profile_id === current).length;
+  return { current, mine, other: kbDocuments.length - mine };
+}
+
+function kbNoDocsForProfileMessage(other) {
+  return other
+    ? `当前模型下没有可检索文档。另有 ${other} 篇用了其他模型，请在顶栏切换模型后再测。`
+    : "当前模型下没有可检索文档。";
+}
+
 function syncKbChrome() {
   const profile = currentKbProfile();
   const side = document.querySelector("#kbSideProfile");
   if (side) side.textContent = profile || "—";
   const recallBadge = document.querySelector("#kbRecallProfile");
-  if (recallBadge) recallBadge.textContent = profile ? `向量检索 · ${profile}` : "向量检索";
+  if (recallBadge) recallBadge.textContent = "自动选择向量模型";
   const chatBadge = document.querySelector("#kbChatProfile");
-  if (chatBadge) chatBadge.textContent = profile ? `向量检索 · ${profile}` : "向量检索";
+  if (chatBadge) chatBadge.textContent = "自动选择向量模型";
   const stats = document.querySelector("#kbSideStats");
   if (stats) stats.textContent = `${kbDocuments.length} 文档`;
+  updateKbHeadNote();
 }
 
 function showKbView(name) {
@@ -1120,7 +1161,6 @@ function showKbView(name) {
     const on = tab.dataset.kbView === (name === "doc" || name === "wizard" ? "docs" : name);
     tab.classList.toggle("active", on);
   });
-  if (name === "recall") renderRecallHistory();
   if (name === "chat") {
     renderKbChatThread();
     syncChatButton();
@@ -1882,14 +1922,35 @@ function syncRecallButton() {
   const count = document.querySelector("#kbRecallCount");
   if (count) count.textContent = `${query.length}/200`;
   const button = document.querySelector("#kbRecallBtn");
-  if (button) button.disabled = !query || !currentKbProfile();
+  if (button) button.disabled = !query;
+}
+
+function applyKbSearchProfile(payload) {
+  const profile = String(payload?.embedding_profile_id || "").trim();
+  const select = document.querySelector("#kbEmbedding");
+  if (!profile) {
+    syncKbChrome();
+    return;
+  }
+  kbApplyingProfile = true;
+  try {
+    if (select && select.value !== profile) select.value = profile;
+    persistKbProfile(profile);
+  } finally {
+    kbApplyingProfile = false;
+  }
+  syncKbChrome();
+}
+
+function kbAutoProfileNote(payload) {
+  if (!payload?.auto_selected || !payload.embedding_profile_id) return "";
+  return ` · 已自动选择 ${payload.embedding_profile_id}`;
 }
 
 async function runKbRecall() {
   const query = document.querySelector("#kbRecallQuery")?.value.trim() || "";
-  const profile = currentKbProfile();
-  if (!query || !profile) {
-    setNamedStatus("#kbRecallStatus", "检索必须填写文本并选择当前模型。", "error");
+  if (!query) {
+    setNamedStatus("#kbRecallStatus", "检索必须填写文本。", "error");
     return;
   }
   const button = document.querySelector("#kbRecallBtn");
@@ -1898,10 +1959,10 @@ async function runKbRecall() {
   try {
     const payload = await kbRequest("/api/kb/search", {
       method: "POST",
-      body: JSON.stringify({ query, embedding_profile_id: profile })
+      body: JSON.stringify({ query })
     });
+    applyKbSearchProfile(payload);
     renderKbRecall(payload);
-    pushRecallHistory(query);
   } catch (error) {
     setNamedStatus("#kbRecallStatus", error.message, "error");
   } finally {
@@ -1909,51 +1970,14 @@ async function runKbRecall() {
   }
 }
 
-function recallHistory() {
-  const raw = kbStorageGet(RECALL_HISTORY_KEY);
-  try {
-    const parsed = JSON.parse(raw || "[]");
-    return Array.isArray(parsed) ? parsed.filter(item => typeof item === "string") : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function pushRecallHistory(query) {
-  const next = [query, ...recallHistory().filter(item => item !== query)].slice(0, 8);
-  kbStorageSet(RECALL_HISTORY_KEY, JSON.stringify(next));
-  renderRecallHistory();
-}
-
-function renderRecallHistory() {
-  const list = document.querySelector("#kbRecallHistory");
-  const empty = document.querySelector("#kbRecallHistoryEmpty");
-  if (!list) return;
-  const items = recallHistory();
-  list.replaceChildren(
-    ...items.map(query => {
-      const row = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = query;
-      button.addEventListener("click", () => {
-        const box = document.querySelector("#kbRecallQuery");
-        if (box) box.value = query.slice(0, 200);
-        syncRecallButton();
-        runKbRecall().catch(error => {
-          setNamedStatus("#kbRecallStatus", error.message, "error");
-        });
-      });
-      row.append(button);
-      return row;
-    })
-  );
-  if (empty) empty.hidden = items.length > 0;
-}
-
-function kbRecallEmpty(text) {
+function kbRecallEmpty(text, title) {
   const wrap = document.createElement("div");
-  wrap.className = "kb-empty-hero";
+  wrap.className = `kb-empty-hero${title ? " kb-switch-model" : ""}`;
+  if (title) {
+    const heading = document.createElement("strong");
+    heading.textContent = title;
+    wrap.append(heading);
+  }
   const p = document.createElement("p");
   p.className = "kb-empty";
   p.textContent = text;
@@ -1961,12 +1985,21 @@ function kbRecallEmpty(text) {
   return wrap;
 }
 
+function kbSwitchModelHero(other) {
+  return kbRecallEmpty(
+    other
+      ? `另有 ${other} 篇文档用了其他模型。请在右上角「当前模型」中切换后再测，不会把不同模型的文档混在一起检索。`
+      : "当前模型下没有可检索文档。",
+    "需要切换模型"
+  );
+}
+
 function renderKbRecall(payload) {
   const host = document.querySelector("#kbRecallHits");
   if (!host) return;
   const hits = payload.hits || [];
   if (hits.length) {
-    setNamedStatus("#kbRecallStatus", `命中 ${hits.length} 块。`);
+    setNamedStatus("#kbRecallStatus", `命中 ${hits.length} 块${kbAutoProfileNote(payload)}。`);
     host.replaceChildren(
       ...hits.map((hit, index) => {
         const card = document.createElement("article");
@@ -1998,9 +2031,12 @@ function renderKbRecall(payload) {
   if (payload.empty_reason === "library_empty") {
     message = "知识库还是空的，先导入文档。";
   } else if (payload.empty_reason === "no_docs_for_profile") {
-    message = other
-      ? `当前模型下没有可检索文档，另有 ${other} 篇用了其他模型。可在顶栏切换模型，而不是融合检索。`
-      : "当前模型下没有可检索文档。";
+    message = kbNoDocsForProfileMessage(other);
+    if (other) {
+      host.replaceChildren(kbSwitchModelHero(other));
+      setNamedStatus("#kbRecallStatus", message, "warn");
+      return;
+    }
   } else if (payload.profile_doc_count) {
     message = `没有命中。当前模型下有 ${payload.profile_doc_count} 篇文档。`;
   }
@@ -2013,7 +2049,7 @@ function syncChatButton() {
   const count = document.querySelector("#kbChatCount");
   if (count) count.textContent = `${query.length}/2000`;
   const button = document.querySelector("#kbChatSend");
-  if (button) button.disabled = kbChatBusy || !query || !currentKbProfile();
+  if (button) button.disabled = kbChatBusy || !query;
 }
 
 function kbChatHistory() {
@@ -2139,9 +2175,9 @@ function renderKbChatHits(payload) {
     if (payload?.empty_reason === "library_empty") {
       message = "知识库还是空的，先导入文档。";
     } else if (payload?.empty_reason === "no_docs_for_profile") {
-      message = other
-        ? `当前模型下没有可检索文档，另有 ${other} 篇用了其他模型。可在顶栏切换模型，而不是融合检索。`
-        : "当前模型下没有可检索文档。";
+      message = kbNoDocsForProfileMessage(other);
+      host.replaceChildren(other ? kbSwitchModelHero(other) : kbRecallEmpty(message));
+      return;
     } else if (payload?.profile_doc_count) {
       message = `没有命中。当前模型下有 ${payload.profile_doc_count} 篇文档。`;
     }
@@ -2194,9 +2230,8 @@ function clearKbChat() {
 async function runKbChat() {
   const box = document.querySelector("#kbChatInput");
   const query = box?.value.trim() || "";
-  const profile = currentKbProfile();
-  if (!query || !profile || kbChatBusy) {
-    setNamedStatus("#kbChatStatus", "提问必须填写文本并选择当前模型。", "error");
+  if (!query || kbChatBusy) {
+    setNamedStatus("#kbChatStatus", "提问必须填写文本。", "error");
     return;
   }
   kbChatBusy = true;
@@ -2211,10 +2246,10 @@ async function runKbChat() {
       method: "POST",
       body: JSON.stringify({
         query,
-        embedding_profile_id: profile,
         history
       })
     });
+    applyKbSearchProfile(payload);
     kbChatTurns.push({ role: "assistant", text: payload.answer || "" });
     renderKbChatThread();
     renderKbChatHits(payload);
@@ -2234,7 +2269,7 @@ async function runKbChat() {
       const points = (payload.analysis_points || []).length;
       setNamedStatus(
         "#kbChatStatus",
-        `拆成 ${n} 个检索问题，命中 ${payload.hits.length} 块，分析 ${points} 条要点。`
+        `拆成 ${n} 个检索问题，命中 ${payload.hits.length} 块，分析 ${points} 条要点${kbAutoProfileNote(payload)}。`
       );
     }
   } catch (error) {
@@ -2247,6 +2282,28 @@ async function runKbChat() {
   }
 }
 
+function resetRecallPaneForProfile() {
+  const host = document.querySelector("#kbRecallHits");
+  if (!kbDocuments.length) {
+    if (host) host.replaceChildren(kbRecallEmpty("知识库还是空的，先导入文档。"));
+    setNamedStatus("#kbRecallStatus", "知识库还是空的，先导入文档。", "warn");
+    return;
+  }
+  if (host) host.replaceChildren(kbRecallEmpty("召回测试结果将展示在这里"));
+  setNamedStatus("#kbRecallStatus", "");
+}
+
+function refreshKbRetrievalForProfile() {
+  syncKbChrome();
+  syncRecallButton();
+  syncChatButton();
+  if (kbView === "recall") resetRecallPaneForProfile();
+  if (kbView === "chat" && !kbChatTurns.length) {
+    renderKbChatHits(null);
+    setNamedStatus("#kbChatStatus", "");
+  }
+}
+
 function onWorkspaceProfileChange() {
   persistKbProfile(currentKbProfile());
   kbLastPreview = null;
@@ -2254,15 +2311,9 @@ function onWorkspaceProfileChange() {
   kbDraftDoc = null;
   const list = document.querySelector("#kbChunks");
   if (list) list.replaceChildren(emptyKbChunks("当前模型已改，请重新点「预览块」。"));
-  fillKbProfiles({
-    default: currentKbProfile(),
-    profiles: [...document.querySelectorAll("#kbEmbedding option")].map(item => item.value)
-  });
   renderKbDocuments();
   renderDocMismatch();
-  syncRecallButton();
-  syncChatButton();
-  syncKbChrome();
+  refreshKbRetrievalForProfile();
 }
 
 function bindDropzone() {
@@ -2317,6 +2368,7 @@ function bindKbWorkspace() {
     setKbStatus("");
   });
   document.querySelector("#kbEmbedding")?.addEventListener("change", () => {
+    if (kbApplyingProfile) return;
     onWorkspaceProfileChange();
     window.refreshKbDraftHint?.();
   });
@@ -2437,7 +2489,6 @@ function bindKbWorkspace() {
   document.querySelector("#kbChatClear")?.addEventListener("click", clearKbChat);
   bindDropzone();
   fillKbStrategies({ default: "sentence", strategies: FALLBACK_STRATEGIES });
-  renderRecallHistory();
 }
 
 bindKbWorkspace();

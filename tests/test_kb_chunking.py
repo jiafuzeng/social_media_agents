@@ -488,6 +488,19 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         js = (PROJECT_ROOT / "static" / "matrix-kb.js").read_text(encoding="utf-8")
         assert "resetKbWorkspaceState" in js
         assert "kbStorageKey" in js
+        assert "applyKbSearchProfile" in js
+        assert "JSON.stringify({ query })" in js
+        assert "kbProfileNeeded" in js
+        assert 'kbView === "wizard" && kbUiStep >= 2' in js
+        assert 'kbView === "recall" || kbView === "chat"' not in js.split("function kbProfileNeeded", 1)[1].split("function updateKbHeadNote", 1)[0]
+        recall_fn = js.split("async function runKbRecall", 1)[1].split("function kbRecallEmpty", 1)[0]
+        assert "embedding_profile_id" not in recall_fn
+        chat_fn = js.split("async function runKbChat", 1)[1].split("function resetRecallPaneForProfile", 1)[0]
+        assert "embedding_profile_id" not in chat_fn
+        change_fn = js.split("function onWorkspaceProfileChange", 1)[1].split("function bindDropzone", 1)[0]
+        assert "runKbRecall" not in change_fn
+        refresh_fn = js.split("function refreshKbRetrievalForProfile", 1)[1].split("function onWorkspaceProfileChange", 1)[0]
+        assert "runKbRecall" not in refresh_fn
         assert ">知识库<" in page or "aria-label=\"知识库\"" in page
         assert 'id="kbStepSource"' in page
         assert 'id="kbDrop"' in page
@@ -495,6 +508,9 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert "尚未写入知识库" in page
         assert "将按以下配置入库" in page
         assert "召回测试" in page
+        assert "请求必须带顶栏当前模型" not in page
+        assert "按问题自动选" in js
+        assert 'id="kbRecallHint"' in page
         assert "召回聊天" in page
         assert 'id="kbViewDocs"' in page
         assert 'id="kbViewChat"' in page

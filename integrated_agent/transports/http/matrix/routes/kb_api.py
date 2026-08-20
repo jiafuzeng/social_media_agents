@@ -162,7 +162,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> SearchKbOut:
-        """按 query 检索当前用户知识库切片。"""
+        """按 query 检索当前用户知识库切片；省略 profile 则自动选一个。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.search(user.user_id, command)

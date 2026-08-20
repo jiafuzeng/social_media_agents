@@ -229,4 +229,7 @@ def test_matrix_page_includes_catalog_editor(tmp_path: Path, monkeypatch) -> Non
         assert 'id="scenePrev"' in page
         assert 'id="sceneNext"' in page
         assert 'class="catalog-grid"' in page
-        assert "/static/matrix-catalog.js" in page
+        assert "/static/matrix-catalog.js?v=kb-ui-44" in page
+        js = (PROJECT_ROOT / "static" / "matrix-catalog.js").read_text(encoding="utf-8")
+        kind_fn = js.split("function setCatalogKind", 1)[1].split("async function loadCatalog", 1)[0]
+        assert "renderCatalogList();" in kind_fn

@@ -13,8 +13,8 @@
     } catch (_) {}
   </script>
   <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/matrix.css?v=kb-ui-38">
-  <link rel="stylesheet" href="/static/matrix-kb.css?v=kb-ui-38">
+  <link rel="stylesheet" href="/static/matrix.css?v=kb-ui-44">
+  <link rel="stylesheet" href="/static/matrix-kb.css?v=kb-ui-44">
 </head>
 <body class="matrix-app auth-locked" data-workspace="task" data-board="home">
   <button type="button" class="dock-show" id="dockShowBtn" aria-label="显示导航" title="显示导航" hidden>
@@ -231,7 +231,7 @@
               <button type="button" class="ghost" id="catalogInsert">插入</button>
             </div>
           </div>
-          <p id="catalogKindHint" class="catalog-kind-hint">人设决定写帖的身份、目标和声量。</p>
+          <p id="catalogKindHint" class="catalog-kind-hint">人设决定写帖的身份、获客目标和声量。</p>
           <div id="catalogList" class="catalog-grid"></div>
           <p id="catalogStatus" class="hint"></p>
         </div>
@@ -272,7 +272,7 @@
 
       <div class="kb-main">
       <header class="kb-head">
-        <p class="kb-head-note" id="kbHeadNote">先导入或打开文档。向量模型在分段入库和召回测试时再选。</p>
+        <p class="kb-head-note" id="kbHeadNote">先导入或打开文档。向量模型在分段入库时再选；召回会按问题自动选择。</p>
         <label class="foot-select kb-profile" id="kbProfileWrap" hidden>
           <span>当前模型</span>
           <span id="kbEmbedMountHead" class="kb-embed-mount-head"></span>
@@ -558,7 +558,7 @@
         <div class="kb-recall">
           <section class="kb-recall-form">
             <h2 class="kb-section-title">召回测试</h2>
-            <p class="kb-hint">根据给定的查询文本测试知识的召回效果。请求必须带顶栏当前模型。</p>
+            <p class="kb-hint" id="kbRecallHint">根据查询文本测试召回效果。系统会按问题自动选择向量模型。</p>
             <div class="kb-recall-box">
               <header>
                 <span>源文本</span>
@@ -571,11 +571,6 @@
               </button>
             </div>
             <p class="kb-status" id="kbRecallStatus" hidden></p>
-            <div class="kb-recall-records">
-              <h3>记录</h3>
-              <ol class="kb-history" id="kbRecallHistory"></ol>
-              <p class="kb-empty" id="kbRecallHistoryEmpty">最近无查询结果</p>
-            </div>
           </section>
           <section class="kb-recall-hits" id="kbRecallHits">
             <div class="kb-empty-hero">
@@ -727,9 +722,9 @@
       </div>
     </div>
   </div>
-  <script src="/static/matrix-auth.js?v=kb-ui-38"></script>
-  <script src="/static/matrix.js?v=kb-ui-38"></script>
-  <script src="/static/matrix-catalog.js?v=kb-preview-8"></script>
-  <script src="/static/matrix-kb.js?v=kb-ui-38"></script>
+  <script src="/static/matrix-auth.js?v=kb-ui-44"></script>
+  <script src="/static/matrix.js?v=kb-ui-44"></script>
+  <script src="/static/matrix-catalog.js?v=kb-ui-44"></script>
+  <script src="/static/matrix-kb.js?v=kb-ui-44"></script>
 </body>
 </html>

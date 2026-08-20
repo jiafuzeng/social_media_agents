@@ -58,6 +58,26 @@ _LIVE_DOC_STATUSES = ("ingesting", "ready", "failed")  # 列表可见；archived
 _UNSAFE_NAME = re.compile(r"[^\w.\u4e00-\u9fff-]+", re.UNICODE)  # 冷文件名非法字符
 
 
+def _is_auto_profile(profile_id: str | None) -> bool:
+    """空串 / auto：工作区召回按 query 选定一个 profile，而不是 yaml default。"""
+    raw = (profile_id or "").strip()
+    return raw == "" or raw.lower() == "auto"
+
+
+def _query_overlap(query: str, texts: list[str]) -> int:
+    """用字面重合给各 profile 的命中打分。不拿跨空间 cosine 比大小。"""
+    blob = "\n".join(text for text in texts if text)
+    compact = "".join(query.split())
+    if not compact or not blob:
+        return 0
+    if compact in blob:
+        return 1000 + len(compact)
+    if len(compact) == 1:
+        return 1 if compact in blob else 0
+    grams = {compact[i : i + 2] for i in range(len(compact) - 1)}
+    return sum(1 for gram in grams if gram in blob)
+
+
 class KnowledgeStore:
     """用户私有知识库门面：文档/切片 CRUD、切分入库、按 embedding profile 检索。
 
@@ -346,52 +366,19 @@ class KnowledgeStore:
                 refs.append(ref)
         return refs
 
-    async def retrieve_draft_cards(
-        self,
-        user_id: str,
-        query: str,
-        embedding_profile_id: str | None = None,
-        *,
-        top_n: int = 4,
-    ) -> list[dict[str, Any]]:
-        """写稿投影：签发 k1…kN。RecordStore id 不出卡片。"""
-        refs = await self.retrieve(
-            user_id, query, embedding_profile_id, top_n=top_n
-        )
-        cards: list[dict[str, Any]] = []
-        for index, ref in enumerate(refs, start=1):
-            chunk = await self._chunk_out(ref)
-            cards.append(
-                {
-                    "kb_id": f"k{index}",
-                    "chunk_id": chunk.chunk_id,
-                    "doc_id": chunk.doc_id,
-                    "text": chunk.text,
-                    "window": chunk.window,
-                    "header_path": chunk.header_path,
-                    "embedding_profile_id": chunk.embedding_profile_id,
-                }
-            )
-        return cards
-
-    async def search(
-        self, user_id: str, command: SearchKbIn
-    ) -> SearchKbOut:
-        """工作区召回。query 与 embedding_profile_id 必填；空库语义写入 empty_reason。"""
-        query = command.query.strip()
-        profile_id = self._require_profile(command.embedding_profile_id.strip())
+    async def _live_docs(self, user_id: str) -> list[KbDocumentOut]:
+        """可检索文档：ready 且启用。"""
         listed = await self.list_documents(user_id)
-        live = [
+        return [
             item
             for item in listed.documents
             if item.status == "ready" and item.enabled
         ]
-        profile_docs = [
-            item for item in live if item.embedding_profile_id == profile_id
-        ]
-        other_docs = [
-            item for item in live if item.embedding_profile_id != profile_id
-        ]
+
+    async def _search_hits(
+        self, user_id: str, query: str, profile_id: str
+    ) -> list[SearchKbHit]:
+        """只在一个 profile 的 store 里 hybrid 召回。"""
         package = await self._store(profile_id).retrieve(
             query,
             method="hybrid",
@@ -429,6 +416,130 @@ class KnowledgeStore:
                     embedding_profile_id=chunk.embedding_profile_id,
                 )
             )
+        return hits
+
+    async def _pick_profile_hits(
+        self,
+        user_id: str,
+        query: str,
+        live: list[KbDocumentOut],
+    ) -> tuple[str, list[SearchKbHit]]:
+        """多 profile 时各搜一遍，按字面重合选一个；禁止把命中混进同一排名。"""
+        counts: dict[str, int] = {}
+        for item in live:
+            pid = item.embedding_profile_id
+            counts[pid] = counts.get(pid, 0) + 1
+        ordered = sorted(counts, key=lambda pid: (-counts[pid], pid))
+        if len(ordered) == 1:
+            profile_id = ordered[0]
+            return profile_id, await self._search_hits(user_id, query, profile_id)
+        ranked: list[tuple[int, int, int, int, str, list[SearchKbHit]]] = []
+        for index, profile_id in enumerate(ordered):
+            hits = await self._search_hits(user_id, query, profile_id)
+            overlap = _query_overlap(
+                query,
+                [
+                    piece
+                    for hit in hits
+                    for piece in (hit.text, hit.window or "", hit.header_path or "")
+                ],
+            )
+            if overlap > 0:
+                ranked.append((1, overlap, len(hits), -index, profile_id, hits))
+            elif hits:
+                ranked.append((0, 1, -index, 0, profile_id, hits))
+            else:
+                ranked.append((0, 0, -index, 0, profile_id, hits))
+        ranked.sort(reverse=True)
+        _flag, _overlap, _count, _tie, profile_id, hits = ranked[0]
+        return profile_id, hits
+
+    async def retrieve_draft_cards(
+        self,
+        user_id: str,
+        query: str,
+        embedding_profile_id: str | None = None,
+        *,
+        top_n: int = 4,
+    ) -> list[dict[str, Any]]:
+        """写稿投影：签发 k1…kN。RecordStore id 不出卡片。"""
+        refs = await self.retrieve(
+            user_id, query, embedding_profile_id, top_n=top_n
+        )
+        cards: list[dict[str, Any]] = []
+        for index, ref in enumerate(refs, start=1):
+            chunk = await self._chunk_out(ref)
+            cards.append(
+                {
+                    "kb_id": f"k{index}",
+                    "chunk_id": chunk.chunk_id,
+                    "doc_id": chunk.doc_id,
+                    "text": chunk.text,
+                    "window": chunk.window,
+                    "header_path": chunk.header_path,
+                    "embedding_profile_id": chunk.embedding_profile_id,
+                }
+            )
+        return cards
+
+    async def bind_workspace_profile(
+        self,
+        user_id: str,
+        query: str,
+        embedding_profile_id: str | None,
+    ) -> tuple[str, bool, str, int, int]:
+        """选定本次工作区检索的唯一 profile。auto 时可能先对各空间各搜一遍。"""
+        live = await self._live_docs(user_id)
+        auto_selected = _is_auto_profile(embedding_profile_id)
+        if auto_selected:
+            if not live:
+                return self.default_profile, True, "library_empty", 0, 0
+            profile_id, _hits = await self._pick_profile_hits(
+                user_id, query.strip(), live
+            )
+            profile_docs = [
+                item for item in live if item.embedding_profile_id == profile_id
+            ]
+            other_docs = [
+                item for item in live if item.embedding_profile_id != profile_id
+            ]
+            return profile_id, True, "", len(profile_docs), len(other_docs)
+        profile_id = self._require_profile((embedding_profile_id or "").strip())
+        profile_docs = [
+            item for item in live if item.embedding_profile_id == profile_id
+        ]
+        other_docs = [
+            item for item in live if item.embedding_profile_id != profile_id
+        ]
+        empty = ""
+        if not live:
+            empty = "library_empty"
+        elif not profile_docs:
+            empty = "no_docs_for_profile"
+        return profile_id, False, empty, len(profile_docs), len(other_docs)
+
+    async def search(
+        self, user_id: str, command: SearchKbIn
+    ) -> SearchKbOut:
+        """工作区召回。可钉死 profile，或按 query 自动选一个；空库语义写入 empty_reason。"""
+        query = command.query.strip()
+        live = await self._live_docs(user_id)
+        auto_selected = _is_auto_profile(command.embedding_profile_id)
+        hits: list[SearchKbHit] = []
+        if auto_selected:
+            if live:
+                profile_id, hits = await self._pick_profile_hits(user_id, query, live)
+            else:
+                profile_id = self.default_profile
+        else:
+            profile_id = self._require_profile(command.embedding_profile_id.strip())
+            hits = await self._search_hits(user_id, query, profile_id)
+        profile_docs = [
+            item for item in live if item.embedding_profile_id == profile_id
+        ]
+        other_docs = [
+            item for item in live if item.embedding_profile_id != profile_id
+        ]
         empty: str = ""
         if not live:
             empty = "library_empty"
@@ -443,6 +554,7 @@ class KnowledgeStore:
             empty_reason=empty,
             profile_doc_count=len(profile_docs),
             other_profile_doc_count=len(other_docs),
+            auto_selected=auto_selected,
         )
 
     async def _create_document(

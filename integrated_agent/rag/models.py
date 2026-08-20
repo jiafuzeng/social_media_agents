@@ -322,10 +322,10 @@ class KbChunkListOut(RagModel):
 
 
 class SearchKbIn(RagModel):
-    """工作区召回。query 与 embedding_profile_id 都必填，省略 profile 则 422。"""
+    """工作区召回。省略 embedding_profile_id、空串或 auto：按 query 自动选定一个 profile。"""
 
     query: str = Field(min_length=1)
-    embedding_profile_id: str = Field(min_length=1)
+    embedding_profile_id: str = ""
 
 
 # 空串=有命中；其余三种空库语义互斥，前端用来区分「没入库 / 模型不对 / 未命中」
@@ -345,14 +345,15 @@ class SearchKbHit(RagModel):
 
 
 class SearchKbOut(RagModel):
-    """hybrid top_n=4。不跨 profile 融合。"""
+    """hybrid top_n=4。不跨 profile 融合；embedding_profile_id 是本次实际检索的那一个。"""
 
     query: str
     embedding_profile_id: str
     hits: list[SearchKbHit]
     empty_reason: SearchEmptyReason = ""
     profile_doc_count: int = 0  # 当前模型下可检索文档数
-    other_profile_doc_count: int = 0  # 其他模型的文档数，提示去换顶栏而非融合检索
+    other_profile_doc_count: int = 0  # 其他模型的文档数；自动选时表示库里还有别的空间
+    auto_selected: bool = False
 
 
 class ChatKbTurn(RagModel):
@@ -364,7 +365,7 @@ class ChatKbIn(RagModel):
     """工作区召回聊天。检索契约与 search 相同；history 只作指代，证据仍以本次 hits 为准。"""
 
     query: str = Field(min_length=1, max_length=2000)
-    embedding_profile_id: str = Field(min_length=1)
+    embedding_profile_id: str = ""
     history: list[ChatKbTurn] = Field(default_factory=list, max_length=8)
 
 
@@ -396,4 +397,5 @@ class ChatKbOut(RagModel):
     empty_reason: SearchEmptyReason = ""
     profile_doc_count: int = 0
     other_profile_doc_count: int = 0
+    auto_selected: bool = False
     limitations: list[str] = Field(default_factory=list)

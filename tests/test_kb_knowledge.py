@@ -657,27 +657,88 @@ async def test_search_requires_profile_and_respects_lock(
     assert hidden.hits == []
 
 
-def test_http_search_omits_profile_is_422(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.asyncio
+async def test_search_auto_selects_profile_for_matching_corpus(
+    tmp_path: Path, monkeypatch
+) -> None:
+    knowledge, _probes = _knowledge(tmp_path, monkeypatch)
+    from integrated_agent.rag.models import SearchKbIn
+
+    refund = await knowledge.create_document(
+        "user-a",
+        CreateDocumentIn(
+            text="七天无理由退款需提供凭证。",
+            embedding_profile_id="bge-m3",
+        ),
+    )
+    tweet = await knowledge.create_document(
+        "user-a",
+        CreateDocumentIn(
+            text="推文创作指南：先写钩子再写正文。",
+            embedding_profile_id="qwen3",
+        ),
+    )
+    refund_hits = await knowledge.search("user-a", SearchKbIn(query="退款"))
+    assert refund_hits.auto_selected is True
+    assert refund_hits.embedding_profile_id == "bge-m3"
+    assert any(hit.doc_id == refund.doc_id for hit in refund_hits.hits)
+    assert all(hit.doc_id != tweet.doc_id for hit in refund_hits.hits)
+    tweet_hits = await knowledge.search(
+        "user-a", SearchKbIn(query="钩子", embedding_profile_id="auto")
+    )
+    assert tweet_hits.auto_selected is True
+    assert tweet_hits.embedding_profile_id == "qwen3"
+    assert any(hit.doc_id == tweet.doc_id for hit in tweet_hits.hits)
+    pinned = await knowledge.search(
+        "user-a",
+        SearchKbIn(query="退款", embedding_profile_id="openai-small"),
+    )
+    assert pinned.auto_selected is False
+    assert pinned.hits == []
+    assert pinned.empty_reason == "no_docs_for_profile"
+
+
+def test_http_search_omits_profile_auto_selects(tmp_path: Path, monkeypatch) -> None:
     client, _knowledge_store, _probes = _client(tmp_path, monkeypatch)
     with client:
         owner, _uid = _auth_user(client, "owner")
-        created = client.post(
+        refund = client.post(
             "/api/kb/documents",
             headers=owner,
             json={"text": "七天无理由退款。", "embedding_profile_id": "bge-m3"},
         )
-        assert created.status_code == 201, created.text
+        assert refund.status_code == 201, refund.text
+        tweet = client.post(
+            "/api/kb/documents",
+            headers=owner,
+            json={
+                "text": "推文创作指南：先写钩子再写正文。",
+                "embedding_profile_id": "qwen3",
+            },
+        )
+        assert tweet.status_code == 201, tweet.text
         omitted = client.post(
             "/api/kb/search",
             headers=owner,
             json={"query": "退款"},
         )
-        assert omitted.status_code == 422
-        ok = client.post(
+        assert omitted.status_code == 200, omitted.text
+        body = omitted.json()
+        assert body["auto_selected"] is True
+        assert body["embedding_profile_id"] == "bge-m3"
+        assert body["hits"]
+        assert all(hit["doc_id"] == refund.json()["doc_id"] for hit in body["hits"])
+        pinned = client.post(
             "/api/kb/search",
             headers=owner,
             json={"query": "退款", "embedding_profile_id": "bge-m3"},
         )
-        assert ok.status_code == 200, ok.text
-        assert ok.json()["embedding_profile_id"] == "bge-m3"
-        assert ok.json()["hits"]
+        assert pinned.status_code == 200, pinned.text
+        assert pinned.json()["auto_selected"] is False
+        assert pinned.json()["embedding_profile_id"] == "bge-m3"
+        unknown = client.post(
+            "/api/kb/search",
+            headers=owner,
+            json={"query": "退款", "embedding_profile_id": "no-such"},
+        )
+        assert unknown.status_code == 422

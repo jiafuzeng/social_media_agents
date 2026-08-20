@@ -33,6 +33,7 @@ html:has(.matrix-app),
 .workbench {
   display: grid;
   grid-template-columns: var(--rail-col, 76px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
   min-height: 0;
   background: #e8ecf2;
@@ -44,6 +45,8 @@ html:has(.matrix-app),
 .workbench > * { min-height: 0; }
 .icon-rail {
   display: flex;
+  grid-column: 1;
+  grid-row: 1;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -195,6 +198,8 @@ html:has(.matrix-app),
   --session-col: 260px;
   --assist-col: 340px;
   display: grid;
+  grid-column: 2;
+  grid-row: 1;
   grid-template-columns: var(--session-col) 5px minmax(320px, 1fr) 5px var(--assist-col);
   grid-template-rows: minmax(0, 1fr);
   grid-auto-rows: minmax(0, 1fr);
@@ -1070,10 +1075,13 @@ html:has(.matrix-app),
 .catalog-stage {
   display: grid;
   grid-column: 2;
+  grid-row: 1;
+  height: 100%;
   padding: 0;
-  overflow: hidden;
+  overflow: auto;
   background: #f5f6f8;
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   min-height: 0;
 }
 .catalog-stage.drawer-open {
@@ -1595,7 +1603,7 @@ html:has(.matrix-app),
   display: none;
 }
 .matrix-app[data-workspace="catalog"] #catalogEditor {
-  display: block;
+  display: grid;
 }
 .matrix-app[data-workspace="catalog"] .workbench,
 .matrix-app[data-workspace="kb"] .workbench {

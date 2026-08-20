@@ -368,36 +368,31 @@ def _uncovered_list(raw: Any) -> list[str]:
 
 
 async def kb_chat_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """绑定请求、校验 profile，并判断空库是否跳过检索。"""
+    """绑定请求、选定本次唯一 profile，并判断空库是否跳过检索。"""
 
     payload = cast(dict[str, Any], data.input)
     command = ChatKbIn.model_validate(payload["command"])
     knowledge = cast(KnowledgeStore, data.require_resource("knowledge"))
     user_id = str(data.require_resource("kb_user_id"))
-    profile_id = knowledge._require_profile(command.embedding_profile_id)
-    listed = await knowledge.list_documents(user_id)
-    live = [
-        item
-        for item in listed.documents
-        if item.status == "ready" and item.enabled
-    ]
-    profile_docs = [
-        item for item in live if item.embedding_profile_id == profile_id
-    ]
-    other_docs = [
-        item for item in live if item.embedding_profile_id != profile_id
-    ]
-    empty_reason = ""
-    if not live:
-        empty_reason = "library_empty"
-    elif not profile_docs:
-        empty_reason = "no_docs_for_profile"
-    await data.async_set_state("query", command.query.strip(), emit=False)
+    query = command.query.strip()
+    (
+        profile_id,
+        auto_selected,
+        empty_reason,
+        profile_doc_count,
+        other_profile_doc_count,
+    ) = await knowledge.bind_workspace_profile(
+        user_id, query, command.embedding_profile_id
+    )
+    await data.async_set_state("query", query, emit=False)
     await data.async_set_state("history", _clip_history(command.history), emit=False)
     await data.async_set_state("embedding_profile_id", profile_id, emit=False)
+    await data.async_set_state("auto_selected", auto_selected, emit=False)
     await data.async_set_state("empty_reason", empty_reason, emit=False)
-    await data.async_set_state("profile_doc_count", len(profile_docs), emit=False)
-    await data.async_set_state("other_profile_doc_count", len(other_docs), emit=False)
+    await data.async_set_state("profile_doc_count", profile_doc_count, emit=False)
+    await data.async_set_state(
+        "other_profile_doc_count", other_profile_doc_count, emit=False
+    )
     await data.async_set_state("skip_retrieve", bool(empty_reason), emit=False)
     await data.async_set_state("limitations", [], emit=False)
     await data.async_set_state("raw_hits", [], emit=False)
@@ -702,6 +697,7 @@ async def kb_chat_summarize(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         empty_reason=reason,
         profile_doc_count=int(data.get_state("profile_doc_count") or 0),
         other_profile_doc_count=int(data.get_state("other_profile_doc_count") or 0),
+        auto_selected=bool(data.get_state("auto_selected")),
         limitations=limitations,
     )
     dumped = package.model_dump(mode="json")

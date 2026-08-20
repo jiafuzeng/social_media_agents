@@ -334,7 +334,14 @@ function setWorkspace(name) {
   if (catalog) catalog.hidden = name !== "catalog";
   if (kb) kb.hidden = name !== "kb";
   syncNav();
-  if (name === "catalog") return;
+  if (name === "catalog") {
+    window.matrixCatalog?.loadCatalog?.().catch(error => {
+      window.matrixCatalog?.renderCatalogList?.();
+      const status = document.querySelector("#catalogStatus");
+      if (status) status.textContent = error.message;
+    });
+    return;
+  }
   const drawer = document.querySelector("#catalogDrawer");
   if (drawer) drawer.hidden = true;
   if (name === "kb") {

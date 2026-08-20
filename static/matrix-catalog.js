@@ -449,6 +449,7 @@ function renderAddTile() {
 }
 
 function renderCatalogList() {
+  if (!catalogList) return;
   const items = catalogItems();
   if (!catalogCreating && items.length && catalogSelected && !items.some(item => item.key === catalogSelected)) {
     catalogSelected = "";
@@ -465,10 +466,13 @@ function setCatalogKind(kind) {
   catalogKind = kind;
   catalogCreating = false;
   catalogSelected = "";
-  catalogTabs.querySelectorAll(".tab").forEach(item => {
+  catalogTabs?.querySelectorAll(".tab").forEach(item => {
     item.classList.toggle("active", item.dataset.kind === kind);
   });
-  closeDrawer();
+  const drawer = document.querySelector("#catalogDrawer");
+  if (drawer) drawer.hidden = true;
+  catalogCreating = false;
+  renderCatalogList();
 }
 
 async function loadCatalog() {
@@ -480,7 +484,7 @@ async function loadCatalog() {
 }
 
 function catalogStatusMessage(text) {
-  catalogStatus.textContent = text;
+  if (catalogStatus) catalogStatus.textContent = text;
 }
 
 async function catalogRequest(url, options) {
@@ -523,24 +527,24 @@ function parseAttachPrompt(text) {
   return key ? { kind, key } : null;
 }
 
-catalogTabs.querySelectorAll(".tab").forEach(tab => {
+catalogTabs?.querySelectorAll(".tab").forEach(tab => {
   tab.addEventListener("click", () => setCatalogKind(tab.dataset.kind));
 });
 
-document.querySelector("#catalogDrawerClose").addEventListener("click", () => closeDrawer());
-document.querySelector("#catalogBackdrop").addEventListener("click", () => closeDrawer());
+document.querySelector("#catalogDrawerClose")?.addEventListener("click", () => closeDrawer());
+document.querySelector("#catalogBackdrop")?.addEventListener("click", () => closeDrawer());
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !document.querySelector("#catalogDrawer").hidden) closeDrawer();
 });
 
-document.querySelector("#catalogNew").addEventListener("click", () => {
+document.querySelector("#catalogNew")?.addEventListener("click", () => {
   catalogCreating = true;
   catalogSelected = "";
   renderCatalogList();
   openDrawer();
 });
 
-document.querySelector("#catalogSave").addEventListener("click", async () => {
+document.querySelector("#catalogSave")?.addEventListener("click", async () => {
   try {
     const record = readForm();
     if (catalogCreating) {
@@ -560,7 +564,7 @@ document.querySelector("#catalogSave").addEventListener("click", async () => {
   }
 });
 
-document.querySelector("#catalogDelete").addEventListener("click", async () => {
+document.querySelector("#catalogDelete")?.addEventListener("click", async () => {
   try {
     const record = readForm();
     await catalogRequest(resourceUrl(record), { method: "DELETE" });
@@ -576,7 +580,7 @@ document.querySelector("#catalogDelete").addEventListener("click", async () => {
   }
 });
 
-document.querySelector("#catalogInsert").addEventListener("click", async () => {
+document.querySelector("#catalogInsert")?.addEventListener("click", async () => {
   try {
     if (catalogKind === "policy") {
       if (!catalogSelected) {
@@ -632,3 +636,7 @@ document.querySelector("#catalogInsert").addEventListener("click", async () => {
 
 loadCatalog().catch(error => catalogStatusMessage(error.message));
 bindSceneCarousel();
+window.addEventListener("matrix-auth-changed", () => {
+  loadCatalog().catch(error => catalogStatusMessage(error.message));
+});
+window.matrixCatalog = { loadCatalog, renderCatalogList, setCatalogKind };

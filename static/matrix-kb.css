@@ -50,6 +50,8 @@
   background: var(--kb-bg);
   display: grid;
   grid-column: 2;
+  grid-row: 1;
+  height: 100%;
   grid-template-columns: 228px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
@@ -1675,35 +1677,6 @@
   padding: 0 !important;
   border-radius: 50% !important;
 }
-.kb-recall-records {
-  margin-top: 28px;
-}
-.kb-recall-records h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: #d7dce8;
-}
-.kb-history {
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  list-style: none;
-}
-.kb-history button {
-  width: 100%;
-  margin: 0;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--kb-surface);
-  color: #d7dce8;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-.kb-history button:hover { background: var(--kb-surface-2); }
 .kb-recall-hits {
   border: 1px solid var(--kb-line);
   border-radius: 18px;
@@ -1718,6 +1691,18 @@
 .kb-recall-hits > .kb-empty-hero {
   min-height: 280px;
   height: 100%;
+}
+.kb-empty-hero.kb-switch-model {
+  gap: 10px;
+}
+.kb-empty-hero.kb-switch-model strong {
+  color: var(--kb-orange);
+  font-size: 18px;
+  font-weight: 700;
+}
+.kb-empty-hero.kb-switch-model .kb-empty {
+  max-width: 28em;
+  line-height: 1.7;
 }
 
 #kbViewChat {

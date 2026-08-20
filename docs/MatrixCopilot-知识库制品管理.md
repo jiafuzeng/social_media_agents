@@ -32,8 +32,8 @@
 | A5 | 与案例 RAG | 分库、分 `collection`、分引用 token。功效门仍只认 `[[ref:]]`。 |
 | A6 | RecordStore 落盘 | 目录固定 `workspace/kb/records/`（可用 env `MATRIX_KB_RECORD_ROOT` 覆盖）。库文件就是该目录下的 `records.db`。禁止框架默认的 `…/.agently/records/records.db`。 |
 | A7 | 向量检索 | **必开**。chunk `put(..., indexed=True, vector=True)`；RetrieveKb `method="hybrid"`（向量 + 关键词）。embedding 未配置或调用失败 → 进程/入库 fail-closed，禁止 silently 变纯关键词。 |
-| A8 | 多 embeddings Agent | 可配置多套、入库与检索都要**显式选一个** `embedding_profile_id`。查询向量只用该 Agent；召回只命中 `meta.embedding_profile_id` 相同的 chunk。禁止跨 profile 混 cosine / 融合。 |
-| A9 | 前端防混用 | 工作区「当前模型」只约束**新建与检索**。已入库文档的改/删/分段/换文件锁定该文档的 profile。换模型必须走「重新索引」确认，禁止下拉框直接 PATCH。 |
+| A8 | 多 embeddings Agent | 可配置多套。入库必须显式选一个 `embedding_profile_id`。一次 retrieve 只打这一个：查询向量只用该 Agent，命中只来自相同 meta。禁止跨 profile 混 cosine / 融合。工作区 search/chat **可以省略** profile（或传 `auto`），由门面按 query **自动选定一个** 再 retrieve；写稿 RetrieveKb 仍用请求绑定。 |
+| A9 | 前端防混用 | 工作区「当前模型」约束**新建**、**semantic 预览**和写稿 RetrieveKb。工作区召回/聊天按问题自动选模型，并把顶栏同步成返回的 id。已入库文档的改/删/分段/换文件锁定该文档的 profile。换模型必须走「重新索引」确认，禁止下拉框直接 PATCH。 |
 
 ---
 
@@ -154,13 +154,14 @@ Agently.create_agent("matrix-kb-embed:{profile_id}")
 | 动作 | 选谁 | 写/滤什么 |
 |---|---|---|
 | 入库 / 重切 / 改正文（新 chunk） | 请求里的 id，缺省则 `default` | document 与每条 chunk 的 `meta.embedding_profile_id`；embed 用该 Agent |
-| 工作区 search / RetrieveKb | **必须带同一个 id**（请求或用户当前选择；缺省则 default，但仍要写入本次过滤） | `filters["meta.embedding_profile_id"]=该 id`；query embed 用该 Agent |
+| 工作区 search / chat | 可省略、空串或 `auto`：按 query 自动选**一个**；也可钉死真实 id | 先选定 id，再 `filters["meta.embedding_profile_id"]=该 id`；query embed 用该 Agent。响应带回该 id 与 `auto_selected` |
+| 写稿 RetrieveKb | 请求或用户当前选择；缺省则 default | 同上等式过滤；**不**走工作区自动选 |
 
 不变式：
 
 1. 查询向量只来自所选 Agent。
 2. 向量命中只来自 `meta.embedding_profile_id` 等于所选 id 的 **active** chunk。
-3. 禁止一次 retrieve 打多个 profile 再拼分（空间不同，cosine 无意义）。
+3. 禁止把多个 profile 的命中拼进同一次排名（空间不同，cosine 无意义）。自动选可以**分别** retrieve 各空间，再留下得分最高的那一个 profile。
 4. 文档用 A 入库、检索选 B → 该文档不出现（空命中，不 skip、不报错当成功召回）。
 5. 改一篇文档的 profile = 按新 Agent **重切重入库**（旧 chunk 归档）。PATCH 只改标题/启用不得偷换 profile。
 6. `semantic` 切分与该次入库共用所选 Agent 的 `embed_texts`。
@@ -321,7 +322,7 @@ P0 列表与召回**不**靠 walk link 当权威；权威是 `meta.status` + `me
 | 文档列表 / 详情 | `search`/`get`：`collection=kb`，`kind=document`，`scope.user_id`，排除 `meta.status=archived` |
 | 分段列表 | 同 `doc_id` 的 chunk；默认只展示 `status=active`（可加筛选看停用） |
 | 原件 | 冷文件 |
-| 工作区检索预览 | 绑定所选 `embedding_profile_id` 后 `retrieve`，过滤同 RetrieveKb |
+| 工作区检索预览 | 省略 profile 则按 query 自动选一个后再 `retrieve`；钉死 id 则只搜该空间 |
 | 写稿 RetrieveKb | 只 chunk：active + enabled + doc ready/enabled + **`meta.embedding_profile_id` = 本次绑定** |
 
 空库、零命中：可写稿，不 skip，不放宽禁词。知识库失败记 `kb_retrieve_failed` limitation。
@@ -386,7 +387,7 @@ GET    /api/kb/embedding-profiles      # 可选 Agent 列表 + default
 GET    /api/kb/chunk-strategies
 POST   /api/kb/preview-chunks          # 不入库；semantic 可带 embedding_profile_id
 POST   /api/kb/extract                 # 抽文本，不入库
-POST   /api/kb/search                  # { query, embedding_profile_id } 绑定后 retrieve
+POST   /api/kb/search                  # { query } 自动选一个 profile；也可带 embedding_profile_id 钉死
 POST   /api/kb/documents               # 可带 embedding_profile_id
 GET    /api/kb/documents
 GET    /api/kb/documents/{doc_id}
@@ -409,7 +410,7 @@ DELETE /api/kb/documents/{doc_id}/chunks/{chunk_id}  # 单块归档
 
 | 层 | 控件 | 管什么 | 不管什么 |
 |---|---|---|---|
-| 工作区当前模型 | 知识库顶栏（及写稿同一 session 键） | **新建**文档、**检索预览**、`semantic` 未入库预览、写稿 RetrieveKb | 已打开文档的分段改删 |
+| 工作区当前模型 | 知识库顶栏（及写稿同一 session 键） | **新建**文档、`semantic` 未入库预览、写稿 RetrieveKb；召回成功后同步成自动选中的 id | 已打开文档的分段改删 |
 | 文档锁定模型 | 文档行/详情上的只读徽章 | 该 `doc_id` 的换文件、重切（不换模型）、增/改/停用分段 | 不能当「换模型」开关 |
 
 `sessionStorage` 键建议：`matrix.kb.embedding_profile_id`。进入工作区：`GET /api/kb/embedding-profiles`，当前值 ∉ 列表则回退 `default` 并提示。顶栏切换只改这个键，**不**调文档 PATCH。
@@ -417,9 +418,10 @@ DELETE /api/kb/documents/{doc_id}/chunks/{chunk_id}  # 单块归档
 #### 列表与检索
 
 - 每行展示入库模型（label + id）。无徽章不准上线。
-- 检索请求**必须**带顶栏当前 `embedding_profile_id`，禁止省略靠后端 default（避免和页面显示不一致）。
-- 默认列表可筛「当前模型」；全部文档要一眼能看出哪些检索不到。
-- 零命中文案必须区分：库空 / 当前模型下无文档 / 有文档但 query 未中。若存在其它模型的文档，提示数量，并提供「切换到该模型」而不是「扩大检索融合」。
+- 工作区 search/chat **省略** `embedding_profile_id`（或传 `auto`）：后端按 query 选一个，响应带回该 id 与 `auto_selected`。前端把顶栏同步成该 id，禁止页面显示 yaml default 而命中来自另一个模型。
+- 请求若钉死某个真实 id，行为同旧：该模型无文档 → `no_docs_for_profile`。
+- 默认列表可筛「当前模型」；全部文档要一眼能看出入库模型。
+- 零命中文案必须区分：库空 / 钉死模型下无文档 / 有文档但 query 未中。自动选时只要库里有文档，就不会因为「顶栏模型不对」而空。禁止把不同模型的命中混排。
 
 #### 打开已有文档后的 CRUD
 
@@ -447,10 +449,10 @@ DELETE /api/kb/documents/{doc_id}/chunks/{chunk_id}  # 单块归档
 #### 前端验收反例（必须挡住）
 
 - 顶栏选 B 后给 A 文档改正文，请求里带了 B
-- 检索省略 `embedding_profile_id`
+- 把不同 `embedding_profile_id` 的命中混进同一次排名
+- 自动选后页面显示的模型与返回的 `embedding_profile_id` 不一致
 - 换模型无需确认即 PATCH 成功
-- 检索空结果不说明「模型不一致」
-- 写稿与工作区顶栏模型不同
+- 写稿与工作区顶栏模型不同（写稿仍跟顶栏，不走召回自动选）
 
 后端仍 fail-closed（未知 id 422、retrieve 等式过滤）。前端是防呆，不是第二套权限。
 

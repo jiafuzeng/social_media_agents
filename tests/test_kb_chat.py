@@ -357,7 +357,7 @@ async def test_collapsed_cite_is_rebuilt_from_analysis_points(
     assert set(out.cited_kb_ids) >= {"k1", "k2"}
 
 
-def test_http_chat_requires_auth_and_profile(tmp_path: Path, monkeypatch) -> None:
+def test_http_chat_omits_profile_auto_selects(tmp_path: Path, monkeypatch) -> None:
     client, _knowledge_store, _probes = _client(tmp_path, monkeypatch)
     with client:
         owner, _uid = _auth_user(client, "owner")
@@ -367,6 +367,15 @@ def test_http_chat_requires_auth_and_profile(tmp_path: Path, monkeypatch) -> Non
             json={"text": "七天无理由退款需提供凭证。", "embedding_profile_id": "bge-m3"},
         )
         assert created.status_code == 201, created.text
+        tweet = client.post(
+            "/api/kb/documents",
+            headers=owner,
+            json={
+                "text": "推文创作指南：先写钩子再写正文。",
+                "embedding_profile_id": "qwen3",
+            },
+        )
+        assert tweet.status_code == 201, tweet.text
         missing = client.post(
             "/api/kb/chat",
             json={"query": "退款", "embedding_profile_id": "bge-m3"},
@@ -375,9 +384,14 @@ def test_http_chat_requires_auth_and_profile(tmp_path: Path, monkeypatch) -> Non
         omitted = client.post(
             "/api/kb/chat",
             headers=owner,
-            json={"query": "退款"},
+            json={"query": "退款要凭证吗"},
         )
-        assert omitted.status_code == 422
+        assert omitted.status_code == 200, omitted.text
+        body = omitted.json()
+        assert body["auto_selected"] is True
+        assert body["embedding_profile_id"] == "bge-m3"
+        assert body["hits"]
+        assert all(hit["embedding_profile_id"] == "bge-m3" for hit in body["hits"])
         unknown = client.post(
             "/api/kb/chat",
             headers=owner,
@@ -390,13 +404,14 @@ def test_http_chat_requires_auth_and_profile(tmp_path: Path, monkeypatch) -> Non
             json={"query": "退款要凭证吗", "embedding_profile_id": "bge-m3"},
         )
         assert ok.status_code == 200, ok.text
-        body = ok.json()
-        assert body["hits"][0]["kb_id"] == "k1"
-        assert "[[kb:k1]]" in body["answer"]
-        assert body["cited_kb_ids"] == ["k1"]
-        assert body["analysis_points"]
-        assert body["rewritten_query"]
-        assert body["retrieval_queries"]
+        pinned = ok.json()
+        assert pinned["auto_selected"] is False
+        assert pinned["hits"][0]["kb_id"] == "k1"
+        assert "[[kb:k1]]" in pinned["answer"]
+        assert pinned["cited_kb_ids"] == ["k1"]
+        assert pinned["analysis_points"]
+        assert pinned["rewritten_query"]
+        assert pinned["retrieval_queries"]
 
 
 def _imported_modules(path: Path) -> set[str]:
