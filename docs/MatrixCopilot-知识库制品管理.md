@@ -6,7 +6,7 @@
 |---|---|
 | 产品 | MatrixCopilot 知识库 |
 | 框架 | `agently==4.1.4.4` RecordStore |
-| 代码位置（落地后） | 门面 `runtimes/matrix/knowledge.py`；切分 `integrated_agent/rag/`；冷文件 `workspace/kb/files/`；RecordStore 目录 `workspace/kb/records/`（即 `records.db`，禁止再套 `.agently/records`） |
+| 代码位置（落地后） | 门面 `runtimes/matrix/rag/knowledge.py`；切分 `integrated_agent/rag/`；冷文件 `workspace/kb/files/`；RecordStore 目录 `workspace/kb/records/`（即 `records.db`，禁止再套 `.agently/records`） |
 | 文档日期 | 2026-08-19 |
 | 状态 | **已拍板** |
 

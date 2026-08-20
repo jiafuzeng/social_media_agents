@@ -26,7 +26,7 @@ class MatrixServiceRuntime:
             timeout=self.timeout,
             trust_env=False,
         ) as client:
-            response = await client.post("/v1/matrix/tasks", json=body)
+            response = await client.post("/v1/matrix/compose", json=body)
             response.raise_for_status()
             accepted = cast(dict[str, Any], response.json())
             yield GatewayEvent(
@@ -88,13 +88,13 @@ class MatrixServiceRuntime:
 
 
 def _task_body(request: GatewayRequest) -> dict[str, Any]:
-    """GatewayRequest → MatrixTaskCreate。这里绑定 scenario，禁止把 auto 交给 HTTP。"""
+    """GatewayRequest → 写帖入站。企业微信落到 matrix 只走 compose，不把 auto 交给 HTTP。"""
 
     return {
         "text": request.text,
-        "scenario": "compose",
         "requester": request.session_id,
         "channel": "gateway",
+        "session_id": request.session_id,
     }
 
 

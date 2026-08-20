@@ -1,24 +1,28 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, cast
 
 from agently import TriggerFlow, TriggerFlowRuntimeData
 
-from .capability import MatrixAnalysisCapability
 from .models import (
     EvidenceCard,
     GatedDraft,
     MatrixTaskRequest,
     MatrixTaskResult,
+    Scenario,
 )
 from .service import MatrixTaskFailed
 from .stores import InMemoryEventStore
 
+AnalyzeFn = Callable[[MatrixTaskRequest], Awaitable[dict[str, Any]]]
+
 
 @dataclass
 class WorkerDependencies:
-    matrix_analysis: MatrixAnalysisCapability
+    analyze_compose: AnalyzeFn
+    analyze_reply: AnalyzeFn
     events: InMemoryEventStore
 
 
@@ -47,15 +51,16 @@ async def _stage(
     )
 
 
-matrix_flow = TriggerFlow(name="enterprise-matrix-service")
-
-
-@matrix_flow.chunk
-async def analyze_matrix(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+async def _run_analysis(
+    data: TriggerFlowRuntimeData,
+    *,
+    stage: str,
+    analyze: AnalyzeFn,
+) -> dict[str, Any]:
     request = MatrixTaskRequest.model_validate(data.input)
     await data.async_set_state("request", request.model_dump(mode="json"), emit=False)
-    await _stage(data, "stage.started", "analyze_matrix")
-    run = await _deps(data).matrix_analysis.analyze(request)
+    await _stage(data, "stage.started", stage)
+    run = await analyze(request)
     await data.async_set_state("matrix_analysis_run", run, emit=False)
     for item in cast(list[dict[str, Any]], (run.get("brief") or {}).get("work_items") or []):
         await _deps(data).events.publish(
@@ -79,17 +84,20 @@ async def analyze_matrix(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await _stage(
         data,
         "stage.completed",
-        "analyze_matrix",
+        stage,
         pipeline_status=run.get("status"),
         snapshot_id=run.get("snapshot_id"),
     )
     return request.model_dump(mode="json")
 
 
-@matrix_flow.chunk
-async def publish_package(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+async def _publish_package(
+    data: TriggerFlowRuntimeData,
+    *,
+    stage: str,
+) -> dict[str, Any]:
     request = _request(data)
-    await _stage(data, "stage.started", "publish_package")
+    await _stage(data, "stage.started", stage)
     run = cast(dict[str, Any], data.get_state("matrix_analysis_run"))
     if run.get("status") == "failed":
         raise MatrixTaskFailed(str(run.get("summary") or "matrix task failed"))
@@ -126,11 +134,48 @@ async def publish_package(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             "draft_count": len(result.drafts),
         },
     )
-    await _stage(data, "stage.completed", "publish_package")
+    await _stage(data, "stage.completed", stage)
     return result.model_dump(mode="json")
 
 
-matrix_flow.to(analyze_matrix).to(publish_package)
+compose_service_flow = TriggerFlow(name="matrix-compose-service")
+reply_service_flow = TriggerFlow(name="matrix-reply-service")
+SERVICE_FLOWS: dict[Scenario, TriggerFlow] = {
+    "compose": compose_service_flow,
+    "reply": reply_service_flow,
+}
+
+
+@compose_service_flow.chunk
+async def analyze_compose(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    return await _run_analysis(
+        data,
+        stage="analyze_compose",
+        analyze=_deps(data).analyze_compose,
+    )
+
+
+@compose_service_flow.chunk
+async def publish_compose_package(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    return await _publish_package(data, stage="publish_compose_package")
+
+
+@reply_service_flow.chunk
+async def analyze_reply(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    return await _run_analysis(
+        data,
+        stage="analyze_reply",
+        analyze=_deps(data).analyze_reply,
+    )
+
+
+@reply_service_flow.chunk
+async def publish_reply_package(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    return await _publish_package(data, stage="publish_reply_package")
+
+
+compose_service_flow.to(analyze_compose).to(publish_compose_package)
+reply_service_flow.to(analyze_reply).to(publish_reply_package)
 
 
 class MatrixWorkflowWorker:
@@ -141,7 +186,8 @@ class MatrixWorkflowWorker:
         self,
         request: MatrixTaskRequest,
     ) -> MatrixTaskResult:
-        execution = matrix_flow.create_execution(
+        flow = SERVICE_FLOWS[request.scenario]
+        execution = flow.create_execution(
             auto_close=False,
             runtime_resources={"worker_dependencies": self.dependencies},
         )

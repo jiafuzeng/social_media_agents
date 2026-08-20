@@ -16,7 +16,7 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     TemplateCard,
     TermListCard,
 )
-from integrated_agent.runtimes.matrix.models import DomainModel
+from integrated_agent.runtimes.matrix.host.models import DomainModel
 
 
 class CatalogDumpOut(DomainModel):

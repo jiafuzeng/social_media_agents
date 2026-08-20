@@ -7,7 +7,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.models import (
     MAX_COMPOSE_POSTS,
     MIN_COMPOSE_POSTS,
     CommentIn,

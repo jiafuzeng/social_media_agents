@@ -3,5 +3,11 @@
 from __future__ import annotations
 
 from .flow import COMPOSE_FLOW, PIPELINE_VERSION, run_compose
+from .worker import make_analyze_compose
 
-__all__ = ["COMPOSE_FLOW", "PIPELINE_VERSION", "run_compose"]
+__all__ = [
+    "COMPOSE_FLOW",
+    "PIPELINE_VERSION",
+    "make_analyze_compose",
+    "run_compose",
+]

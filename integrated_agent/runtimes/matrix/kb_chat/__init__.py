@@ -1,9 +1,9 @@
-"""知识库召回聊天。独立 TriggerFlow，不经过写帖 / 回评分析包。"""
+"""知识库召回聊天。独立 TriggerFlow，不经过写帖 / 回评。"""
 
 from __future__ import annotations
 
 from integrated_agent.rag.models import ChatKbIn, ChatKbOut
-from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
 
 from .flow import KB_CHAT_FLOW, PIPELINE_VERSION, run_kb_chat
 

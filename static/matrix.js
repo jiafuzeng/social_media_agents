@@ -23,7 +23,11 @@ const labels = {
 
 const stageLabels = {
   analyze_matrix: "分析与写稿",
-  publish_package: "打包草稿"
+  analyze_compose: "分析与写稿",
+  analyze_reply: "分析与回评",
+  publish_package: "打包草稿",
+  publish_compose_package: "打包草稿",
+  publish_reply_package: "打包草稿"
 };
 
 const degradeLabels = {

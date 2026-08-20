@@ -23,7 +23,7 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     merged_forbidden_topics,
 )
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.models import (
     BriefOut,
     ComposeDraftOut,
     GatedDraft,

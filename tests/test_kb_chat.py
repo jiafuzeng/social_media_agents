@@ -416,7 +416,7 @@ def test_kb_chat_package_does_not_import_compose_reply_or_gate() -> None:
     root = Path(__file__).resolve().parents[1] / "integrated_agent" / "runtimes" / "matrix" / "kb_chat"
     forbidden = (
         "integrated_agent.runtimes.matrix.host",
-        "integrated_agent.runtimes.matrix.models",
+        "integrated_agent.runtimes.matrix.host.models",
     )
     for path in sorted(root.glob("*.py")):
         imported = _imported_modules(path)
@@ -435,7 +435,7 @@ def test_compose_reply_pipelines_do_not_import_kb_chat() -> None:
         / "runtimes"
         / "matrix"
     )
-    for folder in ("host", "compose", "reply"):
+    for folder in ("host", "compose", "reply", "rag"):
         for path in (root / folder).rglob("*.py"):
             imported = _imported_modules(path)
             leaked = [name for name in imported if "kb_chat" in name]

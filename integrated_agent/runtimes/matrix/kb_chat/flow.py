@@ -7,7 +7,7 @@ from typing import Any, cast
 from agently import TriggerFlow
 
 from integrated_agent.rag.models import ChatKbIn, ChatKbOut
-from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
 
 from .pipeline import (
     kb_chat_analyze,

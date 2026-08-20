@@ -2,19 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from integrated_agent.runtimes.matrix.capability import MatrixAnalysisCapability
-from integrated_agent.runtimes.matrix.db.settings import load_identity_db_settings
-from integrated_agent.runtimes.matrix.identity import IdentityStore
-from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
-from integrated_agent.runtimes.matrix.service import MatrixTaskService
-from integrated_agent.runtimes.matrix.stores import (
+from integrated_agent.runtimes.matrix.compose.worker import make_analyze_compose
+from integrated_agent.runtimes.matrix.host.db.settings import load_identity_db_settings
+from integrated_agent.runtimes.matrix.host.identity import IdentityStore
+from integrated_agent.runtimes.matrix.host.service import MatrixTaskService
+from integrated_agent.runtimes.matrix.host.stores import (
     InMemoryEventStore,
     InMemoryTaskStore,
 )
-from integrated_agent.runtimes.matrix.worker import (
+from integrated_agent.runtimes.matrix.host.worker import (
     MatrixWorkflowWorker,
     WorkerDependencies,
 )
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
+from integrated_agent.runtimes.matrix.reply.worker import make_analyze_reply
 
 
 ROOT = Path(__file__).parents[2]
@@ -38,11 +39,18 @@ def build_matrix_service(
         settings=settings,
     )
     knowledge_store = knowledge or KnowledgeStore()
+    logs_root = root / "logs" / "matrix"
+    data_root = root / "data" / "matrix"
     worker = MatrixWorkflowWorker(
         WorkerDependencies(
-            matrix_analysis=MatrixAnalysisCapability(
-                logs_root=root / "logs" / "matrix",
-                data_root=root / "data" / "matrix",
+            analyze_compose=make_analyze_compose(
+                logs_root=logs_root,
+                data_root=data_root,
+                knowledge=knowledge_store,
+            ),
+            analyze_reply=make_analyze_reply(
+                logs_root=logs_root,
+                data_root=data_root,
                 knowledge=knowledge_store,
             ),
             events=events,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from integrated_agent.runtimes.matrix.host.snapshots import TWITTER_PLATFORM_KEY
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.models import (
     BriefOut,
     ComposeDraftOut,
     Requirement,

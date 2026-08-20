@@ -402,7 +402,7 @@ def test_http_illegal_strategy_is_422_and_all_chunks_are_returned(
 def test_http_preview_does_not_write_record_store(
     tmp_path: Path, monkeypatch
 ) -> None:
-    from integrated_agent.runtimes.matrix import kb_store as kb_store_mod
+    from integrated_agent.runtimes.matrix.rag import kb_store as kb_store_mod
 
     blocked = AsyncMock(side_effect=AssertionError("preview must not put"))
     for store in kb_store_mod.kb_store.values():

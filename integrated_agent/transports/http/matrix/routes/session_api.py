@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Header, HTTPException
 
-from integrated_agent.runtimes.matrix.identity import (
+from integrated_agent.runtimes.matrix.host.identity import (
     CreateSessionIn,
     IdentityError,
     IdentityStore,

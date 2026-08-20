@@ -4,7 +4,7 @@ import pytest
 
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.compose import run_compose
-from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
+from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 from integrated_agent.runtimes.matrix.reply import run_reply
 from tests.fakes import DEMO_REPLY_COMMENTS, ScriptedMatrixModel, install_scripted_ask
 

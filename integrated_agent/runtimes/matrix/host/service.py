@@ -5,8 +5,9 @@ from contextlib import suppress
 from typing import Protocol
 from uuid import uuid4
 
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
+
 from .identity import IdentityStore
-from .knowledge import KnowledgeStore
 from .models import (
     MatrixTaskCreate,
     MatrixTaskRequest,

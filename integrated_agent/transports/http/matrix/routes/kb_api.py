@@ -33,14 +33,14 @@ from integrated_agent.rag.models import (
     UpdateChunkIn,
     UpdateDocumentIn,
 )
-from integrated_agent.runtimes.matrix.identity import (
+from integrated_agent.runtimes.matrix.host.identity import (
     IdentityError,
     IdentityStore,
     UserOut,
     parse_bearer_token,
 )
 from integrated_agent.runtimes.matrix.kb_chat import answer_kb_chat
-from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
 
 _LOG = logging.getLogger(__name__)
 _CREATE_FIELDS = set(CreateDocumentIn.model_fields)

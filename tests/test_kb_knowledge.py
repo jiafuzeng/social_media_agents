@@ -18,8 +18,8 @@ from integrated_agent.rag.models import (
 )
 from tests.fakes import ScriptedMatrixModel, install_kb_chat_ask, install_scripted_ask
 from integrated_agent.runtimes.matrix.kb_chat.scripted import ScriptedKbChatModel
-from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
-from integrated_agent.runtimes.matrix import kb_store as kb_store_mod
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
+from integrated_agent.runtimes.matrix.rag import kb_store as kb_store_mod
 from integrated_agent.transports.http import create_matrix_api
 from tests.test_kb_store import _ProbeProvider
 
@@ -378,7 +378,7 @@ async def test_too_many_ingest_chunks_is_422(tmp_path: Path, monkeypatch) -> Non
         )
 
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.knowledge.preview_chunks", _too_many
+        "integrated_agent.runtimes.matrix.rag.knowledge.preview_chunks", _too_many
     )
     with pytest.raises(KnowledgeError) as caught:
         await knowledge.create_document(

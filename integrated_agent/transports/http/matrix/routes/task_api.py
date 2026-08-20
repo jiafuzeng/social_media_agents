@@ -16,11 +16,11 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     list_account_catalog,
     list_interaction_catalog,
 )
-from integrated_agent.runtimes.matrix.identity import (
+from integrated_agent.runtimes.matrix.host.identity import (
     IdentityError,
     parse_bearer_token,
 )
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.models import (
     MAX_COMPOSE_POSTS,
     MIN_COMPOSE_POSTS,
     CommentIn,
@@ -30,7 +30,7 @@ from integrated_agent.runtimes.matrix.models import (
     TaskEvent,
     TaskSnapshot,
 )
-from integrated_agent.runtimes.matrix.service import MatrixTaskService
+from integrated_agent.runtimes.matrix.host.service import MatrixTaskService
 
 
 class AccountCatalogOut(DomainModel):

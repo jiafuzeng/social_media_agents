@@ -162,7 +162,7 @@ matrix host → 不依赖 HTTP、企业微信、Gateway 或 question.analysis
 | Bounded queue | 问数与矩阵模型过载时不能无限占用内存 |
 | Stable SSE | Web 和 IM 可以独立消费同一任务事实 |
 | Per-session ACP clients | 外部 Agent 的上下文不能跨用户串话 |
-| IdentityRepository | `runtimes/matrix/db`：SQLAlchemy 异步 ORM 落盘；默认 SQLite，不把密码写入 Agently RecordStore；首个用户为 admin，其后公开注册为 user，管理接口按角色鉴权 |
+| IdentityRepository | `runtimes/matrix/host/db`：SQLAlchemy 异步 ORM 落盘；默认 SQLite，不把密码写入 Agently RecordStore；首个用户为 admin，其后公开注册为 user，管理接口按角色鉴权 |
 | Thin bootstrap | 入口变化不会迫使业务模块重新组织 |
 
 ## 项目结构
@@ -174,8 +174,8 @@ integrated_agent_service/
 │   ├── runtimes/
 │   │   ├── agent/               # Agently Agent + Actions + Skills + Sandbox
 │   │   ├── question/            # 问数任务服务、TriggerFlow 和分析流程
-│   │   ├── matrix/              # 社媒矩阵草稿、两套 TriggerFlow 与硬门
-│   │   │   └── db/              # 身份库 ORM、异步仓储与 Alembic 迁移
+│   │   ├── matrix/              # 社媒矩阵草稿：compose / reply / kb_chat / host / rag
+│   │   │   └── host/db/         # 身份库 ORM、异步仓储与 Alembic 迁移
 │   │   └── acp/                 # Codex ACP client 与 session runtime
 │   ├── storage/                 # 对外发布的制品
 │   ├── transports/
@@ -328,7 +328,7 @@ CODEX_AUTO_APPROVE=true
 
 ## 身份库与数据库操作
 
-矩阵登录用户、对话会话、用户轮次和收藏夹默认落 SQLite：`workspace/identity/identity.sqlite`（不入库）。`.env` 里 `IDENTITY_DB=sqlite` 或 `mysql` 切换后端。代码在 `integrated_agent/runtimes/matrix/db/`：
+矩阵登录用户、对话会话、用户轮次和收藏夹默认落 SQLite：`workspace/identity/identity.sqlite`（不入库）。`.env` 里 `IDENTITY_DB=sqlite` 或 `mysql` 切换后端。代码在 `integrated_agent/runtimes/matrix/host/db/`：
 
 ```text
 db/
@@ -386,7 +386,7 @@ alembic history
 也可以显式指定配置文件：
 
 ```bash
-alembic -c integrated_agent/runtimes/matrix/db/alembic.ini upgrade head
+alembic -c integrated_agent/runtimes/matrix/host/db/alembic.ini upgrade head
 ```
 
 换 SQLite 路径：

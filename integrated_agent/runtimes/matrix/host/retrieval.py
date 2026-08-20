@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from integrated_agent.runtimes.matrix.models import DomainModel
+from integrated_agent.runtimes.matrix.host.models import DomainModel
 
 
 class RetrieveQuery(DomainModel):

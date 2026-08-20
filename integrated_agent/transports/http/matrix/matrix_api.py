@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.runtimes.matrix.host.catalog import MatrixCatalog
-from integrated_agent.runtimes.matrix.service import MatrixTaskService
+from integrated_agent.runtimes.matrix.host.service import MatrixTaskService
 
 from .routes import (
     build_auth_router,

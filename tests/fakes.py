@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from integrated_agent.runtimes.matrix.compose.scripted import ScriptedComposeModel
-from integrated_agent.runtimes.matrix.models import CommentIn
+from integrated_agent.runtimes.matrix.host.models import CommentIn
 from integrated_agent.runtimes.matrix.reply.scripted import ScriptedReplyModel
 
 

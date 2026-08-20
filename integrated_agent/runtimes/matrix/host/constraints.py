@@ -5,7 +5,7 @@ from collections import deque
 from collections.abc import Callable, Sequence
 from typing import Awaitable
 
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.models import (
     DegradeOp,
     DegradeStep,
     DraftStatus,

@@ -18,7 +18,7 @@ from integrated_agent.rag.models import (
     KbChunkOut,
     SearchKbIn,
 )
-from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
+from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
 
 KB_CITE_RE = re.compile(r"\[\[kb:([^\]]+)\]\]")
 REF_CITE_RE = re.compile(r"\[\[ref:([^\]]+)\]\]")

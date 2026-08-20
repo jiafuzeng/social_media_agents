@@ -11,8 +11,8 @@ from integrated_agent.config import (
     KB_RECORD_ROOT,
 )
 from integrated_agent.rag.embeddings import list_embedding_profiles
-from integrated_agent.runtimes.matrix import kb_store as kb_store_mod
-from integrated_agent.runtimes.matrix.kb_store import kb_store
+from integrated_agent.runtimes.matrix.rag import kb_store as kb_store_mod
+from integrated_agent.runtimes.matrix.rag.kb_store import kb_store
 
 
 class _ProbeProvider:

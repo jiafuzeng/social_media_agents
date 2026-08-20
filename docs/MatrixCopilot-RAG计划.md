@@ -39,7 +39,7 @@
 |---|---|
 | 1 | RecordStore 工厂；`data/matrix/embedding_profiles.yaml`；`MATRIX_KB_RECORD_ROOT` |
 | 2 | `integrated_agent/rag/`；`llama-index-core`、`pypdf`、`python-multipart` |
-| 3 | `runtimes/matrix/knowledge.py`；`transports/http/matrix/routes/kb_api.py`；`bootstrap/matrix_service.py` |
+| 3 | `runtimes/matrix/rag/knowledge.py`；`transports/http/matrix/routes/kb_api.py`；`bootstrap/matrix_service.py` |
 | 4 | 同上 kb HTTP `POST /api/kb/search` |
 | 5 | `static/matrix.html`、知识库 JS/CSS |
 | 6 | `runtimes/matrix/host/drafting.py` |

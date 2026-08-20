@@ -12,7 +12,7 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     bind_snapshot,
 )
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.models import ComposeDraftOut, WorkItem
+from integrated_agent.runtimes.matrix.host.models import ComposeDraftOut, WorkItem
 
 
 DATA_ROOT = PROJECT_ROOT / "data/matrix"

@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from integrated_agent.runtimes.matrix.models import MAX_COMPOSE_POSTS, MIN_COMPOSE_POSTS
+from integrated_agent.runtimes.matrix.host.models import MAX_COMPOSE_POSTS, MIN_COMPOSE_POSTS
 
 from .snapshots import (
     TWITTER_PLATFORM_KEY,

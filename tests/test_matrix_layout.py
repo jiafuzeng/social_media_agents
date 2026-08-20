@@ -5,6 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1] / "integrated_agent" / "runtimes" / "matrix"
+OWNED_PACKAGES = ("compose", "host", "kb_chat", "rag", "reply")
 
 
 def _imported_modules(path: Path) -> set[str]:
@@ -18,12 +19,8 @@ def _imported_modules(path: Path) -> set[str]:
     return names
 
 
-def _package_imports(package: str) -> dict[str, set[str]]:
-    root = ROOT / package
-    return {
-        path.name: _imported_modules(path)
-        for path in sorted(root.glob("*.py"))
-    }
+def _package_paths(package: str) -> list[Path]:
+    return sorted((ROOT / package).rglob("*.py"))
 
 
 def _leaks(imported: set[str], forbidden: tuple[str, ...]) -> list[str]:
@@ -34,14 +31,25 @@ def _leaks(imported: set[str], forbidden: tuple[str, ...]) -> list[str]:
     ]
 
 
+def test_matrix_root_only_keeps_package_init() -> None:
+    files = sorted(path.name for path in ROOT.glob("*.py"))
+    assert files == ["__init__.py"]
+    dirs = sorted(
+        path.name
+        for path in ROOT.iterdir()
+        if path.is_dir() and path.name != "__pycache__"
+    )
+    assert dirs == sorted(OWNED_PACKAGES)
+
+
 def test_compose_package_does_not_import_reply_or_kb_chat() -> None:
     forbidden = (
         "integrated_agent.runtimes.matrix.reply",
         "integrated_agent.runtimes.matrix.kb_chat",
     )
-    for filename, imported in _package_imports("compose").items():
-        leaked = _leaks(imported, forbidden)
-        assert leaked == [], f"compose/{filename} imports {leaked}"
+    for path in _package_paths("compose"):
+        leaked = _leaks(_imported_modules(path), forbidden)
+        assert leaked == [], f"compose/{path.relative_to(ROOT / 'compose')} imports {leaked}"
 
 
 def test_reply_package_does_not_import_compose_or_kb_chat() -> None:
@@ -49,9 +57,9 @@ def test_reply_package_does_not_import_compose_or_kb_chat() -> None:
         "integrated_agent.runtimes.matrix.compose",
         "integrated_agent.runtimes.matrix.kb_chat",
     )
-    for filename, imported in _package_imports("reply").items():
-        leaked = _leaks(imported, forbidden)
-        assert leaked == [], f"reply/{filename} imports {leaked}"
+    for path in _package_paths("reply"):
+        leaked = _leaks(_imported_modules(path), forbidden)
+        assert leaked == [], f"reply/{path.relative_to(ROOT / 'reply')} imports {leaked}"
 
 
 def test_host_package_does_not_import_product_flows() -> None:
@@ -60,18 +68,29 @@ def test_host_package_does_not_import_product_flows() -> None:
         "integrated_agent.runtimes.matrix.reply",
         "integrated_agent.runtimes.matrix.kb_chat",
     )
-    for path in sorted((ROOT / "host").glob("*.py")):
+    for path in _package_paths("host"):
         leaked = _leaks(_imported_modules(path), forbidden)
-        assert leaked == [], f"host/{path.name} imports {leaked}"
+        assert leaked == [], f"host/{path.relative_to(ROOT / 'host')} imports {leaked}"
 
 
-def test_kb_chat_still_isolated_from_compose_reply() -> None:
+def test_rag_package_does_not_import_product_or_host() -> None:
+    forbidden = (
+        "integrated_agent.runtimes.matrix.compose",
+        "integrated_agent.runtimes.matrix.reply",
+        "integrated_agent.runtimes.matrix.kb_chat",
+        "integrated_agent.runtimes.matrix.host",
+    )
+    for path in _package_paths("rag"):
+        leaked = _leaks(_imported_modules(path), forbidden)
+        assert leaked == [], f"rag/{path.relative_to(ROOT / 'rag')} imports {leaked}"
+
+
+def test_kb_chat_still_isolated_from_compose_reply_host() -> None:
     forbidden = (
         "integrated_agent.runtimes.matrix.compose",
         "integrated_agent.runtimes.matrix.reply",
         "integrated_agent.runtimes.matrix.host",
-        "integrated_agent.runtimes.matrix.models",
     )
-    for filename, imported in _package_imports("kb_chat").items():
-        leaked = _leaks(imported, forbidden)
-        assert leaked == [], f"kb_chat/{filename} imports {leaked}"
+    for path in _package_paths("kb_chat"):
+        leaked = _leaks(_imported_modules(path), forbidden)
+        assert leaked == [], f"kb_chat/{path.name} imports {leaked}"

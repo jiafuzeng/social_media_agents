@@ -15,7 +15,7 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     list_interaction_catalog,
     merged_forbidden_topics,
 )
-from integrated_agent.runtimes.matrix.models import CommentIn
+from integrated_agent.runtimes.matrix.host.models import CommentIn
 from tests.fakes import DEMO_REPLY_COMMENTS
 
 

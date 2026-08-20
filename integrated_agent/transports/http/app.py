@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from integrated_agent.runtimes.matrix.service import MatrixTaskService, ServiceBusyError
+from integrated_agent.runtimes.matrix.host.service import MatrixTaskService, ServiceBusyError
 from integrated_agent.runtimes.question.service import QuestionTaskService
 
 from .matrix import build_matrix_router

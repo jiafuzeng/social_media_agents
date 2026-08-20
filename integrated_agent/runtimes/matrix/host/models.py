@@ -34,7 +34,7 @@ class CommentIn(DomainModel):
 
 
 class MatrixTaskCreate(DomainModel):
-    """矩阵任务入站契约。Web 与 Gateway 最终都落成此对象；禁止 extra 字段，禁止 scenario=auto。"""
+    """队列内部命令。入口路径已绑定 scenario 后再构造；禁止 extra，禁止 scenario=auto。"""
 
     text: str = Field(
         min_length=1,
@@ -98,6 +98,76 @@ class MatrixTaskCreate(DomainModel):
             if not self.comments:
                 self.comments = [CommentIn(text=self.text, role="root")]
         return self
+
+
+class ComposeTaskCreate(DomainModel):
+    """写帖入站。由 POST /v1/matrix/compose 绑定场景，body 不得带 scenario。"""
+
+    text: str = Field(min_length=1, description="创作主题或口径")
+    account_key: str | None = Field(default=None, description="获客人设；省略则为 default")
+    need_trends: bool = Field(default=False, description="是否先抓热帖再写")
+    post_count: int | None = Field(
+        default=None,
+        ge=MIN_COMPOSE_POSTS,
+        le=MAX_COMPOSE_POSTS,
+        description="本次要出几条推文；范围 1–10。省略则由模型在平台上限内决定",
+    )
+    requester: str = Field(default="course-user", description="提交者，仅审计/日志")
+    channel: str = Field(default="web", description="来源通道 web 或 gateway")
+    session_id: str = Field(min_length=1, description="host 对话 id")
+    embedding_profile_id: str | None = Field(
+        default=None,
+        description="写稿 RetrieveKb 所用 embedding；省略则 yaml default",
+    )
+
+    @model_validator(mode="after")
+    def bind_defaults(self) -> "ComposeTaskCreate":
+        if not self.account_key:
+            self.account_key = "default"
+        return self
+
+    def to_matrix(self) -> MatrixTaskCreate:
+        return MatrixTaskCreate(scenario="compose", **self.model_dump())
+
+
+class ReplyTaskCreate(DomainModel):
+    """回评入站。由 POST /v1/matrix/reply 绑定场景，body 不得带 scenario。"""
+
+    text: str = Field(
+        min_length=1,
+        description="有 comments 时是运营指令，否则签发为待回评论",
+    )
+    interaction_key: str | None = Field(
+        default=None, description="互动规则；省略则为 help-first"
+    )
+    reply_count: int | None = Field(
+        default=None,
+        ge=MIN_COMPOSE_POSTS,
+        le=MAX_COMPOSE_POSTS,
+        description="本次要出几条回复草稿；范围 1–10",
+    )
+    comments: list[CommentIn] | None = Field(
+        default=None,
+        description="直接提交的评论；省略则用 text 签发一条",
+    )
+    requester: str = Field(default="course-user", description="提交者，仅审计/日志")
+    channel: str = Field(default="web", description="来源通道 web 或 gateway")
+    session_id: str = Field(min_length=1, description="host 对话 id")
+    embedding_profile_id: str | None = Field(
+        default=None,
+        description="写稿 RetrieveKb 所用 embedding；省略则 yaml default",
+    )
+
+    @model_validator(mode="after")
+    def bind_defaults(self) -> "ReplyTaskCreate":
+        if not self.interaction_key:
+            self.interaction_key = "help-first"
+        if not self.comments:
+            self.comments = [CommentIn(text=self.text, role="root")]
+        return self
+
+    def to_matrix(self) -> MatrixTaskCreate:
+        return MatrixTaskCreate(scenario="reply", **self.model_dump())
 
 
 class MatrixTaskRequest(MatrixTaskCreate):

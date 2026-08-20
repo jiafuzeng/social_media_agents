@@ -14,7 +14,7 @@ from integrated_agent.runtimes.agent import (
     AgentlyAgentRuntime,
     WorkspaceFileService,
 )
-from integrated_agent.runtimes.matrix.client import MatrixServiceRuntime
+from integrated_agent.runtimes.matrix.compose.client import MatrixServiceRuntime
 from integrated_agent.runtimes.question.client import QuestionServiceRuntime
 from integrated_agent.storage import ArtifactStore
 from integrated_agent.transports.wecom import (

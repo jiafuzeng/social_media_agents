@@ -8,7 +8,7 @@ from typing import Any, cast
 
 from agently import TriggerFlow
 
-from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
+from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 
 from integrated_agent.runtimes.matrix.host.snapshots import bind_snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run

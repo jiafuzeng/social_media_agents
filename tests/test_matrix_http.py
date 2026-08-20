@@ -10,13 +10,13 @@ from pydantic import ValidationError
 
 from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.config import PROJECT_ROOT
-from integrated_agent.runtimes.matrix.identity import IdentityStore
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.identity import IdentityStore
+from integrated_agent.runtimes.matrix.host.models import (
     MatrixTaskCreate,
     MatrixTaskRequest,
     MatrixTaskResult,
 )
-from integrated_agent.runtimes.matrix.service import MatrixTaskService
+from integrated_agent.runtimes.matrix.host.service import MatrixTaskService
 from integrated_agent.runtimes.question.analysis import QuestionAnalysisCapability
 from integrated_agent.runtimes.question.service import QuestionTaskService
 from integrated_agent.runtimes.question.stores import (
@@ -76,7 +76,7 @@ def test_t12_queue_full_returns_503(tmp_path: Path) -> None:
             await asyncio.Event().wait()
             raise AssertionError("unreachable")
 
-    from integrated_agent.runtimes.matrix.stores import (
+    from integrated_agent.runtimes.matrix.host.stores import (
         InMemoryEventStore,
         InMemoryTaskStore,
     )

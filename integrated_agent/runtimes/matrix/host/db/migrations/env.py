@@ -21,8 +21,8 @@ project_root = _project_root()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from integrated_agent.runtimes.matrix.db.models import Base
-from integrated_agent.runtimes.matrix.db.settings import load_identity_db_settings
+from integrated_agent.runtimes.matrix.host.db.models import Base
+from integrated_agent.runtimes.matrix.host.db.settings import load_identity_db_settings
 
 config = context.config
 

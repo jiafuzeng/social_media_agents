@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from integrated_agent.config import KB_DEFAULT_EMBEDDING_PROFILE
-from integrated_agent.runtimes.matrix.models import (
+from integrated_agent.runtimes.matrix.host.models import (
     ComposeDraftOut,
     GatedDraft,
     ReplyDraftOut,

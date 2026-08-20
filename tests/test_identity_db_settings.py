@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from integrated_agent.runtimes.matrix.db.settings import (
+from integrated_agent.runtimes.matrix.host.db.settings import (
     load_identity_db_settings,
     sqlite_settings,
     to_async_url,

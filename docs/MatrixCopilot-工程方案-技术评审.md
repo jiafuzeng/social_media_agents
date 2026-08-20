@@ -51,14 +51,13 @@ runtimes/matrix/host → 不依赖 HTTP、企业微信、Gateway、question.anal
 
 | 路径 | 所有者 | 不拥有 |
 |---|---|---|
-| `runtimes/matrix/models.py` | 入站与 TaskResult 契约 | 平台原始 frame |
-| `runtimes/matrix/service.py` | 队列、503、任务状态 | 语义拆解 |
-| `runtimes/matrix/worker.py` | 外层 analyze → publish SSE | Prompt |
-| `runtimes/matrix/client.py` | SSE → GatewayEvent | 业务阶段 |
-| `runtimes/matrix/capability.py` | 按 scenario 分发到 compose/reply | 业务节点、Prompt |
-| `runtimes/matrix/compose/` | 写帖 TriggerFlow 与阶段 | 回评、召回聊天 |
-| `runtimes/matrix/reply/` | 回评 TriggerFlow 与阶段 | 写帖、趋势节点 |
+| `runtimes/matrix/host/models.py` | 入站与 TaskResult 契约 | 平台原始 frame |
+| `runtimes/matrix/host/service.py` | 队列、503、任务状态 | 语义拆解 |
+| `runtimes/matrix/host/worker.py` | 外层 analyze → publish SSE | Prompt、写帖/回评节点 |
+| `runtimes/matrix/compose/` | 写帖 TriggerFlow、Gateway client、队列入口 | 回评、召回聊天 |
+| `runtimes/matrix/reply/` | 回评 TriggerFlow 与队列入口 | 写帖、趋势节点 |
 | `runtimes/matrix/kb_chat/` | 召回聊天 TriggerFlow | 写帖、回评 |
+| `runtimes/matrix/rag/` | 知识库 RecordStore 与文档门面 | 业务 Flow |
 | `host/snapshots.py` | 短 key 投影、snapshot_id | 意图路由 |
 | `host/constraints.py` | AC、字数、引用、降级算子 | 该不该回 |
 | `host/retrieval.py` | RetrieveCases 契约 | 硬词表、放行 |

@@ -47,7 +47,7 @@ from integrated_agent.rag.models import (
     UpdateChunkIn,
     UpdateDocumentIn,
 )
-from integrated_agent.runtimes.matrix.kb_store import kb_store as default_kb_stores
+from integrated_agent.runtimes.matrix.rag.kb_store import kb_store as default_kb_stores
 
 _LOG = logging.getLogger(__name__)
 

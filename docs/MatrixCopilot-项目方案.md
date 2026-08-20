@@ -411,28 +411,35 @@ SSE：`task.submitted`、`stage.*`、`work_item.ready`、`draft.ready`、一次 
 
 ```text
 integrated_agent/runtimes/matrix/
-  models.py
-  service.py
-  stores.py
-  worker.py
-  client.py
-  capability.py             # 按 scenario 分发，不含业务节点
-  compose/                  # 写帖独立模块
+  __init__.py
+  compose/                  # 写帖
     flow.py
     pipeline.py
-  reply/                    # 回评独立模块
+    client.py               # Gateway 只走写帖
+    worker.py               # 队列侧写帖入口
+  reply/                    # 回评
     flow.py
     pipeline.py
-  kb_chat/                  # 召回聊天独立模块
+    worker.py               # 队列侧回评入口
+  kb_chat/                  # 召回聊天
     flow.py
     pipeline.py
-  host/                     # 共用宿主：快照、硬门、案例、目录
+  rag/                      # 知识库 RecordStore 与文档门面
+    kb_store.py
+    knowledge.py
+  host/                     # 共用宿主：快照、硬门、案例、目录、身份、队列
+    models.py
     snapshots.py
     constraints.py
     retrieval.py
     drafting.py
     catalog.py
     trace_log.py
+    identity.py
+    service.py
+    stores.py
+    worker.py
+    db/
 integrated_agent/transports/http/matrix_api.py
 integrated_agent/bootstrap/matrix_service.py
 data/matrix/
