@@ -342,7 +342,7 @@ class KnowledgeStore:
             if not isinstance(item, dict):
                 continue
             ref = item.get("ref")
-            if isinstance(ref, dict):
+            if isinstance(ref, dict) and self._owned_ref(user_id, ref):
                 refs.append(ref)
         return refs
 
@@ -414,7 +414,7 @@ class KnowledgeStore:
             if not isinstance(item, dict):
                 continue
             ref = item.get("ref")
-            if not isinstance(ref, dict):
+            if not isinstance(ref, dict) or not self._owned_ref(user_id, ref):
                 continue
             chunk = await self._chunk_out(ref)
             score = item.get("score")
@@ -1055,6 +1055,10 @@ class KnowledgeStore:
         embeddings = await store.backend.embedding_provider.embed_texts([text])
         if embeddings and embeddings[0]:
             await provider.index_record(ref, embeddings[0])
+
+    def _owned_ref(self, user_id: str, ref: RecordRef) -> bool:
+        """命中必须仍属于当前用户，不单信检索过滤器。"""
+        return str((ref.get("scope") or {}).get("user_id") or "") == user_id
 
     async def _document_ref(
         self, user_id: str, doc_id: str, *, include_archived: bool = False

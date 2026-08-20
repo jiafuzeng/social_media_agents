@@ -118,6 +118,17 @@ async def test_cross_user_document_is_forbidden(tmp_path: Path, monkeypatch) -> 
     with pytest.raises(KnowledgeError) as caught:
         await knowledge.get_document("user-b", doc.doc_id)
     assert caught.value.status == 403
+    assert await knowledge.retrieve("user-a", "仅限本人", "bge-m3")
+    assert await knowledge.retrieve("user-b", "仅限本人", "bge-m3") == []
+    from integrated_agent.rag.models import SearchKbIn
+
+    hidden = await knowledge.search(
+        "user-b",
+        SearchKbIn(query="仅限本人", embedding_profile_id="bge-m3"),
+    )
+    assert hidden.hits == []
+    listed = await knowledge.list_documents("user-b")
+    assert listed.documents == []
 
 
 @pytest.mark.asyncio
@@ -565,6 +576,24 @@ def test_http_documents_crud_and_forbidden(tmp_path: Path, monkeypatch) -> None:
         stranger, _sid = _auth_user(client, "stranger")
         denied = client.get(f"/api/kb/documents/{doc_id}", headers=stranger)
         assert denied.status_code == 403
+        listed_other = client.get("/api/kb/documents", headers=stranger)
+        assert listed_other.status_code == 200
+        assert listed_other.json()["documents"] == []
+        assert client.get(f"/api/kb/documents/{doc_id}/chunks", headers=stranger).status_code == 403
+        search_other = client.post(
+            "/api/kb/search",
+            headers=stranger,
+            json={"query": "退款", "embedding_profile_id": "bge-m3"},
+        )
+        assert search_other.status_code == 200
+        assert search_other.json()["hits"] == []
+        chat_other = client.post(
+            "/api/kb/chat",
+            headers=stranger,
+            json={"query": "退款", "embedding_profile_id": "bge-m3"},
+        )
+        assert chat_other.status_code == 200
+        assert chat_other.json()["hits"] == []
         unknown = client.post(
             "/api/kb/documents",
             headers=owner,
@@ -582,6 +611,7 @@ def test_http_documents_crud_and_forbidden(tmp_path: Path, monkeypatch) -> None:
         downloaded = client.get(f"/api/kb/documents/{file_id}/file", headers=owner)
         assert downloaded.status_code == 200
         assert downloaded.content == "上传原件正文。".encode("utf-8")
+        assert client.get(f"/api/kb/documents/{file_id}/file", headers=stranger).status_code == 403
         paste_file = client.get(f"/api/kb/documents/{doc_id}/file", headers=owner)
         assert paste_file.status_code == 404
         deleted = client.delete(f"/api/kb/documents/{doc_id}", headers=owner)

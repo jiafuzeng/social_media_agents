@@ -486,6 +486,9 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert page.count('id="kbEmbedding"') == 1
         assert 'id="kbDraftProfile"' in page
         assert "/static/matrix-kb.js" in page
+        js = (PROJECT_ROOT / "static" / "matrix-kb.js").read_text(encoding="utf-8")
+        assert "resetKbWorkspaceState" in js
+        assert "kbStorageKey" in js
         assert ">知识库<" in page or "aria-label=\"知识库\"" in page
         assert 'id="kbStepSource"' in page
         assert 'id="kbDrop"' in page

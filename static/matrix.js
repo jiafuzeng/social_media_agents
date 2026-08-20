@@ -122,12 +122,19 @@ async function loadSessions() {
   const current = activeThread();
   threads.length = 0;
   threads.push(...(payload.sessions || []).map(sessionToThread));
-  if (current) {
+  if (current && threads.some(item => item.id === current.id)) {
     const index = threads.findIndex(item => item.id === current.id);
     if (index >= 0 && current.turns.length) {
       threads[index] = { ...threads[index], ...current, title: threads[index].title };
     }
-    if (threads.some(item => item.id === current.id)) activeThreadId = current.id;
+    activeThreadId = current.id;
+  } else {
+    if (current) {
+      for (const key of Object.keys(lastThreadByScenario)) {
+        if (lastThreadByScenario[key] === current.id) lastThreadByScenario[key] = null;
+      }
+    }
+    if (!threads.some(item => item.id === activeThreadId)) activeThreadId = null;
   }
   renderHistory();
 }
@@ -1800,19 +1807,35 @@ function renderHistory() {
 
 async function deleteThread(thread) {
   if (!thread?.id) return;
+  bumpViewEpoch();
   await sessionRequest(`/api/sessions/${encodeURIComponent(thread.id)}`, {
     method: "DELETE"
   });
-  const index = threads.findIndex(item => item.id === thread.id);
-  if (index >= 0) threads.splice(index, 1);
-  for (const key of Object.keys(lastThreadByScenario)) {
-    if (lastThreadByScenario[key] === thread.id) lastThreadByScenario[key] = null;
-  }
-  if (activeThreadId === thread.id) {
+  dropLocalThread(thread.id);
+  if (!activeThreadId) {
     startFreshTask({ forgetLast: true });
     return;
   }
   renderHistory();
+}
+
+function dropLocalThread(id) {
+  const index = threads.findIndex(item => item.id === id);
+  if (index >= 0) threads.splice(index, 1);
+  for (const key of Object.keys(lastThreadByScenario)) {
+    if (lastThreadByScenario[key] === id) lastThreadByScenario[key] = null;
+  }
+  if (activeThreadId === id) activeThreadId = null;
+}
+
+function sessionGone(error) {
+  const text = error?.message || "";
+  return (
+    text === "session not found" ||
+    text === "session access denied" ||
+    text === "会话不存在" ||
+    text === "不能访问别人的会话"
+  );
 }
 
 async function ensureThread(text) {
@@ -1863,6 +1886,16 @@ async function openThread(id) {
     else threads.unshift(thread);
   } catch (error) {
     if (epoch !== viewEpoch) return;
+    if (sessionGone(error)) {
+      const wasActive = activeThreadId === id;
+      dropLocalThread(id);
+      if (wasActive && document.body.dataset.workspace === "task") {
+        startFreshTask({ forgetLast: true });
+        return;
+      }
+      renderHistory();
+      return;
+    }
     errorPanel.textContent = error.message;
     errorPanel.hidden = false;
     return;
@@ -2296,11 +2329,7 @@ function draftCount() {
 function currentDraftKbProfile() {
   const select = document.querySelector("#kbEmbedding");
   if (select?.value) return select.value;
-  try {
-    return sessionStorage.getItem("matrix.kb.embedding_profile_id") || "";
-  } catch (_) {
-    return "";
-  }
+  return window.matrixKb?.rememberedProfile?.() || "";
 }
 
 function refreshKbDraftHint() {

@@ -93,6 +93,7 @@ let kbIngestedDoc = null;
 let kbProfilesPromise = null;
 let kbChatTurns = [];
 let kbChatBusy = false;
+let kbAuthUserId = "";
 
 function kbAuthHeaders() {
   return window.matrixAuth?.headers() || {};
@@ -150,34 +151,49 @@ function currentKbProfile() {
   return document.querySelector("#kbEmbedding")?.value || "";
 }
 
-function persistKbProfile(profileId) {
-  if (!profileId) return;
+function kbUserId() {
+  return window.matrixAuth?.user()?.user_id || "";
+}
+
+function kbStorageKey(base) {
+  const userId = kbUserId();
+  return userId ? `${base}.${userId}` : "";
+}
+
+function kbStorageGet(base) {
+  const key = kbStorageKey(base);
+  if (!key) return "";
   try {
-    sessionStorage.setItem(PROFILE_KEY, profileId);
+    return sessionStorage.getItem(key) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function kbStorageSet(base, value) {
+  const key = kbStorageKey(base);
+  if (!key) return;
+  try {
+    sessionStorage.setItem(key, value);
   } catch (_) {}
 }
 
+function persistKbProfile(profileId) {
+  if (!profileId) return;
+  kbStorageSet(PROFILE_KEY, profileId);
+}
+
 function rememberedKbProfile() {
-  try {
-    return sessionStorage.getItem(PROFILE_KEY) || "";
-  } catch (_) {
-    return "";
-  }
+  return kbStorageGet(PROFILE_KEY);
 }
 
 function rememberedKbStrategy() {
-  try {
-    return sessionStorage.getItem(STRATEGY_KEY) || "";
-  } catch (_) {
-    return "";
-  }
+  return kbStorageGet(STRATEGY_KEY);
 }
 
 function persistKbStrategy(strategy) {
   if (!strategy) return;
-  try {
-    sessionStorage.setItem(STRATEGY_KEY, strategy);
-  } catch (_) {}
+  kbStorageSet(STRATEGY_KEY, strategy);
 }
 
 function selectedKbStrategy() {
@@ -980,6 +996,83 @@ async function goKbStep(step) {
     document.querySelector("#kbStepDone")?.classList.remove("is-ingested", "is-ingesting");
     setNamedStatus("#kbDoneStatus", "");
   }
+}
+
+function applyKbSessionPreferences() {
+  const strategy = rememberedKbStrategy();
+  kbStrategyUserPicked = Boolean(strategy);
+  kbSelectedStrategy = strategy || "sentence";
+  applyKbStrategyChrome();
+  const select = document.querySelector("#kbEmbedding");
+  const remembered = rememberedKbProfile();
+  if (select?.options.length) {
+    const allowed = [...select.options].map(item => item.value);
+    if (remembered && allowed.includes(remembered)) {
+      select.value = remembered;
+    } else {
+      select.value = allowed.includes("bge-m3") ? "bge-m3" : allowed[0] || "";
+    }
+  }
+  const workspace = currentKbProfile();
+  if (workspace) persistKbProfile(workspace);
+  if (kbSelectedStrategy) persistKbStrategy(kbSelectedStrategy);
+  syncKbChrome();
+  window.refreshKbDraftHint?.();
+}
+
+function resetKbWorkspaceState() {
+  stopKbSplitBusy();
+  stopKbExtractBusy();
+  stopKbIngestBusy();
+  stopKbAddSegBusy();
+  stopKbReindexBusy();
+  kbOpened = false;
+  kbView = "docs";
+  kbDocuments = [];
+  kbOpenDoc = null;
+  kbOpenChunks = [];
+  kbSegNotice = { chunkId: "", text: "", kind: "" };
+  kbChatTurns = [];
+  kbChatBusy = false;
+  kbStrategyUserPicked = false;
+  clearKbSource({ keepMode: false });
+  resetKbParams();
+  const recallQuery = document.querySelector("#kbRecallQuery");
+  if (recallQuery) recallQuery.value = "";
+  const chatInput = document.querySelector("#kbChatInput");
+  if (chatInput) chatInput.value = "";
+  const title = document.querySelector("#kbDocTitle");
+  if (title) title.value = "";
+  const addBox = document.querySelector("#kbAddSegBox");
+  if (addBox) addBox.hidden = true;
+  const addText = document.querySelector("#kbAddSegText");
+  if (addText) addText.value = "";
+  renderKbDocuments();
+  const recallHits = document.querySelector("#kbRecallHits");
+  if (recallHits) recallHits.replaceChildren(kbRecallEmpty("召回测试结果将展示在这里"));
+  renderRecallHistory();
+  renderKbChatThread();
+  renderKbChatHits(null);
+  setNamedStatus("#kbRecallStatus", "");
+  setNamedStatus("#kbChatStatus", "");
+  setNamedStatus("#kbDocStatus", "");
+  setNamedStatus("#kbDocsStatus", "");
+  setKbStatus("");
+  applyKbSessionPreferences();
+  showKbView("docs");
+  setKbStep(1);
+  syncRecallButton();
+  syncChatButton();
+}
+
+function onKbAuthChanged() {
+  const nextId = kbUserId();
+  if (nextId !== kbAuthUserId) {
+    kbAuthUserId = nextId;
+    resetKbWorkspaceState();
+  }
+  if (!nextId || document.body.dataset.workspace !== "kb") return;
+  openKbWorkspace().catch(error => setKbStatus(error.message, "error"));
 }
 
 async function openKbWorkspace() {
@@ -1817,8 +1910,9 @@ async function runKbRecall() {
 }
 
 function recallHistory() {
+  const raw = kbStorageGet(RECALL_HISTORY_KEY);
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(RECALL_HISTORY_KEY) || "[]");
+    const parsed = JSON.parse(raw || "[]");
     return Array.isArray(parsed) ? parsed.filter(item => typeof item === "string") : [];
   } catch (_) {
     return [];
@@ -1827,9 +1921,7 @@ function recallHistory() {
 
 function pushRecallHistory(query) {
   const next = [query, ...recallHistory().filter(item => item !== query)].slice(0, 8);
-  try {
-    sessionStorage.setItem(RECALL_HISTORY_KEY, JSON.stringify(next));
-  } catch (_) {}
+  kbStorageSet(RECALL_HISTORY_KEY, JSON.stringify(next));
   renderRecallHistory();
 }
 
@@ -2012,6 +2104,10 @@ function renderKbChatHits(payload) {
   const host = document.querySelector("#kbChatHits");
   if (!host) return;
   const hits = payload?.hits || [];
+  if (!payload) {
+    host.replaceChildren(kbRecallEmpty("引用块会出现在这里。"));
+    return;
+  }
   if (!hits.length) {
     const other = payload?.other_profile_doc_count || 0;
     let message = "没有命中手册段落。";
@@ -2312,9 +2408,5 @@ function bindKbWorkspace() {
 }
 
 bindKbWorkspace();
-window.addEventListener("matrix-auth-changed", () => {
-  if (document.body.dataset.workspace === "kb") {
-    openKbWorkspace().catch(error => setKbStatus(error.message, "error"));
-  }
-});
-window.matrixKb = { open: openKbWorkspace };
+window.addEventListener("matrix-auth-changed", onKbAuthChanged);
+window.matrixKb = { open: openKbWorkspace, rememberedProfile: rememberedKbProfile };
