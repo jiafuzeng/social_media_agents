@@ -8,10 +8,11 @@ import logging
 import re
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 from agently.core.storage import RecordStore
+from agently.types.data.record_store import RecordRef
 
 from integrated_agent.config import (
     KB_DEFAULT_EMBEDDING_PROFILE,
@@ -50,14 +51,19 @@ from integrated_agent.runtimes.matrix.kb_store import kb_store as default_kb_sto
 
 _LOG = logging.getLogger(__name__)
 
-KB_COLLECTION = "kb"
-KIND_DOCUMENT = "document"
-KIND_CHUNK = "chunk"
-_LIVE_DOC_STATUSES = ("ingesting", "ready", "failed")
-_UNSAFE_NAME = re.compile(r"[^\w.\u4e00-\u9fff-]+", re.UNICODE)
+KB_COLLECTION = "kb"  # RecordStore 集合名，与身份库/案例记录隔离
+KIND_DOCUMENT = "document"  # 文档卡
+KIND_CHUNK = "chunk"  # 切片；向量与 hybrid 检索打在这一层
+_LIVE_DOC_STATUSES = ("ingesting", "ready", "failed")  # 列表可见；archived 不出现
+_UNSAFE_NAME = re.compile(r"[^\w.\u4e00-\u9fff-]+", re.UNICODE)  # 冷文件名非法字符
 
 
 class KnowledgeStore:
+    """用户私有知识库门面：文档/切片 CRUD、切分入库、按 embedding profile 检索。
+
+    记录走 RecordStore（每模型一个库），冷文件在 files_root；身份库只解析 user_id。
+    写入口只经本类，不直接 RecordStore.put，也不把 LlamaIndex 当产品存储。
+    """
     def __init__(
         self,
         stores: dict[str, RecordStore] | None = None,
@@ -65,6 +71,7 @@ class KnowledgeStore:
         files_root: Path | None = None,
         default_profile: str = KB_DEFAULT_EMBEDDING_PROFILE,
     ) -> None:
+        """绑定各 embedding profile 的 RecordStore 与冷文件根目录。"""
         self._stores = stores if stores is not None else default_kb_stores
         if not self._stores:
             raise RuntimeError("KnowledgeStore requires at least one embedding profile store")
@@ -74,18 +81,21 @@ class KnowledgeStore:
         self._lock = asyncio.Lock()
 
     def _store(self, profile_id: str) -> RecordStore:
+        """按 profile 取 RecordStore；未知 id 则 422。"""
         store = self._stores.get(profile_id)
         if store is None:
             raise KnowledgeError(422, "unknown embedding_profile_id")
         return store
 
     def _require_profile(self, profile_id: str | None) -> str:
+        """解析 embedding profile，缺省用 yaml default；未知则 422。"""
         resolved = (profile_id or self.default_profile).strip()
         if resolved not in KB_EMBEDDING_AGENTS or resolved not in self._stores:
             raise KnowledgeError(422, "unknown embedding_profile_id")
         return resolved
 
     async def list_documents(self, user_id: str) -> KbDocumentListOut:
+        """列出该用户未归档文档。"""
         refs = await self._catalog.search(
             filters={
                 "collection": KB_COLLECTION,
@@ -97,6 +107,7 @@ class KnowledgeStore:
         return KbDocumentListOut(documents=[self._document_out(ref) for ref in refs])
 
     async def get_document(self, user_id: str, doc_id: str) -> KbDocumentOut:
+        """取一篇文档卡；跨用户 403。"""
         return self._document_out(await self._document_ref(user_id, doc_id))
 
     async def create_document(
@@ -108,6 +119,7 @@ class KnowledgeStore:
         filename: str | None = None,
         mime: str | None = None,
     ) -> KbDocumentOut:
+        """新建文档并切分入库；切片锁定本次 embedding_profile_id。"""
         async with self._lock:
             return await self._create_document(
                 user_id,
@@ -127,6 +139,7 @@ class KnowledgeStore:
         filename: str | None = None,
         mime: str | None = None,
     ) -> KbDocumentOut:
+        """改文档卡。换 embedding 必须 rechunk，禁止静默改徽章。"""
         async with self._lock:
             return await self._update_document(
                 user_id,
@@ -138,6 +151,7 @@ class KnowledgeStore:
             )
 
     async def delete_document(self, user_id: str, doc_id: str) -> None:
+        """删文档：硬删记录与向量，并去掉冷文件。"""
         async with self._lock:
             ref = await self._document_ref(user_id, doc_id)
             meta = dict(ref.get("meta") or {})
@@ -152,6 +166,7 @@ class KnowledgeStore:
                 )
 
     async def document_file(self, user_id: str, doc_id: str) -> tuple[Path, str]:
+        """返回上传原件路径与下载名；粘贴文档无文件则 404。"""
         ref = await self._document_ref(user_id, doc_id)
         meta = dict(ref.get("meta") or {})
         artifact_id = meta.get("artifact_id")
@@ -169,6 +184,7 @@ class KnowledgeStore:
         return path, download_name
 
     async def list_chunks(self, user_id: str, doc_id: str) -> KbChunkListOut:
+        """列出该文档当前有效切片，按 ordinal 排序。"""
         await self._document_ref(user_id, doc_id)
         refs = await self._chunk_refs(user_id, doc_id, active_only=True)
         chunks = [await self._chunk_out(ref) for ref in refs]
@@ -178,6 +194,7 @@ class KnowledgeStore:
     async def create_chunk(
         self, user_id: str, doc_id: str, command: CreateChunkIn
     ) -> KbChunkOut:
+        """单块入库：当场 embed + put，不重写兄弟块。"""
         async with self._lock:
             doc = await self._document_ref(user_id, doc_id)
             self._reject_foreign_profile(doc, command.embedding_profile_id)
@@ -207,6 +224,7 @@ class KnowledgeStore:
     async def update_chunk(
         self, user_id: str, doc_id: str, chunk_id: str, command: UpdateChunkIn
     ) -> KbChunkOut:
+        """改一块。改正文会 put 新记录并归档旧行，diverged=true。"""
         async with self._lock:
             doc = await self._document_ref(user_id, doc_id)
             self._reject_foreign_profile(doc, command.embedding_profile_id)
@@ -275,6 +293,7 @@ class KnowledgeStore:
             return await self._chunk_out(updated)
 
     async def delete_chunk(self, user_id: str, doc_id: str, chunk_id: str) -> None:
+        """删除一块及其历史行和向量。"""
         async with self._lock:
             doc = await self._document_ref(user_id, doc_id)
             current = await self._chunk_ref(user_id, doc_id, chunk_id)
@@ -298,7 +317,8 @@ class KnowledgeStore:
         embedding_profile_id: str | None = None,
         *,
         top_n: int = 4,
-    ) -> list[dict[str, Any]]:
+    ) -> list[RecordRef]:
+        """hybrid 检索启用块；不跨 profile 融合。"""
         profile_id = self._require_profile(embedding_profile_id)
         package = await self._store(profile_id).retrieve(
             query,
@@ -317,9 +337,11 @@ class KnowledgeStore:
                 "meta.embedding_profile_id": profile_id,
             },
         )
-        refs: list[dict[str, Any]] = []
+        refs: list[RecordRef] = []
         for item in package.get("items") or []:
-            ref = item.get("ref") if isinstance(item, dict) else None
+            if not isinstance(item, dict):
+                continue
+            ref = item.get("ref")
             if isinstance(ref, dict):
                 refs.append(ref)
         return refs
@@ -332,7 +354,7 @@ class KnowledgeStore:
         *,
         top_n: int = 4,
     ) -> list[dict[str, Any]]:
-        """写稿投影：k1…kN。RecordStore id 不出卡片。"""
+        """写稿投影：签发 k1…kN。RecordStore id 不出卡片。"""
         refs = await self.retrieve(
             user_id, query, embedding_profile_id, top_n=top_n
         )
@@ -355,6 +377,7 @@ class KnowledgeStore:
     async def search(
         self, user_id: str, command: SearchKbIn
     ) -> SearchKbOut:
+        """工作区召回。query 与 embedding_profile_id 必填；空库语义写入 empty_reason。"""
         query = command.query.strip()
         profile_id = self._require_profile(command.embedding_profile_id.strip())
         listed = await self.list_documents(user_id)
@@ -431,6 +454,7 @@ class KnowledgeStore:
         filename: str | None,
         mime: str | None,
     ) -> KbDocumentOut:
+        """解析正文、写冷文件、put 文档行并逐块 ingest。"""
         profile_id = self._require_profile(command.embedding_profile_id)
         source = "upload" if file_bytes is not None else command.source
         if source == "upload" and file_bytes is None:
@@ -499,6 +523,7 @@ class KnowledgeStore:
         filename: str | None,
         mime: str | None,
     ) -> KbDocumentOut:
+        """改标题/启用，或按 rechunk 重切并换 embedding。"""
         doc = await self._document_ref(user_id, doc_id)
         meta = dict(doc.get("meta") or {})
         current_profile = str(meta.get("embedding_profile_id") or self.default_profile)
@@ -543,7 +568,7 @@ class KnowledgeStore:
 
     async def _rechunk_document(
         self,
-        doc: dict[str, Any],
+        doc: RecordRef,
         command: UpdateDocumentIn,
         *,
         profile_id: str,
@@ -553,6 +578,7 @@ class KnowledgeStore:
         filename: str | None,
         mime: str | None,
     ) -> None:
+        """先归档旧块再写入新块；失败则恢复旧记录。"""
         user_id = str(doc["scope"]["user_id"])
         doc_id = str(doc["scope"]["doc_id"])
         meta = dict(doc.get("meta") or {})
@@ -589,7 +615,10 @@ class KnowledgeStore:
             if not text:
                 raise KnowledgeError(422, "text is required to rechunk")
             suffix = suffix or meta.get("source_suffix")
-        source = meta.get("source") if meta.get("source") in {"upload", "paste"} else "paste"
+        raw_source = meta.get("source")
+        source: Literal["upload", "paste"] = (
+            raw_source if raw_source in {"upload", "paste"} else "paste"
+        )
         params = CreateDocumentIn(
             title=title,
             text=text,
@@ -675,6 +704,7 @@ class KnowledgeStore:
         await self._purge_records(old_profile, existing)
 
     def _reload_text(self, user_id: str, meta: dict[str, Any]) -> str:
+        """从冷文件重新抽正文，供重切使用。"""
         artifact_id = meta.get("artifact_id")
         if not artifact_id:
             return ""
@@ -700,6 +730,7 @@ class KnowledgeStore:
         profile_id: str,
         suffix: str | None,
     ) -> tuple[list[TextChunk], str]:
+        """调用 Parser 预览切分；超 80 块 422。"""
         if not (text or "").strip():
             return [], ""
         try:
@@ -724,7 +755,8 @@ class KnowledgeStore:
             raise KnowledgeError(422, "too many chunks")
         return payload.chunks, payload.notes
 
-    async def _ingest_chunks(self, doc: dict[str, Any], chunks: list[TextChunk]) -> None:
+    async def _ingest_chunks(self, doc: RecordRef, chunks: list[TextChunk]) -> None:
+        """按序 put 各块；一块失败抛出，由调用方回滚。"""
         for ordinal, chunk in enumerate(chunks):
             try:
                 await self._put_chunk(doc, chunk, ordinal=ordinal, diverged=False)
@@ -740,15 +772,16 @@ class KnowledgeStore:
 
     async def _put_chunk(
         self,
-        doc: dict[str, Any],
+        doc: RecordRef,
         chunk: TextChunk,
         *,
         ordinal: int,
         diverged: bool,
         enabled: bool = True,
         chunk_id: str | None = None,
-        replaces: dict[str, Any] | None = None,
+        replaces: RecordRef | None = None,
     ) -> KbChunkOut:
+        """embed + put 一块，并链到文档；替换时归档旧行。"""
         scope = dict(doc.get("scope") or {})
         user_id = str(scope["user_id"])
         doc_id = str(scope["doc_id"])
@@ -828,11 +861,12 @@ class KnowledgeStore:
 
     async def _set_chunk_count(
         self,
-        doc: dict[str, Any],
+        doc: RecordRef,
         *,
         status: str | None = None,
         error: str | None = None,
     ) -> None:
+        """回写文档的启用块数量与状态。"""
         user_id = str(doc["scope"]["user_id"])
         doc_id = str(doc["scope"]["doc_id"])
         live = await self._chunk_refs(user_id, doc_id, active_only=True)
@@ -848,6 +882,7 @@ class KnowledgeStore:
     async def _rewrite_doc_enabled(
         self, user_id: str, doc_id: str, enabled: bool, profile_id: str
     ) -> None:
+        """把各块 meta.doc_enabled 与文档启用状态对齐。"""
         for ref in await self._chunk_refs(user_id, doc_id, active_only=True):
             updated = _with_meta(ref, doc_enabled=enabled)
             await self._catalog.backend.put_record(updated)
@@ -856,10 +891,11 @@ class KnowledgeStore:
     async def _archive_chunks(
         self,
         profile_id: str,
-        refs: list[dict[str, Any]],
+        refs: list[RecordRef],
         *,
         drop_vectors: bool = True,
     ) -> None:
+        """把切片标成 archived，可选删除向量。"""
         if not refs:
             return
         store = self._stores.get(profile_id)
@@ -879,7 +915,8 @@ class KnowledgeStore:
                     exc_info=True,
                 )
 
-    async def _restore_chunks(self, profile_id: str, refs: list[dict[str, Any]]) -> None:
+    async def _restore_chunks(self, profile_id: str, refs: list[RecordRef]) -> None:
+        """重切失败时把旧块记录和向量写回去。"""
         for ref in refs:
             await self._catalog.backend.put_record(ref)
             try:
@@ -892,8 +929,8 @@ class KnowledgeStore:
                     exc_info=True,
                 )
 
-    async def _purge_records(self, profile_id: str, refs: list[dict[str, Any]]) -> None:
-        """RecordStore 无公开 delete：宿主按 sqlite 行硬删 chunk / document。"""
+    async def _purge_records(self, profile_id: str, refs: list[RecordRef]) -> None:
+        """RecordStore 无公开 delete：按 sqlite 行硬删 chunk / document 与向量。"""
         ids = list(dict.fromkeys(str(ref["id"]) for ref in refs if ref.get("id")))
         if not ids:
             return
@@ -919,6 +956,7 @@ class KnowledgeStore:
         parameters = tuple(ids)
 
         def _delete_rows(connection: Any) -> list[str]:
+            """在同一事务里删 links / checkpoints / vectors / records。"""
             link_ids: list[str] = []
             if table_exists(connection, "links"):
                 rows = connection.execute(
@@ -969,6 +1007,7 @@ class KnowledgeStore:
             return link_ids
 
         async def _run() -> list[str]:
+            """持写锁执行 sqlite 删除。"""
             with connect(write=True) as connection:
                 return _delete_rows(connection)
 
@@ -982,7 +1021,8 @@ class KnowledgeStore:
         if discard is not None:
             await discard([*ids, *link_ids])
 
-    async def _sync_vector_meta(self, profile_id: str, ref: dict[str, Any]) -> None:
+    async def _sync_vector_meta(self, profile_id: str, ref: RecordRef) -> None:
+        """块启用变化后同步向量：不可见则删，可见则复用或重 embed。"""
         store = self._stores.get(profile_id)
         if store is None:
             return
@@ -1018,7 +1058,8 @@ class KnowledgeStore:
 
     async def _document_ref(
         self, user_id: str, doc_id: str, *, include_archived: bool = False
-    ) -> dict[str, Any]:
+    ) -> RecordRef:
+        """按 doc_id 取文档 RecordRef；校验归属。"""
         hits = await self._catalog.search(
             filters={
                 "collection": KB_COLLECTION,
@@ -1044,7 +1085,8 @@ class KnowledgeStore:
 
     async def _chunk_refs(
         self, user_id: str, doc_id: str, *, active_only: bool
-    ) -> list[dict[str, Any]]:
+    ) -> list[RecordRef]:
+        """列出文档下切片记录。"""
         filters: dict[str, Any] = {
             "collection": KB_COLLECTION,
             "kind": KIND_CHUNK,
@@ -1055,7 +1097,8 @@ class KnowledgeStore:
             filters["meta.status"] = "active"
         return await self._catalog.search(filters=filters)
 
-    async def _chunk_ref(self, user_id: str, doc_id: str, chunk_id: str) -> dict[str, Any]:
+    async def _chunk_ref(self, user_id: str, doc_id: str, chunk_id: str) -> RecordRef:
+        """取一块当前有效记录；跨用户 403。"""
         hits = await self._catalog.search(
             filters={
                 "collection": KB_COLLECTION,
@@ -1080,7 +1123,8 @@ class KnowledgeStore:
             raise KnowledgeError(404, "chunk not found")
         return hits[0]
 
-    async def _chunk_out(self, ref: dict[str, Any]) -> KbChunkOut:
+    async def _chunk_out(self, ref: RecordRef) -> KbChunkOut:
+        """RecordRef 投影成 KbChunkOut。"""
         meta = dict(ref.get("meta") or {})
         scope = dict(ref.get("scope") or {})
         try:
@@ -1103,20 +1147,27 @@ class KnowledgeStore:
             embedding_profile_id=str(meta.get("embedding_profile_id") or ""),
         )
 
-    def _document_out(self, ref: dict[str, Any]) -> KbDocumentOut:
+    def _document_out(self, ref: RecordRef) -> KbDocumentOut:
+        """RecordRef 投影成 KbDocumentOut。"""
         meta = dict(ref.get("meta") or {})
-        source = meta.get("source") if meta.get("source") in {"upload", "paste"} else "paste"
+        raw_source = meta.get("source")
+        source: Literal["upload", "paste"] = (
+            raw_source if raw_source in {"upload", "paste"} else "paste"
+        )
         status = meta.get("status")
         if status not in {"ingesting", "ready", "failed", "archived"}:
             status = "ready"
-        strategy = meta.get("strategy") if meta.get("strategy") in {
-            "sentence",
-            "token",
-            "markdown",
-            "markdown_element",
-            "semantic",
-            "sentence_window",
-        } else DEFAULT_CHUNK_STRATEGY
+        raw_strategy = meta.get("strategy")
+        strategy: ChunkStrategy = (
+            raw_strategy if raw_strategy in {
+                "sentence",
+                "token",
+                "markdown",
+                "markdown_element",
+                "semantic",
+                "sentence_window",
+            } else DEFAULT_CHUNK_STRATEGY
+        )
         return KbDocumentOut(
             doc_id=str((ref.get("scope") or {}).get("doc_id") or ""),
             title=str(meta.get("title") or ref.get("summary") or ""),
@@ -1144,6 +1195,7 @@ class KnowledgeStore:
         )
 
     def _write_artifact(self, user_id: str, filename: str, data: bytes) -> dict[str, Any]:
+        """把上传原件写入 files_root/{user_id}/{artifact_id}/。"""
         artifact_id = str(uuid4())
         stored = _safe_filename(filename)
         folder = self.files_root / user_id / artifact_id
@@ -1157,7 +1209,8 @@ class KnowledgeStore:
             "filename": filename,
         }
 
-    def _reject_foreign_profile(self, doc: dict[str, Any], profile_id: str | None) -> None:
+    def _reject_foreign_profile(self, doc: RecordRef, profile_id: str | None) -> None:
+        """单块请求不得换文档已锁定的 embedding。"""
         if not profile_id:
             return
         expected = str((doc.get("meta") or {}).get("embedding_profile_id") or "")
@@ -1165,13 +1218,15 @@ class KnowledgeStore:
             raise KnowledgeError(422, "embedding_profile_id does not match document")
 
     @staticmethod
-    def _next_ordinal(refs: list[dict[str, Any]]) -> int:
+    def _next_ordinal(refs: list[RecordRef]) -> int:
+        """下一切片序号：当前最大 ordinal + 1。"""
         if not refs:
             return 0
         return max(int((item.get("meta") or {}).get("ordinal") or 0) for item in refs) + 1
 
 
 def _extract(filename: str | None, data: bytes, mime: str | None):
+    """抽上传文件正文；失败转成 KnowledgeError。"""
     try:
         return extract_upload(filename, data, mime)
     except ExtractError as error:
@@ -1192,6 +1247,7 @@ def _document_meta(
     chunk_count: int,
     notes: str,
 ) -> dict[str, Any]:
+    """组装文档 meta：切分参数、profile、冷文件指纹。"""
     meta: dict[str, Any] = {
         "status": status,
         "enabled": enabled,
@@ -1221,16 +1277,18 @@ def _document_meta(
     return meta
 
 
-def _copy_ref(ref: dict[str, Any]) -> dict[str, Any]:
+def _copy_ref(ref: RecordRef) -> RecordRef:
+    """浅拷贝 RecordRef 的 meta/scope，避免原地改旧快照。"""
     copied = dict(ref)
     copied["meta"] = dict(ref.get("meta") or {})
     scope = ref.get("scope")
     if isinstance(scope, dict):
         copied["scope"] = dict(scope)
-    return copied
+    return cast(RecordRef, copied)
 
 
-def _with_meta(ref: dict[str, Any], **updates: Any) -> dict[str, Any]:
+def _with_meta(ref: RecordRef, **updates: Any) -> RecordRef:
+    """复制一条记录并合并 meta 字段。"""
     updated = dict(ref)
     meta = dict(ref.get("meta") or {})
     for key, value in updates.items():
@@ -1239,10 +1297,11 @@ def _with_meta(ref: dict[str, Any], **updates: Any) -> dict[str, Any]:
         else:
             meta[key] = value
     updated["meta"] = meta
-    return updated
+    return cast(RecordRef, updated)
 
 
 def _title(title: str | None, filename: str | None, text: str) -> str:
+    """文档标题：显式 title > 文件名 > 正文首行。"""
     if title and title.strip():
         return title.strip()
     if filename:
@@ -1256,12 +1315,14 @@ def _title(title: str | None, filename: str | None, text: str) -> str:
 
 
 def _safe_filename(name: str) -> str:
+    """冷文件名去掉路径与危险字符。"""
     base = Path(name).name.strip() or "upload"
     cleaned = _UNSAFE_NAME.sub("_", base).strip("._") or "upload"
     return cleaned[:180]
 
 
 def _optional_str(value: Any) -> str | None:
+    """空串视为 None。"""
     if value is None:
         return None
     text = str(value)
@@ -1269,6 +1330,7 @@ def _optional_str(value: Any) -> str | None:
 
 
 def _optional_int(value: Any) -> int | None:
+    """空值视为 None，否则转 int。"""
     if value is None or value == "":
         return None
     return int(value)

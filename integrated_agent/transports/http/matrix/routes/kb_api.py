@@ -48,10 +48,12 @@ _UPDATE_FIELDS = set(UpdateDocumentIn.model_fields)
 
 
 def _raise_identity(error: IdentityError) -> None:
+    """把 IdentityStore 的业务错误转成 HTTP 状态码，不在路由里重写文案。"""
     raise HTTPException(status_code=error.status, detail=str(error)) from error
 
 
 def _raise_knowledge(error: KnowledgeError) -> None:
+    """把 KnowledgeStore 的业务错误转成 HTTP 状态码，不在路由里重写文案。"""
     raise HTTPException(status_code=error.status, detail=str(error)) from error
 
 
@@ -59,14 +61,17 @@ def _token(
     authorization: str | None,
     x_user_token: str | None,
 ) -> str | None:
+    """优先 X-User-Token，否则 Authorization: Bearer。"""
     return parse_bearer_token(authorization, x_user_token)
 
 
 def _http_validation(error: ValidationError) -> None:
+    """把 Pydantic ValidationError 转成 422。"""
     raise HTTPException(status_code=422, detail=error.errors()) from error
 
 
 def _form_payload(form: Any, keys: set[str]) -> dict[str, Any]:
+    """从表单取出模型字段，跳过空值和文件。"""
     payload: dict[str, Any] = {}
     for key in keys:
         value = form.get(key)
@@ -79,6 +84,7 @@ def _form_payload(form: Any, keys: set[str]) -> dict[str, Any]:
 
 
 async def _read_upload(form: Any) -> tuple[bytes | None, str | None, str | None]:
+    """从表单读 file 字段的字节、文件名和 MIME。"""
     upload = form.get("file")
     if upload is None or not hasattr(upload, "read"):
         return None, None, None
@@ -97,6 +103,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None,
         x_user_token: str | None,
     ) -> UserOut:
+        """用当前 token 解析登录用户；失败转 HTTP。"""
         try:
             return await identity.user_for_token(_token(authorization, x_user_token))
         except IdentityError as error:
@@ -108,6 +115,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> EmbeddingProfileListOut:
+        """列出可用 embedding profile，供向导入库选择。"""
         await _require_user(authorization, x_user_token)
         return list_embedding_profiles()
 
@@ -116,6 +124,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> ChunkStrategyListOut:
+        """列出切分策略目录。"""
         await _require_user(authorization, x_user_token)
         return CHUNK_STRATEGY_CATALOG
 
@@ -125,6 +134,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> PreviewChunksOut:
+        """按所选策略预览切片，不写库。"""
         await _require_user(authorization, x_user_token)
         try:
             return await preview_chunks(command)
@@ -152,6 +162,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> SearchKbOut:
+        """按 query 检索当前用户知识库切片。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.search(user.user_id, command)
@@ -165,6 +176,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> ChatKbOut:
+        """RAG 召回聊天：改写拆分检索后生成带 [[kb:]] 的回答。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await answer_kb_chat(knowledge, user.user_id, command)
@@ -178,6 +190,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbDocumentOut:
+        """新建文档并切分入库；支持 JSON 或 multipart。"""
         user = await _require_user(authorization, x_user_token)
         try:
             command, file_bytes, filename, mime = await _parse_create(request)
@@ -197,6 +210,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbDocumentListOut:
+        """列出当前用户知识库文档。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.list_documents(user.user_id)
@@ -210,6 +224,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbDocumentOut:
+        """打开一篇文档卡。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.get_document(user.user_id, doc_id)
@@ -224,6 +239,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbDocumentOut:
+        """改标题/启用/重切；可换文件。"""
         user = await _require_user(authorization, x_user_token)
         try:
             command, file_bytes, filename, mime = await _parse_update(request)
@@ -245,6 +261,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> None:
+        """归档删除文档及其切片。"""
         user = await _require_user(authorization, x_user_token)
         try:
             await knowledge.delete_document(user.user_id, doc_id)
@@ -258,6 +275,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> FileResponse:
+        """下载文档冷文件。"""
         user = await _require_user(authorization, x_user_token)
         try:
             path, download_name = await knowledge.document_file(user.user_id, doc_id)
@@ -272,6 +290,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbChunkListOut:
+        """列出文档当前有效切片。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.list_chunks(user.user_id, doc_id)
@@ -290,6 +309,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbChunkOut:
+        """单块入库，不重写兄弟块。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.create_chunk(user.user_id, doc_id, command)
@@ -308,6 +328,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> KbChunkOut:
+        """改单块文本或启用状态。"""
         user = await _require_user(authorization, x_user_token)
         try:
             return await knowledge.update_chunk(user.user_id, doc_id, chunk_id, command)
@@ -325,6 +346,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
         authorization: str | None = Header(default=None),
         x_user_token: str | None = Header(default=None, alias="X-User-Token"),
     ) -> None:
+        """归档删除单块。"""
         user = await _require_user(authorization, x_user_token)
         try:
             await knowledge.delete_chunk(user.user_id, doc_id, chunk_id)
@@ -338,6 +360,7 @@ def build_kb_router(identity: IdentityStore, knowledge: KnowledgeStore) -> APIRo
 async def _parse_create(
     request: Request,
 ) -> tuple[CreateDocumentIn, bytes | None, str | None, str | None]:
+    """解析新建文档请求：multipart 带文件或 JSON 纯文本。"""
     content_type = (request.headers.get("content-type") or "").lower()
     try:
         if content_type.startswith("multipart/form-data"):
@@ -360,6 +383,7 @@ async def _parse_create(
 async def _parse_update(
     request: Request,
 ) -> tuple[UpdateDocumentIn, bytes | None, str | None, str | None]:
+    """解析更新文档请求：multipart 换文件或 JSON 字段。"""
     content_type = (request.headers.get("content-type") or "").lower()
     try:
         if content_type.startswith("multipart/form-data"):

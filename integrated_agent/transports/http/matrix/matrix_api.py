@@ -26,26 +26,22 @@ def build_matrix_router(
     data_root: Path | None = None,
 ) -> APIRouter:
     router = APIRouter(tags=["matrix"])
+    # 账号/平台/案例夹具目录；省略则用仓库内 data/matrix
     catalog_root = data_root or (PROJECT_ROOT / "data" / "matrix")
     catalog = MatrixCatalog(catalog_root)
-    router.include_router(build_auth_router(service.identity))
-    router.include_router(build_session_router(service.identity))
-    router.include_router(build_collection_router(service.identity))
-    router.include_router(build_kb_router(service.identity, service.knowledge))
-    router.include_router(build_task_router(service, catalog_root=catalog_root))
-    router.include_router(build_catalog_router(catalog))
+    router.include_router(build_auth_router(service.identity))  # 登录与本机账号
+    router.include_router(build_session_router(service.identity))  # 对话 session
+    router.include_router(build_collection_router(service.identity))  # 收藏夹
+    router.include_router(build_kb_router(service.identity, service.knowledge))  # 知识库 CRUD / 检索 / 召回聊天
+    router.include_router(build_task_router(service, catalog_root=catalog_root))  # 写稿 / 回评任务
+    router.include_router(build_catalog_router(catalog))  # 人设与互动规则目录
 
     if static_root is not None:
-
-        def matrix_page() -> FileResponse:
-            return FileResponse(static_root / "matrix.html")
+        page = static_root / "matrix.html"
 
         @router.get("/", response_class=FileResponse)
-        async def root_index() -> FileResponse:
-            return matrix_page()
-
         @router.get("/matrix", response_class=FileResponse)
         async def matrix_index() -> FileResponse:
-            return matrix_page()
+            return FileResponse(page)
 
     return router

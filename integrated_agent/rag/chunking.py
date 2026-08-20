@@ -1,9 +1,11 @@
+"""知识库切分预览：清洗后按用户策略卡走 LlamaIndex Parser，产出 TextChunk，不写库。"""
+
 from __future__ import annotations
 
 import inspect
 import re
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 from llama_index.core.base.embeddings.base import BaseEmbedding, Embedding
 from llama_index.core.bridge.pydantic import PrivateAttr
@@ -35,9 +37,9 @@ from integrated_agent.rag.models import (
     TextChunk,
 )
 
-_ZH_SENTENCE_RE = re.compile(r"(?<=[。！？；])")
-_HEADING_RE = re.compile(r"^(#+)\s+(.*)$")
-_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+_ZH_SENTENCE_RE = re.compile(r"(?<=[。！？；])")  # 中文句末切分，保留标点在前一段
+_HEADING_RE = re.compile(r"^(#+)\s+(.*)$")  # Markdown 标题行
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")  # 含汉字则软换行直接拼接，不加空格
 
 
 def _join_soft_breaks(text: str) -> str:
@@ -70,32 +72,39 @@ def split_zh_sentences(text: str) -> list[str]:
 class _ProfileEmbedding(BaseEmbedding):
     """把 Step 1 Agent embed_texts 接到 SemanticSplitterNodeParser。"""
 
-    _profile_id: str = PrivateAttr()
+    _profile_id: str = PrivateAttr()  # Pydantic 私有字段，不进模型序列化
 
     def __init__(self, profile_id: str) -> None:
+        """绑定 KB embedding profile，不走 LlamaIndex 自带 Embed 客户端。"""
         super().__init__(model_name=profile_id, embed_batch_size=10)
         self._profile_id = profile_id
 
     def _get_query_embedding(self, query: str) -> Embedding:
+        """同步 query 向量；语义切分实际走异步路径。"""
         return self._get_text_embedding(query)
 
     async def _aget_query_embedding(self, query: str) -> Embedding:
+        """异步 query 向量。"""
         return await self._aget_text_embedding(query)
 
     def _get_text_embedding(self, text: str) -> Embedding:
+        """同步单条向量。"""
         return self._get_text_embeddings([text])[0]
 
     def _get_text_embeddings(self, texts: list[str]) -> list[Embedding]:
+        """同步批量向量；若底层是协程则拒绝，避免在 sync parser 里漏跑 embed。"""
         result = kb_embeddings.embed_profile_texts(self._profile_id, texts)
         if inspect.isawaitable(result):
             raise ChunkPreviewError(500, "semantic embed must run on the async parser path")
         return result
 
     async def _aget_text_embedding(self, text: str) -> Embedding:
+        """异步单条向量。"""
         vectors = await self._aget_text_embeddings([text])
         return vectors[0]
 
     async def _aget_text_embeddings(self, texts: list[str]) -> list[Embedding]:
+        """异步批量向量，转给 Step 1 Agent。"""
         return await kb_embeddings.embed_profile_texts(self._profile_id, texts)
 
     async def aget_text_embedding_batch(
@@ -135,13 +144,14 @@ async def preview_chunks(command: PreviewChunksIn) -> PreviewChunksOut:
             raise
         notes = f"semantic embedding failed ({exc}); fell back to sentence"
         strategy = "sentence"
-        nodes = _parse_sentence(documents, command.chunk_size, command.chunk_overlap)
+        nodes = _parse_sentence(documents, command.chunk_size, command.chunk_overlap)  # 语义失败降级句切，预览不中断
 
     chunks = _project_chunks(text, nodes)
     return PreviewChunksOut(strategy=strategy, notes=notes, chunks=chunks)
 
 
 def _normalize_source_suffix(value: str | None) -> str:
+    """文件名或扩展名收成小写 .md / .pdf；只影响清洗是否保结构。"""
     raw = (value or "").strip().lower()
     if not raw:
         return ""
@@ -152,24 +162,30 @@ def _normalize_source_suffix(value: str | None) -> str:
     return raw if raw.startswith(".") else f".{raw}"
 
 
+def _as_documents(nodes: Sequence[BaseNode]) -> list[Document]:
+    """公开入口标成 Document，内部按 BaseNode 切；过滤 IndexNode，不改节点本体。"""
+    return cast(list[Document], [node for node in nodes if not isinstance(node, IndexNode)])
+
+
 async def _parse_nodes(
     command: PreviewChunksIn, documents: Sequence[BaseNode]
 ) -> list[BaseNode]:
-    docs = [node for node in documents if not isinstance(node, IndexNode)]
+    """按策略卡选 Parser；超长节再交给句切。未知策略 422。"""
+    docs = _as_documents(documents)
     if not docs:
         return []
     size, overlap = command.chunk_size, command.chunk_overlap
     strategy = command.strategy
     if strategy == "sentence":
-        return _parse_sentence(docs, size, overlap)
+        return _parse_sentence(docs, size, overlap)  # 中文句切
     if strategy == "token":
-        return TokenTextSplitter(
+        return TokenTextSplitter(  # tokenizer 长度切，中文标点作 backup
             chunk_size=size,
             chunk_overlap=overlap,
             backup_separators=["\n", "。", "！", "？", "；"],
         ).get_nodes_from_documents(docs, show_progress=False)
     if strategy == "markdown":
-        capped = [
+        capped = [  # 四级及以上标题降成粗体，避免再切一节
             Document(
                 text=_cap_markdown_headings(
                     node.get_content(metadata_mode=MetadataMode.NONE),
@@ -187,12 +203,12 @@ async def _parse_nodes(
         body = "\n\n".join(
             node.get_content(metadata_mode=MetadataMode.NONE) for node in docs
         )
-        return _parse_markdown_element(body, size, overlap)
+        return _parse_markdown_element(body, size, overlap)  # 标题/段落/表格，不跑表格 LLM
     if strategy == "semantic":
         profile_id = (command.embedding_profile_id or "").strip()
         if profile_id not in KB_EMBEDDING_AGENTS:
             raise ChunkPreviewError(422, f"unknown embedding_profile_id: {profile_id}")
-        parser = SemanticSplitterNodeParser(
+        parser = SemanticSplitterNodeParser(  # embedding 相似度断点切
             embed_model=_ProfileEmbedding(profile_id),
             breakpoint_percentile_threshold=command.breakpoint_percentile_threshold,
             buffer_size=command.buffer_size,
@@ -201,7 +217,7 @@ async def _parse_nodes(
         nodes = await parser.aget_nodes_from_documents(docs, show_progress=False)
         return _limit_length(nodes, size, overlap)
     if strategy == "sentence_window":
-        windows = SentenceWindowNodeParser.from_defaults(
+        windows = SentenceWindowNodeParser.from_defaults(  # 句为核，邻句进 window 元数据
             sentence_splitter=split_zh_sentences,
             window_size=command.window_size,
             window_metadata_key="window",
@@ -214,12 +230,17 @@ async def _parse_nodes(
 def _parse_sentence(
     documents: Sequence[BaseNode], chunk_size: int, chunk_overlap: int
 ) -> list[BaseNode]:
+    """中文句切：。！？；与空行分段。"""
+    docs = _as_documents(documents)
+    if not docs:
+        return []
     return _sentence_splitter(chunk_size, chunk_overlap).get_nodes_from_documents(
-        list(documents), show_progress=False
+        docs, show_progress=False
     )
 
 
 def _sentence_splitter(chunk_size: int, chunk_overlap: int) -> SentenceSplitter:
+    """官方 SentenceSplitter + 中文句函数，给句切和超长回切共用。"""
     return SentenceSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -232,11 +253,12 @@ def _sentence_splitter(chunk_size: int, chunk_overlap: int) -> SentenceSplitter:
 def _limit_length(
     nodes: Sequence[BaseNode], chunk_size: int, chunk_overlap: int
 ) -> list[BaseNode]:
-    usable = [node for node in nodes if not isinstance(node, IndexNode)]
-    if not usable:
+    """markdown / semantic / window 切完后，超长块再按句长切开。"""
+    docs = _as_documents(nodes)
+    if not docs:
         return []
     return _sentence_splitter(chunk_size, chunk_overlap).get_nodes_from_documents(
-        usable, show_progress=False
+        docs, show_progress=False
     )
 
 
@@ -275,6 +297,7 @@ def _cap_markdown_headings(text: str, max_level: int) -> str:
 
 
 def _project_chunks(source: str, nodes: Sequence[BaseNode]) -> list[TextChunk]:
+    """Parser 节点投成预览卡：正文、字偏移、header_path / element_type / window。"""
     cursor = 0
     chunks: list[TextChunk] = []
     for node in nodes:
@@ -304,6 +327,7 @@ def _project_chunks(source: str, nodes: Sequence[BaseNode]) -> list[TextChunk]:
 def _char_span(
     source: str, body: str, cursor: int, node: BaseNode
 ) -> tuple[int | None, int | None]:
+    """优先用 TextNode 自带起止；否则从清洗后原文里找本块。"""
     if isinstance(node, TextNode) and node.start_char_idx is not None:
         start = node.start_char_idx
         end = node.end_char_idx
@@ -319,6 +343,7 @@ def _char_span(
 
 
 def _public_metadata(node: BaseNode) -> dict[str, Any]:
+    """丢掉 LlamaIndex 下划线内部键，预览卡只展示业务 metadata。"""
     return {
         key: value
         for key, value in dict(node.metadata).items()
@@ -327,6 +352,7 @@ def _public_metadata(node: BaseNode) -> dict[str, Any]:
 
 
 def _optional_str(value: Any) -> str | None:
+    """空串与 None 都当成未填。"""
     if value is None:
         return None
     text = str(value)
