@@ -1,4 +1,4 @@
-"""COMPOSE_FLOW 的四个可观察阶段：prelude → brief → 按 work_item 检索写稿 → review 打包。"""
+"""写帖 TriggerFlow 阶段：prelude → brief → 按 work_item 检索写稿 → review。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,23 @@ from typing import Any, cast
 
 from agently import Agently, TriggerFlowRuntimeData
 
+from integrated_agent.runtimes.matrix.host.constraints import (
+    AhoCorasickMatcher,
+    KB_CITE_RE,
+    apply_constraint_gate,
+)
+from integrated_agent.runtimes.matrix.host.drafting import (
+    apply_review,
+    retrieve_and_gate_draft,
+    rollup_status,
+)
+from integrated_agent.runtimes.matrix.host.snapshots import (
+    OFFERED_CLAIM_TYPES,
+    TWITTER_PLATFORM_KEY,
+    Snapshot,
+    merged_forbidden_topics,
+)
+from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 from integrated_agent.runtimes.matrix.models import (
     BriefOut,
     ComposeDraftOut,
@@ -14,16 +31,6 @@ from integrated_agent.runtimes.matrix.models import (
     ReviewOut,
     WorkItem,
 )
-
-from ....constraints import AhoCorasickMatcher, KB_CITE_RE, apply_constraint_gate
-from ....drafting import apply_review, retrieve_and_gate_draft, rollup_status
-from ....snapshots import (
-    OFFERED_CLAIM_TYPES,
-    TWITTER_PLATFORM_KEY,
-    Snapshot,
-    merged_forbidden_topics,
-)
-from ....trace_log import TraceLog
 
 
 async def compose_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:

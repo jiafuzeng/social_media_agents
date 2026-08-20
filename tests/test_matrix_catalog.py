@@ -7,8 +7,7 @@ from fastapi.testclient import TestClient
 
 from integrated_agent.config import PROJECT_ROOT
 from integrated_agent.transports.http import create_matrix_api
-from tests.fakes import install_scripted_ask
-from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
+from tests.fakes import ScriptedMatrixModel, install_scripted_ask
 from integrated_agent.bootstrap.matrix_service import build_matrix_service
 
 

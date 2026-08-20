@@ -3,11 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import Field, ValidationError
 
-from integrated_agent.runtimes.matrix.analysis.catalog import (
+from integrated_agent.runtimes.matrix.host.catalog import (
     CatalogError,
     MatrixCatalog,
 )
-from integrated_agent.runtimes.matrix.analysis.snapshots import (
+from integrated_agent.runtimes.matrix.host.snapshots import (
     AccountCard,
     GuardrailCard,
     InteractionCard,

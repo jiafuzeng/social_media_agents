@@ -46,7 +46,7 @@ bootstrap → transports / gateway / runtimes / storage
 transports → gateway contracts + matrix models
 gateway → AgentRuntime.stream
 runtimes/matrix → gateway contracts
-runtimes/matrix/analysis → 不依赖 HTTP、企业微信、Gateway、question.analysis
+runtimes/matrix/host → 不依赖 HTTP、企业微信、Gateway、question.analysis
 ```
 
 | 路径 | 所有者 | 不拥有 |
@@ -55,12 +55,13 @@ runtimes/matrix/analysis → 不依赖 HTTP、企业微信、Gateway、question.
 | `runtimes/matrix/service.py` | 队列、503、任务状态 | 语义拆解 |
 | `runtimes/matrix/worker.py` | 外层 analyze → publish SSE | Prompt |
 | `runtimes/matrix/client.py` | SSE → GatewayEvent | 业务阶段 |
-| `analysis/snapshots.py` | 短 key 投影、snapshot_id | 意图路由 |
-| `analysis/constraints.py` | AC、字数、引用、降级算子 | 该不该回 |
-| `analysis/retrieval.py` | RetrieveCases 契约 | 硬词表、放行 |
-| `analysis/workflows/compose_flow.py` | 创作 TriggerFlow 与 close | 回复节点 |
-| `analysis/workflows/reply_flow.py` | 回复 TriggerFlow 与 close | 趋势节点 |
-| `chunks/compose|reply/{brief,draft,review}.py` | 各三条可观察阶段 | 发送 |
+| `runtimes/matrix/capability.py` | 按 scenario 分发到 compose/reply | 业务节点、Prompt |
+| `runtimes/matrix/compose/` | 写帖 TriggerFlow 与阶段 | 回评、召回聊天 |
+| `runtimes/matrix/reply/` | 回评 TriggerFlow 与阶段 | 写帖、趋势节点 |
+| `runtimes/matrix/kb_chat/` | 召回聊天 TriggerFlow | 写帖、回评 |
+| `host/snapshots.py` | 短 key 投影、snapshot_id | 意图路由 |
+| `host/constraints.py` | AC、字数、引用、降级算子 | 该不该回 |
+| `host/retrieval.py` | RetrieveCases 契约 | 硬词表、放行 |
 | `transports/http/matrix_api.py` | HTTP Transport → GatewayRequest | 直连队列 |
 | `data/matrix/` | 演示快照与案例夹具 | 运行时状态 |
 

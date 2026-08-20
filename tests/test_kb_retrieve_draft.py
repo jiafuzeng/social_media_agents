@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 
 from integrated_agent.config import PROJECT_ROOT
-from integrated_agent.runtimes.matrix.analysis.drafting import retrieve_and_gate_draft
-from integrated_agent.runtimes.matrix.analysis.retrieval import RetrieveResult
-from integrated_agent.runtimes.matrix.analysis.snapshots import (
+from integrated_agent.runtimes.matrix.host.drafting import retrieve_and_gate_draft
+from integrated_agent.runtimes.matrix.host.retrieval import RetrieveResult
+from integrated_agent.runtimes.matrix.host.snapshots import (
     TWITTER_PLATFORM_KEY,
     bind_snapshot,
 )
-from integrated_agent.runtimes.matrix.analysis.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 from integrated_agent.runtimes.matrix.models import ComposeDraftOut, WorkItem
 
 
@@ -114,7 +114,7 @@ async def test_kb_retrieve_failed_does_not_skip() -> None:
 async def test_kb_only_hit_cannot_pass_efficacy_empty_cases(monkeypatch) -> None:
     snapshot = bind_snapshot(data_root=DATA_ROOT, account_key="default", scenario="compose")
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.analysis.drafting.retrieve_cases",
+        "integrated_agent.runtimes.matrix.host.drafting.retrieve_cases",
         lambda *args, **kwargs: RetrieveResult(state="empty", cards=[]),
     )
     gated, _cards, notes = await retrieve_and_gate_draft(
@@ -143,7 +143,7 @@ async def test_case_retrieve_failed_still_skips(monkeypatch, tmp_path: Path) -> 
     del tmp_path
     snapshot = bind_snapshot(data_root=DATA_ROOT, account_key="default", scenario="compose")
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.analysis.drafting.retrieve_cases",
+        "integrated_agent.runtimes.matrix.host.drafting.retrieve_cases",
         lambda *args, **kwargs: RetrieveResult(state="failed", cards=[]),
     )
     gated, cards, notes = await retrieve_and_gate_draft(

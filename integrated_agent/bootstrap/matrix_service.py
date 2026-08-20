@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from integrated_agent.runtimes.matrix.analysis import MatrixAnalysisCapability
+from integrated_agent.runtimes.matrix.capability import MatrixAnalysisCapability
 from integrated_agent.runtimes.matrix.db.settings import load_identity_db_settings
 from integrated_agent.runtimes.matrix.identity import IdentityStore
 from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore

@@ -16,12 +16,11 @@ from integrated_agent.rag.models import (
     UpdateChunkIn,
     UpdateDocumentIn,
 )
-from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
+from tests.fakes import ScriptedMatrixModel, install_kb_chat_ask, install_scripted_ask
 from integrated_agent.runtimes.matrix.kb_chat.scripted import ScriptedKbChatModel
 from integrated_agent.runtimes.matrix.knowledge import KnowledgeStore
 from integrated_agent.runtimes.matrix import kb_store as kb_store_mod
 from integrated_agent.transports.http import create_matrix_api
-from tests.fakes import install_kb_chat_ask, install_scripted_ask
 from tests.test_kb_store import _ProbeProvider
 
 

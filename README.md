@@ -71,7 +71,7 @@ transports → gateway contracts
 gateway → runtime protocol
 runtimes → gateway contracts
 question analysis → 不依赖 HTTP、企业微信或 Gateway
-matrix analysis → 不依赖 HTTP、企业微信、Gateway 或 question.analysis
+matrix host → 不依赖 HTTP、企业微信、Gateway 或 question.analysis
 ```
 
 `bootstrap` 可以认识所有模块，但只组装对象；任何业务规则都不能写回启动文件。

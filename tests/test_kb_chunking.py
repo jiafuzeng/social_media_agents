@@ -19,9 +19,8 @@ from integrated_agent.rag.models import (
     ChunkPreviewError,
     PreviewChunksIn,
 )
-from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
+from tests.fakes import ScriptedMatrixModel, install_scripted_ask
 from integrated_agent.transports.http import create_matrix_api
-from tests.fakes import install_scripted_ask
 
 _MARKDOWN = """# 售后
 
@@ -503,7 +502,8 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert 'id="kbChatThread"' in page
         assert 'id="kbChatPlan"' in page
         assert page.count('id="kbChatPlan"') == 1
-        assert "回答只在相关句后标 [[kb:k1]]" in page
+        assert "一句一个依据" in page
+        assert "[[kb:kN]]" in page
         assert "保存并处理" in page
         assert "删除该文档的旧切片记录和向量" in page
         assert "确认重切" in page

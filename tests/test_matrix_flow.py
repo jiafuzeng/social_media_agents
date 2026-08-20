@@ -3,11 +3,10 @@ from __future__ import annotations
 import pytest
 
 from integrated_agent.config import PROJECT_ROOT
-from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
-from integrated_agent.runtimes.matrix.analysis.workflows.compose_flow import run_compose
-from integrated_agent.runtimes.matrix.analysis.workflows.reply_flow import run_reply
+from integrated_agent.runtimes.matrix.compose import run_compose
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
-from tests.fakes import DEMO_REPLY_COMMENTS, install_scripted_ask
+from integrated_agent.runtimes.matrix.reply import run_reply
+from tests.fakes import DEMO_REPLY_COMMENTS, ScriptedMatrixModel, install_scripted_ask
 
 
 DATA_ROOT = PROJECT_ROOT / "data/matrix"

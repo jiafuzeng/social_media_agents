@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from agently import TriggerFlow, TriggerFlowRuntimeData
 
-from .analysis import MatrixAnalysisCapability
+from .capability import MatrixAnalysisCapability
 from .models import (
     EvidenceCard,
     GatedDraft,

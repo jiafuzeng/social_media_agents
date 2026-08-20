@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import Field
 
 from integrated_agent.config import KB_DEFAULT_EMBEDDING_PROFILE, KB_EMBEDDING_AGENTS
-from integrated_agent.runtimes.matrix.analysis.snapshots import (
+from integrated_agent.runtimes.matrix.host.snapshots import (
     AccountCard,
     InteractionCard,
     list_account_catalog,

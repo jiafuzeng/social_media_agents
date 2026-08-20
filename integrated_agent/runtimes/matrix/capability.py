@@ -1,16 +1,17 @@
+"""矩阵任务入口：按已绑定 scenario 分发到写帖或回评模块。"""
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
+from integrated_agent.runtimes.matrix.compose import run_compose
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
-
-from .workflows.compose_flow import run_compose
-from .workflows.reply_flow import run_reply
+from integrated_agent.runtimes.matrix.reply import run_reply
 
 
 class MatrixAnalysisCapability:
-    """矩阵分析入口：绑定日志目录和快照数据，按任务跑完一套 Flow。"""
+    """队列 Worker 用的分析入口。本身不含写帖/回评业务节点。"""
 
     def __init__(
         self,
@@ -19,8 +20,8 @@ class MatrixAnalysisCapability:
         data_root: Path,
         knowledge: Any | None = None,
     ) -> None:
-        self.logs_root = logs_root  # 每单 Trace：logs_root / task_id
-        self.data_root = data_root  # 账号、平台、模板、案例夹具
+        self.logs_root = logs_root
+        self.data_root = data_root
         self.knowledge = knowledge
 
     async def analyze(self, request: MatrixTaskRequest) -> dict[str, Any]:
@@ -31,7 +32,6 @@ class MatrixAnalysisCapability:
             output_directory=output_directory,
             knowledge=self.knowledge,
         )
-        # Worker / SSE 用这条 URI 回指本单 run.json，不把 Trace 对象带出分析层。
         run["trace_ref"] = (output_directory / "run.json").resolve().as_uri()
         return run
 
@@ -43,7 +43,7 @@ async def run_matrix(
     output_directory: Path,
     knowledge: Any | None = None,
 ) -> dict[str, Any]:
-    """按入口已绑定的 scenario 分发；compose 与 reply 是两张独立 TriggerFlow。"""
+    """入口已绑定 scenario。这里只分发，不把两套 Flow 画成一张图。"""
 
     if request.scenario == "compose":
         return await run_compose(

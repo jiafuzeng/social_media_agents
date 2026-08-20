@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 from integrated_agent.config import PROJECT_ROOT
-from integrated_agent.runtimes.matrix.analysis.constraints import (
+from integrated_agent.runtimes.matrix.host.constraints import (
     AhoCorasickMatcher,
     apply_constraint_gate,
     collect_issues,
 )
-from integrated_agent.runtimes.matrix.analysis.snapshots import (
+from integrated_agent.runtimes.matrix.host.snapshots import (
     SnapshotError,
     bind_snapshot,
     list_account_catalog,
@@ -121,7 +121,7 @@ def test_bind_reply_uses_interaction_not_account() -> None:
 
 
 def test_unknown_term_list_id_fails_resolve() -> None:
-    from integrated_agent.runtimes.matrix.analysis.snapshots import resolve_term_lists
+    from integrated_agent.runtimes.matrix.host.snapshots import resolve_term_lists
 
     with pytest.raises(SnapshotError, match="unknown term_list_id"):
         resolve_term_lists(["no-such-pack"], {})

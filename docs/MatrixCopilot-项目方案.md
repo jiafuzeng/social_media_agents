@@ -416,20 +416,25 @@ integrated_agent/runtimes/matrix/
   stores.py
   worker.py
   client.py
-  analysis/
+  capability.py             # 按 scenario 分发，不含业务节点
+  compose/                  # 写帖独立模块
+    flow.py
+    pipeline.py
+  reply/                    # 回评独立模块
+    flow.py
+    pipeline.py
+  kb_chat/                  # 召回聊天独立模块
+    flow.py
+    pipeline.py
+  host/                     # 共用宿主：快照、硬门、案例、目录
     snapshots.py
-    constraints.py          # 硬规则、AC、降级
-    retrieval.py            # RetrieveCases；P0 可返回 empty
-    capability.py
-    runner.py
-    workflows/compose_flow.py
-    workflows/reply_flow.py
-    workflows/chunks/compose/{brief,draft,review}.py
-    workflows/chunks/reply/{brief,draft,review}.py
-    prompts/compose/{brief,draft,review}.yaml
-    prompts/reply/{brief,draft,review}.yaml
+    constraints.py
+    retrieval.py
+    drafting.py
+    catalog.py
+    trace_log.py
 integrated_agent/transports/http/matrix_api.py
-integrated_agent/bootstrap/content_service.py   # 或 matrix_service.py
+integrated_agent/bootstrap/matrix_service.py
 data/matrix/
   accounts.yaml
   platforms.yaml

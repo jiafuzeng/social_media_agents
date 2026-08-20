@@ -42,7 +42,7 @@
 | 3 | `runtimes/matrix/knowledge.py`；`transports/http/matrix/routes/kb_api.py`；`bootstrap/matrix_service.py` |
 | 4 | 同上 kb HTTP `POST /api/kb/search` |
 | 5 | `static/matrix.html`、知识库 JS/CSS |
-| 6 | `runtimes/matrix/analysis/drafting.py` |
+| 6 | `runtimes/matrix/host/drafting.py` |
 
 鉴权对齐收藏夹（Bearer / `X-User-Token`）。身份库只解析 `user_id`。
 

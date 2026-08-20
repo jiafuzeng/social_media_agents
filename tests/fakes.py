@@ -3,7 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from integrated_agent.runtimes.matrix.compose.scripted import ScriptedComposeModel
 from integrated_agent.runtimes.matrix.models import CommentIn
+from integrated_agent.runtimes.matrix.reply.scripted import ScriptedReplyModel
+
+
+class ScriptedMatrixModel(ScriptedComposeModel, ScriptedReplyModel):
+    """HTTP 应用同时挂写帖和回评时的测试门面，业务包不要依赖。"""
+
 
 class EmptyKnowledgeStore:
     """HTTP / Flow 测试用：写稿 RetrieveKb 返回空卡，避免打真实 embedding。"""
@@ -204,21 +211,35 @@ async def _dispatch_kb_chat(model, name: str, input_data: Any, info: Any):
     raise AssertionError(f"unexpected Agently agent name: {name}")
 
 
-def install_scripted_ask(monkeypatch, model) -> None:
-    """只替换写帖 / 回评 chunk 的 Agently.create_agent，不碰召回聊天。"""
+def install_compose_ask(monkeypatch, model) -> None:
+    """只替换写帖 pipeline 的 Agently.create_agent。"""
 
     async def dispatch(name: str, input_data: Any, info: Any):
         return await _dispatch_compose_reply(model, name, input_data, info)
 
-    fake_create_agent = _fake_create_agent(dispatch)
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.analysis.workflows.chunks.compose.pipeline.Agently.create_agent",
-        fake_create_agent,
+        "integrated_agent.runtimes.matrix.compose.pipeline.Agently.create_agent",
+        _fake_create_agent(dispatch),
     )
+
+
+def install_reply_ask(monkeypatch, model) -> None:
+    """只替换回评 pipeline 的 Agently.create_agent。"""
+
+    async def dispatch(name: str, input_data: Any, info: Any):
+        return await _dispatch_compose_reply(model, name, input_data, info)
+
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.analysis.workflows.chunks.reply.pipeline.Agently.create_agent",
-        fake_create_agent,
+        "integrated_agent.runtimes.matrix.reply.pipeline.Agently.create_agent",
+        _fake_create_agent(dispatch),
     )
+
+
+def install_scripted_ask(monkeypatch, model) -> None:
+    """HTTP 应用同时挂写帖和回评时一并替换，不碰召回聊天。"""
+
+    install_compose_ask(monkeypatch, model)
+    install_reply_ask(monkeypatch, model)
 
 
 def install_kb_chat_ask(monkeypatch, model) -> None:

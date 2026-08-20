@@ -1,3 +1,5 @@
+"""写帖业务 Flow。不包含回评节点。"""
+
 from __future__ import annotations
 
 import json
@@ -8,44 +10,43 @@ from agently import TriggerFlow
 
 from integrated_agent.runtimes.matrix.models import MatrixTaskRequest
 
-from ..snapshots import bind_snapshot
-from ..trace_log import TraceLog, save_run
-from .chunks.reply.pipeline import (
-    reply_brief,
-    reply_prelude,
-    reply_review,
-    retrieve_and_reply_draft,
+from integrated_agent.runtimes.matrix.host.snapshots import bind_snapshot
+from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
+from .pipeline import (
+    compose_brief,
+    compose_prelude,
+    compose_review,
+    retrieve_and_compose_draft,
 )
 
 
-PIPELINE_VERSION = "matrix-reply-v1"
+PIPELINE_VERSION = "matrix-compose-v1"
 
-REPLY_FLOW = TriggerFlow(name="matrix-reply-v1")
+COMPOSE_FLOW = TriggerFlow(name="matrix-compose-v1")
 (
-    REPLY_FLOW.to(reply_prelude)
-    .to(reply_brief)
-    .for_each(concurrency=4)
-    .to(retrieve_and_reply_draft)
+    COMPOSE_FLOW.to(compose_prelude)
+    .to(compose_brief)
+    .for_each(concurrency=10)
+    .to(retrieve_and_compose_draft)
     .end_for_each()
-    .to(reply_review)
+    .to(compose_review)
 )
 
 
-async def run_reply(
+async def run_compose(
     request: MatrixTaskRequest,
     *,
     data_root: Path,
     output_directory: Path,
-    max_concurrency: int = 4,
+    max_concurrency: int = 10,
     knowledge: Any | None = None,
 ) -> dict[str, Any]:
     snapshot = bind_snapshot(
         data_root=data_root,
-        interaction_key=request.interaction_key,
-        scenario="reply",
-        comments=request.comments,
+        account_key=request.account_key,
+        scenario="compose",
     )
-    execution = REPLY_FLOW.create_execution(
+    execution = COMPOSE_FLOW.create_execution(
         concurrency=max_concurrency,
         runtime_resources={
             "snapshot": snapshot,
@@ -75,7 +76,7 @@ async def run_reply(
         "task_id": request.task_id,
         "execution_id": execution.id,
         "status": package["status"],
-        "task_type": "reply_comment",
+        "task_type": "compose_post",
         "snapshot_id": snapshot.snapshot_id,
         "pipeline_version": PIPELINE_VERSION,
         "brief": state.get("brief"),
@@ -101,4 +102,4 @@ def _unique_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return unique
 
 
-__all__ = ["PIPELINE_VERSION", "REPLY_FLOW", "run_reply"]
+__all__ = ["COMPOSE_FLOW", "PIPELINE_VERSION", "run_compose"]

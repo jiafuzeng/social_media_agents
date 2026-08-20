@@ -10,7 +10,6 @@ from pydantic import ValidationError
 
 from integrated_agent.bootstrap.matrix_service import build_matrix_service
 from integrated_agent.config import PROJECT_ROOT
-from integrated_agent.runtimes.matrix.analysis.scripted import ScriptedMatrixModel
 from integrated_agent.runtimes.matrix.identity import IdentityStore
 from integrated_agent.runtimes.matrix.models import (
     MatrixTaskCreate,
@@ -29,7 +28,7 @@ from integrated_agent.runtimes.question.worker import (
     WorkerDependencies,
 )
 from integrated_agent.transports.http import create_http_app, create_matrix_api
-from tests.fakes import EmptyKnowledgeStore, fake_question_runner, install_scripted_ask
+from tests.fakes import EmptyKnowledgeStore, ScriptedMatrixModel, fake_question_runner, install_scripted_ask
 
 
 def _matrix_service(monkeypatch, tmp_path: Path, **kwargs) -> MatrixTaskService:
