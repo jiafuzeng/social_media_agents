@@ -231,7 +231,7 @@ def install_compose_ask(monkeypatch, model) -> None:
         )
 
     monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.compose.pipeline.Agently.create_agent",
+        "integrated_agent.runtimes.matrix.compose.route.Agently.create_agent",
         _fake_create_agent(dispatch),
     )
 

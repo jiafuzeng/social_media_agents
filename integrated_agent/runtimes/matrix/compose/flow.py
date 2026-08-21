@@ -11,12 +11,10 @@ from agently import TriggerFlow
 from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 from integrated_agent.runtimes.matrix.host.snapshots import SnapshotError, bind_snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
-from .pipeline import (
-    compose_branch_hold,
-    compose_init,
-    compose_package,
-    compose_route,
-)
+from .branch_hold import compose_branch_hold
+from .init import compose_init
+from .package import compose_package
+from .route import compose_route
 
 
 PIPELINE_VERSION = "matrix-compose-v1"

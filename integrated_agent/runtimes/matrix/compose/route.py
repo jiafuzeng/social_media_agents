@@ -1,4 +1,4 @@
-"""写帖 TriggerFlow：M1 Snapshot 入态 + M2 Route 分流。"""
+"""M2：模型意图识别。成功 emit compose|rewrite；失败 emit PACKAGE。"""
 
 from __future__ import annotations
 
@@ -6,39 +6,11 @@ from typing import Any, cast
 
 from agently import Agently, TriggerFlowRuntimeData
 
-from integrated_agent.runtimes.matrix.host.models import (
-    MatrixTaskRequest,
-    RouteIntentOut,
-)
-from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
+from integrated_agent.runtimes.matrix.host.models import RouteIntentOut
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 
-async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """M1：snapshot 已在 Flow 外绑定；这里只初始化本单 state。"""
-    payload = cast(dict[str, Any], data.input)
-    request = MatrixTaskRequest.model_validate(payload["request"])
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    await data.async_set_state("request", request.model_dump(mode="json"), emit=False)
-    await data.async_set_state("limitations", [], emit=False)
-    await data.async_set_state("drafts", [], emit=False)
-    await data.async_set_state("evidence_cards", [], emit=False)
-    await data.async_set_state("tweet_cards", [], emit=False)
-    await data.async_set_state("trend_cards", [], emit=False)
-    await data.async_set_state("work_items", [], emit=False)
-    trace = cast(TraceLog, data.require_resource("trace"))
-    trace.log(
-        layer="business",
-        event_type="business.matrix.snapshot_bound",
-        status="completed",
-        subject_id=request.task_id,
-        facts={"snapshot_id": snapshot.snapshot_id, "need_trends": request.need_trends},
-    )
-    return payload
-
-
 async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """M2：模型意图识别。成功 emit compose|rewrite；失败 emit PACKAGE。"""
     request = cast(dict[str, Any], data.get_state("request") or {})
     text = str(request.get("text") or "")
     task_id = str(request.get("task_id") or "")
@@ -51,16 +23,18 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             .input({"text": text})
             .info(
                 {
-                    "job": "识别用户输入文本的意图：走创作还是改写。只签发一个确定结果，并写明理由。",
+                    "job": "识别用户输入文本的意图：走创作还是改写。只签发一个确定结果，并写明理由。不要被「创作」「写推文」等口头词带偏。",
                 }
             )
             .instruct(
                 [
-                    "先看用户原文里有没有「被写对象」，再给出唯一意图。必须选 compose 或 rewrite 之一，不要骑墙。",
-                    "改写特征：要把某一条现成帖/粘贴正文改口吻、转写、改成我们的。创作特征：对标结构自己写、只给主题要新写一组。",
-                    "有链接或「参考这条写」倾向改写；「对标这条的结构自己写」倾向创作。",
+                    "先看有没有「被写/被跟对象」（现成帖、粘贴正文、链接、要检索的人/事最新动态），再给出唯一意图。必须选 compose 或 rewrite 之一，不要骑墙。",
+                    "rewrite：依赖已有材料或检索对象再写。包括：改某条帖/粘贴正文口吻；参考某条写；查找某人/某事最新动态、新闻、近帖后再写成推文。",
+                    "compose：只有抽象主题/卖点，不依赖现成帖，也不要求先查某人某事再写。例：「为秋季上新写预热稿」。",
+                    "忽略表面用词：即使用户说「创作推文」「写一条」，只要任务是「先查最新动态再写」或「按某条改写」，一律 rewrite。例：「查找特朗普最新动态，创作推文」→ rewrite。",
+                    "「对标这条的结构自己写、不要内容」才偏 compose；有链接或「参考这条写」偏 rewrite。",
                     "reason 用一两句话指出原文线索；intent 只填 compose 或 rewrite。",
-                    "rewrite 且原文是帖：source_kind 为 url 或 tweet_id，source_anchor 填原文里的 tweet_id。paste 时 source_anchor 留空。compose：source_kind 多为 none。",
+                    "rewrite 且原文是帖：source_kind 为 url 或 tweet_id，source_anchor 填原文里的 tweet_id。paste 时 source_anchor 留空。只有人名/主题、无链接无 handle：source_kind 多为 none，source_anchor 留空。compose：source_kind 多为 none。",
                     "不得发明原文没有的 tweet_id 或 handle。user_instruction 填去掉原文或链接后的任务说明。",
                 ]
             )
@@ -126,34 +100,4 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     }
 
 
-async def compose_branch_hold(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """M3+ 尚未接线：分流成功后暂以空草稿包收尾，保留 intent。"""
-    intent = cast(str | None, data.get_state("intent"))
-    package = {
-        "status": "completed",
-        "intent": intent,
-        "task_type": "compose_post",
-        "summary": "",
-        "drafts": [],
-        "limitations": list(cast(list[str], data.get_state("limitations") or [])),
-    }
-    await data.async_set_state("package", package, emit=False)
-    return package
-
-
-async def compose_package(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    existing = data.get_state("package")
-    if isinstance(existing, dict):
-        package = existing
-    else:
-        package = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    await data.async_set_state("package", package, emit=False)
-    return package
-
-
-__all__ = [
-    "compose_branch_hold",
-    "compose_init",
-    "compose_package",
-    "compose_route",
-]
+__all__ = ["compose_route"]
