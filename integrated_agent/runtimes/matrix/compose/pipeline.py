@@ -1,4 +1,4 @@
-"""写帖 TriggerFlow 阶段：prelude → brief → 按 work_item 检索写稿 → review。"""
+"""写帖 TriggerFlow：M1 Snapshot 入态 + M2 Route 分流。"""
 
 from __future__ import annotations
 
@@ -6,46 +6,26 @@ from typing import Any, cast
 
 from agently import Agently, TriggerFlowRuntimeData
 
-from integrated_agent.runtimes.matrix.host.constraints import (
-    AhoCorasickMatcher,
-    KB_CITE_RE,
-    apply_constraint_gate,
-)
-from integrated_agent.runtimes.matrix.host.drafting import (
-    apply_review,
-    retrieve_and_gate_draft,
-    rollup_status,
-)
-from integrated_agent.runtimes.matrix.host.snapshots import (
-    OFFERED_CLAIM_TYPES,
-    TWITTER_PLATFORM_KEY,
-    Snapshot,
-    merged_forbidden_topics,
-)
-from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 from integrated_agent.runtimes.matrix.host.models import (
-    BriefOut,
-    ComposeDraftOut,
-    GatedDraft,
     MatrixTaskRequest,
-    ReviewOut,
-    WorkItem,
+    RouteIntentOut,
 )
+from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
+from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 
-async def compose_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """快照已在 run_compose 绑好。这里只初始化 state；P0 不真抓热帖。"""
-
+async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """M1：snapshot 已在 Flow 外绑定；这里只初始化本单 state。"""
     payload = cast(dict[str, Any], data.input)
     request = MatrixTaskRequest.model_validate(payload["request"])
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    limitations: list[str] = list(payload.get("limitations") or [])
-    if request.need_trends:
-        limitations.append("trends_unavailable")
     await data.async_set_state("request", request.model_dump(mode="json"), emit=False)
-    await data.async_set_state("limitations", limitations, emit=False)
+    await data.async_set_state("limitations", [], emit=False)
     await data.async_set_state("drafts", [], emit=False)
     await data.async_set_state("evidence_cards", [], emit=False)
+    await data.async_set_state("tweet_cards", [], emit=False)
+    await data.async_set_state("trend_cards", [], emit=False)
+    await data.async_set_state("work_items", [], emit=False)
     trace = cast(TraceLog, data.require_resource("trace"))
     trace.log(
         layer="business",
@@ -57,302 +37,123 @@ async def compose_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     return payload
 
 
-def _compose_post_limit(request: MatrixTaskRequest, snapshot: Snapshot) -> int:
-    cap = snapshot.platform.max_posts
-    if request.post_count is None:
-        return cap
-    return min(request.post_count, cap)
-
-
-async def compose_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
-    """模型按主题拆推文 work_item；条数取请求 post_count，且不超过平台 max_posts。"""
-
-    request = MatrixTaskRequest.model_validate(data.get_state("request"))
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
+async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """M2：模型意图识别。成功 emit compose|rewrite；失败 emit PACKAGE。"""
+    request = cast(dict[str, Any], data.get_state("request") or {})
+    text = str(request.get("text") or "")
+    task_id = str(request.get("task_id") or "")
     trace = cast(TraceLog, data.require_resource("trace"))
-    max_posts = _compose_post_limit(request, snapshot)
-    count_rule = (
-        f"必须正好生成 {max_posts} 条 work_item。"
-        if request.post_count is not None
-        else f"生成 1 到 {max_posts} 条 work_item，条数由主题需要决定。"
-    )
-    info = {
-        "platform": snapshot.platform.model_dump(mode="json"),
-        "guardrails": [item.model_dump(mode="json") for item in snapshot.guardrails],
-        "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
-        "account": snapshot.account.model_dump(mode="json") if snapshot.account else {},
-        "trend_cards": [item.model_dump(mode="json") for item in snapshot.trend_cards],
-        "offered_claim_types": sorted(OFFERED_CLAIM_TYPES),
-        "post_count": max_posts,
-    }
+
     try:
         result = await (
-            Agently.create_agent(name="matrix-compose-brief")
+            Agently.create_agent(name="matrix-compose-route-intent")
             .activate_session(session_id=str(data.require_resource("session_id")))
-            .input({"text": request.text})
-            .info({"snapshot": info})
+            .input({"text": text})
+            .info(
+                {
+                    "job": "识别用户输入文本的意图：走创作还是改写。只签发一个确定结果，并写明理由。",
+                }
+            )
             .instruct(
                 [
-                    "只做创作拆解，不要判断这是创作还是回复，不要输出 scenario。",
-                    f"为 Twitter/X 生成 work_item，kind 必须是 compose_post，platform_key 必须是 {TWITTER_PLATFORM_KEY}。",
-                    count_rule,
-                    "拆解必须符合 info.snapshot.account 的人设：background、goals、must_do、must_not；目标以营销涨粉为主，同时守住该行业职责，不要换成别的身份。",
-                    "必须避开 info.snapshot.forbidden_topics，那是此人设挂载的全部护栏禁区并集。",
-                    "不得超过 info.snapshot.platform.max_posts，也不得超过 info.snapshot.post_count。",
-                    "claim_types 只能从 info.snapshot.offered_claim_types 选取，例如 format；不要把 template_key、品牌名或人设词写进去。",
-                    "每个 requirement 必须被至少一条 work_item 引用。",
-                    "不写正文，不引用评论，不要设置 source_comment_key。",
+                    "先看用户原文里有没有「被写对象」，再给出唯一意图。必须选 compose 或 rewrite 之一，不要骑墙。",
+                    "改写特征：要把某一条现成帖/粘贴正文改口吻、转写、改成我们的。创作特征：对标结构自己写、只给主题要新写一组。",
+                    "有链接或「参考这条写」倾向改写；「对标这条的结构自己写」倾向创作。",
+                    "reason 用一两句话指出原文线索；intent 只填 compose 或 rewrite。",
+                    "rewrite 且原文是帖：source_kind 为 url 或 tweet_id，source_anchor 填原文里的 tweet_id。paste 时 source_anchor 留空。compose：source_kind 多为 none。",
+                    "不得发明原文没有的 tweet_id 或 handle。user_instruction 填去掉原文或链接后的任务说明。",
                 ]
             )
             .output(
                 {
-                    "normalized_brief": (str, "保留主题与矩阵要求的改写", "not_null"),
-                    "requirements": (
-                        [
-                            {
-                                "requirement_id": (str, "not_null"),
-                                "description": (str, "not_null"),
-                            }
-                        ],
-                        "not_null",
-                    ),
-                    "work_items": (
-                        [
-                            {
-                                "work_item_id": (str, "not_null"),
-                                "kind": (str, "必须是 compose_post", "not_null"),
-                                "requirement_ids": ([str], "not_null"),
-                                "platform_key": (str, "not_null"),
-                                "goal": (str, "not_null"),
-                                "talking_points": [str],
-                                "claim_types": [str],
-                            }
-                        ],
-                        "not_null",
-                    ),
+                    "reason": (str, "判定理由，须引用原文线索", "not_null"),
+                    "intent": (str, "compose 或 rewrite，唯一结果", "not_null"),
+                    "source_kind": (str, "paste、url、tweet_id、handle 或 none", "not_null"),
+                    "source_anchor": (str, "tweet_id 或 handle，没有则空"),
+                    "user_instruction": (str, "去掉原文后的任务说明"),
+                    "confidence": (str, "high 或 low", "not_null"),
                 },
                 format="json",
             )
             .async_start()
         )
-        brief = BriefOut.model_validate(result)
-        if len(brief.work_items) > max_posts:
-            brief = brief.model_copy(
-                update={"work_items": list(brief.work_items[:max_posts])}
-            )
-            limitations = list(cast(list[str], data.get_state("limitations") or []))
-            limitations.append(f"truncated_to_max_posts:{max_posts}")
-            await data.async_set_state("limitations", limitations, emit=False)
+        routed = RouteIntentOut.model_validate(result)
     except Exception as exc:
+        package = {
+            "status": "failed",
+            "intent": None,
+            "task_type": "compose_post",
+            "summary": "意图识别失败。",
+            "drafts": [],
+            "limitations": [f"route_intent_error:{type(exc).__name__}"],
+        }
+        await data.async_set_state("package", package, emit=False)
         await data.async_set_state("final_failed", True, emit=False)
         trace.log(
             layer="business",
-            event_type="business.matrix.briefed",
+            event_type="business.matrix.routed",
             status="failed",
-            subject_id=request.task_id,
-            error=exc,
+            subject_id=task_id,
+            facts={"limitations": package["limitations"]},
         )
-        raise
-    await data.async_set_state("brief", brief.model_dump(mode="json"), emit=False)
+        await data.async_emit("PACKAGE", package)
+        return package
+
+    instruction = str(routed.user_instruction or "").strip() or text.strip()
+    await data.async_set_state("intent", routed.intent, emit=False)
+    await data.async_set_state("source_kind", routed.source_kind, emit=False)
+    await data.async_set_state("source_anchor", str(routed.source_anchor or "").strip(), emit=False)
+    await data.async_set_state("user_instruction", instruction, emit=False)
     trace.log(
         layer="business",
-        event_type="business.matrix.briefed",
+        event_type="business.matrix.routed",
         status="completed",
-        subject_id=request.task_id,
-        output=brief.model_dump(mode="json"),
-        facts={"work_item_count": len(brief.work_items)},
+        subject_id=task_id,
+        facts={
+            "intent": routed.intent,
+            "reason": routed.reason,
+            "source_kind": routed.source_kind,
+            "source_anchor": routed.source_anchor,
+        },
     )
-    return [item.model_dump(mode="json") for item in brief.work_items]
+    await data.async_emit(str(routed.intent), {"intent": routed.intent})
+    return {
+        "intent": routed.intent,
+        "reason": routed.reason,
+        "source_kind": routed.source_kind,
+        "source_anchor": str(routed.source_anchor or "").strip(),
+        "user_instruction": instruction,
+    }
 
 
-async def retrieve_and_compose_draft(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """for_each 的每一条：先 RetrieveCases，再写稿，最后硬门 Gate。"""
-
-    work_item = WorkItem.model_validate(data.input)
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-
-    async def compose_draft(
-        *,
-        work_item: dict,
-        info: dict,
-        repair: dict | None = None,
-    ) -> ComposeDraftOut:
-        result = await (
-            Agently.create_agent(name="matrix-compose-draft")
-            .activate_session(session_id=str(data.require_resource("session_id")))
-            .input({"work_item": work_item, "repair": repair or {}})
-            .info({"context": info})
-            .instruct(
-                [
-                    "为这一条平台稿写正文和评理，不要输出 reply_decision。",
-                    "用 info.context.account 的声量写：voice_summary、must_do、must_not；优先服务涨粉与关注引导，同时守住行业职责；不要自称其他品牌或公权力。",
-                    "必须避开 info.context.forbidden_topics。",
-                    "不得承诺稳赚、治愈、保本或未授权最高级。",
-                    "案例证据只能引用 info.context.offered_refs 的 ref_id，写进 evidence_ids，正文可用 [[ref:e1]]。offered_refs 为空时 evidence_ids 必须是 []，不得编造 e1。",
-                    "手册证据只能引用 info.context.offered_kbs 的 kb_id，正文写成 [[kb:k1]]，不要写进 evidence_ids，也不要占用 [[ref:]]。offered_kbs 为空时不要写 [[kb:]]。",
-                    "功效、医疗、收益类主张必须引用案例 ref；只引手册不能代替案例。",
-                    "正文长度不得超过 info.context.max_chars。",
-                    "skip 时正文必须空串。若 repair.issues 含 over_limit，删减卖点直到不超限。",
-                    "评理必须说明依据和未写的内容。",
-                ]
-            )
-            .output(
-                {
-                    "work_item_id": (str, "not_null"),
-                    "stance_assessment": (str, "not_null"),
-                    "claim_types": [str],
-                    "risk_flags": [str],
-                    "draft_text": str,
-                    "rationale": (str, "not_null"),
-                    "evidence_ids": [str],
-                    "proposed_degrade": (
-                        str,
-                        "pass、rewrite_safe、template_fallback、skip 或空",
-                    ),
-                },
-                format="json",
-            )
-            .async_start()
-        )
-        return ComposeDraftOut.model_validate(result)
-
-    gated, cards, kb_notes = await retrieve_and_gate_draft(
-        work_item=work_item,
-        snapshot=snapshot,
-        data_root=data.require_resource("data_root"),
-        draft_once=compose_draft,
-        trace=cast(TraceLog, data.require_resource("trace")),
-        kind="compose_post",
-        knowledge=data.require_resource("knowledge"),
-        user_id=str(data.require_resource("kb_user_id") or "") or None,
-        embedding_profile_id=str(data.require_resource("kb_profile_id") or "") or None,
-    )
-    if kb_notes:
-        limitations = list(cast(list[str], data.get_state("limitations") or []))
-        for note in kb_notes:
-            if note not in limitations:
-                limitations.append(note)
-        await data.async_set_state("limitations", limitations, emit=False)
-    await data.async_append_state("drafts", gated.model_dump(mode="json"), emit=False)
-    for card in cards:
-        await data.async_append_state("evidence_cards", card, emit=False)
-    return gated.model_dump(mode="json")
-
-
-async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """口径对齐。skip/template 不可被 Review 回抬；改写正文必须再过 Gate。"""
-
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    trace = cast(TraceLog, data.require_resource("trace"))
-    drafts = [
-        GatedDraft.model_validate(item)
-        for item in cast(list[dict[str, Any]], data.get_state("drafts") or [])
-    ]
-    limitations = list(cast(list[str], data.get_state("limitations") or []))
-    try:
-        result = await (
-            Agently.create_agent(name="matrix-compose-review")
-            .activate_session(session_id=str(data.require_resource("session_id")))
-            .input(
-                {
-                    "package": {
-                        "brief": data.get_state("brief"),
-                        "drafts": [item.model_dump(mode="json") for item in drafts],
-                        "limitations": limitations,
-                    }
-                }
-            )
-            .info({"snapshot": {"snapshot_id": snapshot.snapshot_id}})
-            .instruct(
-                [
-                    "对齐矩阵口径，只能评审已有 draft_key。",
-                    "不得把 skip 或 template_fallback 改回可发正文。",
-                    "revise 只允许收紧表述，不能放宽硬门。",
-                ]
-            )
-            .output(
-                {
-                    "item_verdicts": [
-                        {
-                            "draft_key": (str, "not_null"),
-                            "verdict": (str, "accept、revise 或 reject", "not_null"),
-                            "revised_text": str,
-                            "notes": str,
-                        }
-                    ],
-                    "package_summary": (str, "not_null"),
-                    "limitations": [str],
-                },
-                format="json",
-            )
-            .async_start()
-        )
-        review = ReviewOut.model_validate(result)
-    except Exception as exc:
-        trace.log(
-            layer="business",
-            event_type="business.matrix.reviewed",
-            status="failed",
-            subject_id=cast(dict[str, Any], data.get_state("request"))["task_id"],
-            error=exc,
-        )
-        raise
-    matcher = AhoCorasickMatcher(snapshot.policy.terms)
-
-    async def re_gate(current: GatedDraft, revised_text: str) -> GatedDraft:
-        """Review 改写后的正文再过硬门，禁止用修订绕过禁词、字数和证据约束。"""
-        platform = snapshot.platform
-        gated = await apply_constraint_gate(
-            work_item_id=current.draft_key.removeprefix("d-"),
-            kind=current.kind,
-            platform_key=current.platform_key,
-            source_comment_key=current.source_comment_key,
-            text=revised_text,
-            rationale=current.rationale,
-            evidence_ids=current.evidence_ids,
-            risk_flags=current.risk_flags,
-            claim_types=[],
-            reply_decision=None,
-            proposed_degrade=None,
-            max_chars=platform.max_chars,
-            matcher=matcher,
-            offered_refs=list(current.evidence_ids),
-            offered_kbs=list(current.kb_ids),
-            retrieval_state="hits" if current.evidence_ids else "empty",
-            templates=[item.model_dump(mode="json") for item in snapshot.templates],
-        )
-        offered = list(current.kb_ids)
-        cited = [
-            token
-            for token in KB_CITE_RE.findall(gated.text or revised_text)
-            if token in offered
-        ]
-        return gated.model_copy(update={"kb_ids": cited})
-
-    drafts, extra = await apply_review(drafts, review, re_gate=re_gate)
-    status = rollup_status(drafts)
+async def compose_branch_hold(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """M3+ 尚未接线：分流成功后暂以空草稿包收尾，保留 intent。"""
+    intent = cast(str | None, data.get_state("intent"))
     package = {
-        "status": status,
+        "status": "completed",
+        "intent": intent,
         "task_type": "compose_post",
-        "summary": review.package_summary,
-        "drafts": [item.model_dump(mode="json") for item in drafts],
-        "limitations": limitations + extra,
+        "summary": "",
+        "drafts": [],
+        "limitations": list(cast(list[str], data.get_state("limitations") or [])),
     }
     await data.async_set_state("package", package, emit=False)
-    await data.async_set_state("final_failed", status == "failed", emit=False)
-    task_id = cast(dict[str, Any], data.get_state("request"))["task_id"]
-    trace.log(
-        layer="business",
-        event_type="business.matrix.reviewed",
-        status="completed",
-        subject_id=task_id,
-        output={"status": status, "draft_count": len(drafts)},
-    )
-    trace.log(
-        layer="business",
-        event_type="business.matrix.packaged",
-        status="completed" if status != "failed" else "failed",
-        subject_id=task_id,
-        output=package,
-    )
     return package
+
+
+async def compose_package(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    existing = data.get_state("package")
+    if isinstance(existing, dict):
+        package = existing
+    else:
+        package = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
+    await data.async_set_state("package", package, emit=False)
+    return package
+
+
+__all__ = [
+    "compose_branch_hold",
+    "compose_init",
+    "compose_package",
+    "compose_route",
+]

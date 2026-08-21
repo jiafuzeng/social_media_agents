@@ -21,11 +21,27 @@ class ScriptedComposeModel:
         evidence_overrides: dict[str, list[str]] | None = None,
         review_lift_skip: bool = False,
         compose_work_item_count: int = 1,
+        route_intent_out: dict | None = None,
     ) -> None:
         self.draft_text_overrides = draft_text_overrides or {}
         self.evidence_overrides = evidence_overrides or {}
         self.review_lift_skip = review_lift_skip
         self.compose_work_item_count = compose_work_item_count
+        self.route_intent_out = route_intent_out
+        self.agent_sessions: list[tuple[str, str | None]] = []
+
+    async def route_intent(self, *, text: str, info: dict) -> dict:
+        del info
+        if self.route_intent_out is not None:
+            return dict(self.route_intent_out)
+        return {
+            "reason": "用户只给主题，没有指定要改或参考的原文。",
+            "intent": "compose",
+            "source_kind": "none",
+            "source_anchor": "",
+            "user_instruction": text,
+            "confidence": "high",
+        }
 
     async def compose_brief(self, *, text: str, info: dict) -> BriefOut:
         del info

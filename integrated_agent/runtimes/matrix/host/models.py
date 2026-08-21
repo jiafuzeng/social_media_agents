@@ -21,6 +21,9 @@ CommentRole = Literal["root", "reply"]
 GatedDecision = Literal["reply", "acknowledge", "skip", "publishable"]
 RetrievalState = Literal["hits", "empty", "failed"]
 TaskStatus = Literal["completed", "partial"]
+WriteIntent = Literal["compose", "rewrite"]
+SourceKind = Literal["paste", "url", "tweet_id", "handle", "prior_draft", "none"]
+RouteConfidence = Literal["high", "low"]
 
 MIN_COMPOSE_POSTS = 1
 MAX_COMPOSE_POSTS = 10
@@ -59,6 +62,10 @@ class MatrixTaskCreate(DomainModel):
         le=MAX_COMPOSE_POSTS,
         description="本次要出几条推文；仅 compose，范围 1–10。省略则由模型在平台上限内决定",
     )
+    force_intent: WriteIntent | None = Field(
+        default=None,
+        description="纠错强制支路；仅 compose。存在则跳过 route_intent",
+    )
     reply_count: int | None = Field(
         default=None,
         ge=MIN_COMPOSE_POSTS,
@@ -91,6 +98,8 @@ class MatrixTaskCreate(DomainModel):
         if self.scenario == "reply":
             if self.post_count is not None:
                 raise ValueError("reply must not include post_count")
+            if self.force_intent is not None:
+                raise ValueError("reply must not include force_intent")
             if self.account_key is not None:
                 raise ValueError("reply must not include account_key")
             if not self.interaction_key:
@@ -385,4 +394,15 @@ class ReviewOut(DomainModel):
     def require_summary(cls, value: object) -> object:
         text = str(value or "").strip()
         return text or "草稿包已完成口径复核。"
+
+
+class RouteIntentOut(DomainModel):
+    """M2 route_intent 出参。"""
+
+    reason: str = Field(min_length=1, description="判定理由")
+    intent: WriteIntent = Field(description="compose 或 rewrite")
+    source_kind: SourceKind = Field(description="paste、url、tweet_id、handle、prior_draft 或 none")
+    source_anchor: str = Field(default="", description="tweet_id 或 handle，没有则空")
+    user_instruction: str = Field(default="", description="去掉原文后的任务说明")
+    confidence: RouteConfidence = Field(default="high", description="high 或 low")
 

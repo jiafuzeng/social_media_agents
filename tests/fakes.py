@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from integrated_agent.runtimes.matrix.compose.scripted import ScriptedComposeModel
+from tests.scripted_compose import ScriptedComposeModel
 from integrated_agent.runtimes.matrix.host.models import CommentIn
 from integrated_agent.runtimes.matrix.reply.scripted import ScriptedReplyModel
 
@@ -137,7 +137,10 @@ class _ScriptedAgent:
 
     async def async_start(self):
         return await self._dispatch(
-            self._name, self._input or {}, self._info or {}
+            self._name,
+            self._input or {},
+            self._info or {},
+            getattr(self, "session_id", None),
         )
 
 
@@ -154,9 +157,15 @@ def _fake_create_agent(dispatch):
     return fake_create_agent
 
 
-async def _dispatch_compose_reply(model, name: str, input_data: Any, info: Any):
+async def _dispatch_compose_reply(
+    model, name: str, input_data: Any, info: Any, session_id: str | None = None
+):
+    if hasattr(model, "agent_sessions"):
+        model.agent_sessions.append((name, session_id))
     snapshot = info.get("snapshot") if isinstance(info, dict) else info
     context = info.get("context") if isinstance(info, dict) else info
+    if name == "matrix-compose-route-intent":
+        return await model.route_intent(text=input_data.get("text") or "", info=info)
     if name == "matrix-compose-brief":
         return await model.compose_brief(text=input_data["text"], info=snapshot)
     if name == "matrix-compose-draft":
@@ -214,8 +223,12 @@ async def _dispatch_kb_chat(model, name: str, input_data: Any, info: Any):
 def install_compose_ask(monkeypatch, model) -> None:
     """只替换写帖 pipeline 的 Agently.create_agent。"""
 
-    async def dispatch(name: str, input_data: Any, info: Any):
-        return await _dispatch_compose_reply(model, name, input_data, info)
+    async def dispatch(
+        name: str, input_data: Any, info: Any, session_id: str | None = None
+    ):
+        return await _dispatch_compose_reply(
+            model, name, input_data, info, session_id
+        )
 
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.compose.pipeline.Agently.create_agent",
@@ -226,8 +239,12 @@ def install_compose_ask(monkeypatch, model) -> None:
 def install_reply_ask(monkeypatch, model) -> None:
     """只替换回评 pipeline 的 Agently.create_agent。"""
 
-    async def dispatch(name: str, input_data: Any, info: Any):
-        return await _dispatch_compose_reply(model, name, input_data, info)
+    async def dispatch(
+        name: str, input_data: Any, info: Any, session_id: str | None = None
+    ):
+        return await _dispatch_compose_reply(
+            model, name, input_data, info, session_id
+        )
 
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.reply.pipeline.Agently.create_agent",

@@ -13,7 +13,7 @@ DATA_ROOT = PROJECT_ROOT / "data/matrix"
 
 
 @pytest.mark.asyncio
-async def test_t07_compose_yields_one_twitter_draft(tmp_path, monkeypatch) -> None:
+async def test_t07_compose_routes_theme(tmp_path, monkeypatch) -> None:
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     run = await run_compose(
         MatrixTaskRequest(
@@ -25,48 +25,27 @@ async def test_t07_compose_yields_one_twitter_draft(tmp_path, monkeypatch) -> No
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t07",
     )
-    assert len(run["drafts"]) == 1
-    assert run["drafts"][0]["platform_key"] == "x-twitter"
+    assert run["status"] == "completed"
+    assert run["intent"] == "compose"
+    assert run["drafts"] == []
     assert run["task_type"] == "compose_post"
 
 
 @pytest.mark.asyncio
-async def test_compose_caps_work_items_at_platform_max_posts(tmp_path, monkeypatch) -> None:
-    install_scripted_ask(
-        monkeypatch, ScriptedMatrixModel(compose_work_item_count=11)
-    )
+async def test_compose_handle_calls_route_intent(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     run = await run_compose(
         MatrixTaskRequest(
-            task_id="t07-cap",
-            text="为秋季上新写一组预热推文",
+            task_id="t07-handle",
+            text="@foo",
             session_id="flow-session",
             scenario="compose",
         ),
         data_root=DATA_ROOT,
-        output_directory=tmp_path / "t07-cap",
+        output_directory=tmp_path / "t07-handle",
     )
-    assert len(run["drafts"]) == 10
-    assert "truncated_to_max_posts:10" in run["limitations"]
-
-
-@pytest.mark.asyncio
-async def test_compose_honors_requested_post_count(tmp_path, monkeypatch) -> None:
-    install_scripted_ask(
-        monkeypatch, ScriptedMatrixModel(compose_work_item_count=8)
-    )
-    run = await run_compose(
-        MatrixTaskRequest(
-            task_id="t07-count",
-            text="为秋季上新写一组预热推文",
-            session_id="flow-session",
-            scenario="compose",
-            post_count=3,
-        ),
-        data_root=DATA_ROOT,
-        output_directory=tmp_path / "t07-count",
-    )
-    assert len(run["drafts"]) == 3
-    assert "truncated_to_max_posts:3" in run["limitations"]
+    assert run["status"] == "completed"
+    assert run["intent"] == "compose"
 
 
 @pytest.mark.asyncio

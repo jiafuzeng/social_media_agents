@@ -1,36 +1,57 @@
-"""写帖业务 Flow。不包含回评节点。"""
+"""写帖业务 Flow：M1 Snapshot → M2 Route → compose|rewrite|PACKAGE。"""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from agently import TriggerFlow
 
 from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
-
-from integrated_agent.runtimes.matrix.host.snapshots import bind_snapshot
+from integrated_agent.runtimes.matrix.host.snapshots import SnapshotError, bind_snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
 from .pipeline import (
-    compose_brief,
-    compose_prelude,
-    compose_review,
-    retrieve_and_compose_draft,
+    compose_branch_hold,
+    compose_init,
+    compose_package,
+    compose_route,
 )
 
 
 PIPELINE_VERSION = "matrix-compose-v1"
 
 COMPOSE_FLOW = TriggerFlow(name="matrix-compose-v1")
-(
-    COMPOSE_FLOW.to(compose_prelude)
-    .to(compose_brief)
-    .for_each(concurrency=10)
-    .to(retrieve_and_compose_draft)
-    .end_for_each()
-    .to(compose_review)
-)
+COMPOSE_FLOW.to(compose_init).to(compose_route)
+COMPOSE_FLOW.when("compose").to(compose_branch_hold)
+COMPOSE_FLOW.when("rewrite").to(compose_branch_hold)
+COMPOSE_FLOW.when("PACKAGE").to(compose_package)
+
+
+def _failed_run(
+    request: MatrixTaskRequest,
+    *,
+    summary: str,
+    limitations: list[str],
+    snapshot_id: str = "",
+    execution_id: str = "",
+    events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "task_id": request.task_id,
+        "execution_id": execution_id,
+        "status": "failed",
+        "intent": None,
+        "task_type": "compose_post",
+        "snapshot_id": snapshot_id,
+        "pipeline_version": PIPELINE_VERSION,
+        "brief": None,
+        "drafts": [],
+        "summary": summary,
+        "limitations": limitations,
+        "evidence": [],
+        "events": events or [],
+    }
 
 
 async def run_compose(
@@ -40,21 +61,30 @@ async def run_compose(
     output_directory: Path,
     max_concurrency: int = 10,
     knowledge: Any | None = None,
+    fetch_tweets: Any | None = None,
 ) -> dict[str, Any]:
-    snapshot = bind_snapshot(
-        data_root=data_root,
-        account_key=request.account_key,
-        scenario="compose",
-    )
+    del knowledge, fetch_tweets
+    try:
+        snapshot = bind_snapshot(
+            data_root=data_root,
+            account_key=request.account_key,
+            scenario="compose",
+        )
+    except SnapshotError as exc:
+        run = _failed_run(
+            request,
+            summary="未知人设或快照无效，无法写帖。",
+            limitations=[str(exc)],
+        )
+        save_run(run, output_directory)
+        return run
+
     execution = COMPOSE_FLOW.create_execution(
         concurrency=max_concurrency,
         runtime_resources={
             "snapshot": snapshot,
             "data_root": data_root,
             "session_id": request.session_id,
-            "knowledge": knowledge,
-            "kb_user_id": request.user_id or "",
-            "kb_profile_id": request.embedding_profile_id or "",
         },
         auto_close=False,
     )
@@ -71,35 +101,42 @@ async def run_compose(
             encoding="utf-8",
         )
         raise
-    package = cast(dict[str, Any], state["package"])
+
+    package = state.get("package")
+    if not isinstance(package, dict):
+        run = _failed_run(
+            request,
+            summary="写帖未产出草稿包。",
+            limitations=["missing_package"],
+            snapshot_id=snapshot.snapshot_id,
+            execution_id=execution.id,
+            events=trace.events,
+        )
+        save_run(run, output_directory)
+        return run
+
     run = {
         "task_id": request.task_id,
         "execution_id": execution.id,
-        "status": package["status"],
+        "status": package.get("status") or "failed",
+        "intent": package.get("intent") or state.get("intent"),
         "task_type": "compose_post",
         "snapshot_id": snapshot.snapshot_id,
         "pipeline_version": PIPELINE_VERSION,
         "brief": state.get("brief"),
-        "drafts": package["drafts"],
-        "summary": package["summary"],
-        "limitations": package.get("limitations") or [],
-        "evidence": _unique_cards(state.get("evidence_cards") or []),
+        "work_items": state.get("work_items") or [],
+        "drafts": package.get("drafts") or [],
+        "summary": package.get("summary") or "",
+        "source_kind": state.get("source_kind"),
+        "source_anchor": state.get("source_anchor"),
+        "user_instruction": state.get("user_instruction"),
+        "candidates": state.get("candidates"),
+        "limitations": package.get("limitations") or state.get("limitations") or [],
+        "evidence": [],
         "events": trace.events,
     }
     save_run(run, output_directory)
     return run
-
-
-def _unique_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[str] = set()
-    unique: list[dict[str, Any]] = []
-    for card in cards:
-        ref_id = str(card.get("ref_id") or "")
-        if not ref_id or ref_id in seen:
-            continue
-        seen.add(ref_id)
-        unique.append(card)
-    return unique
 
 
 __all__ = ["COMPOSE_FLOW", "PIPELINE_VERSION", "run_compose"]
