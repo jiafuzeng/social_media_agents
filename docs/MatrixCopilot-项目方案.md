@@ -1,6 +1,6 @@
 # MatrixCopilot 项目方案
 
-社媒矩阵内容智能助手。本文是当前讨论的完整方案，作为产品、架构与工程落地的单一依据。
+社媒矩阵内容智能助手。本文是产品总案与回评路径的依据。**写帖（创作/改写）P0 实现规格已归档**，以 [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md) 为准，不要按本文旧线性创作图落地。
 
 | 项 | 值 |
 |---|---|
@@ -8,8 +8,9 @@
 | Runtime | `matrix` |
 | 主路径 | 推文创作 `compose`、评论回复 `reply`（两套 Flow） |
 | 参照工程 | 本仓库问数 Runtime（TriggerFlow、有界队列、SSE、证据短 key） |
-| 文档日期 | 2026-08-15 |
-| P0 终态 | 带评理与降级轨迹的草稿包，不发送 |
+| 文档日期 | 2026-08-21 |
+| 写帖规格 | [推文创作技术方案](./MatrixCopilot-推文创作技术方案.md) **v1.0 定版** |
+| P0 终态 | 带评理与降级轨迹的草稿包，不发送。写帖图文契约见 v1.0 |
 
 配套可视化：
 
@@ -19,6 +20,8 @@
 - 知识库切分：[MatrixCopilot-知识库切分策略.md](./MatrixCopilot-知识库切分策略.md)
 - 知识库制品 CRUD / RecordStore：[MatrixCopilot-知识库制品管理.md](./MatrixCopilot-知识库制品管理.md)
 - 知识库 RAG 计划表：[MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md)
+- 写帖（创作/改写）实现规格 **v1.0 定版**：[MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md)
+- 写帖 v1.0 冻结副本：[MatrixCopilot-推文创作技术方案-v1.0.md](./MatrixCopilot-推文创作技术方案-v1.0.md)
 
 ---
 
@@ -99,16 +102,15 @@ flowchart LR
 
 ### 3.1 推文创作 compose
 
+创作与改写共用 `POST /api/create` 与一张 `COMPOSE_FLOW`。分流、图文签发、TikHub 与模块契约以 [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md) 为准。改写图文是草稿包里的 jpg/封面。创作允许无图。TikHub 调用走 ReAct（思考 → 确认参数 → 执行 → 观察）；相同入参的成功响应进独立 RecordStore，TTL 按方法（列表 1h、详情/资料 24h），过期后原地覆盖。创作只喂 24h 保护期内的对标帖。
+
 | 项 | 约定 |
 |---|---|
-| 入站 | HTTP `/api/create` 或企业微信文本落到 matrix；皆经 Gateway |
-| 输入 | 主题、目标、`platform_keys[]`、`account_key` |
-| 可选 | `need_trends=true` 时先抓取爆款，校验成 top-N 卡片再进 ComposeBrief |
-| Brief | 共享 talking points，按平台拆 work_item |
-| Draft | 每平台一条；评理与正文同请求；无 `reply_decision` |
-| Gate | 超限、禁词、未授权卖点 → 降级 |
-| Review | 矩阵口径对齐；不能放宽 Gate |
-| 产出 | `platform_key × draft`，带 rationale 与 degrade_trace |
+| 入站 | 只 HTTP `/api/create`（写帖 P0 不考虑企业微信） |
+| 平台 | P0 固定 `x-twitter`。条数 = `post_count`（改写忽略，固定 1 条） |
+| 输入 | 主题或帖锚点、`account_key`、`need_trends`（前端传，默认 false）、可选 `force_intent` / `post_count` |
+| 分流 | 同一张 `COMPOSE_FLOW` 内 `when compose\|rewrite`，规则见写帖规格 §2.2 |
+| 产出 | 图文草稿包 `completed \| partial \| failed`，不发送 |
 
 ### 3.2 评论回复 reply
 
@@ -129,16 +131,12 @@ flowchart LR
 
 ### 4.1 逻辑总图
 
+写帖 `COMPOSE_FLOW` 的分流、TikHub ReAct、`when` 汇合以 [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md) 为准，**不要按下面旧线性图实现创作**。回评骨架仍如下。
+
 ```text
-COMPOSE_FLOW
-    → 快照（硬规则 / 品牌 / 平台）
-    → 可选 fetch_trends → 爆款卡片
-    → ComposeBrief 按平台拆
-    → RetrieveCases 投影 ref_id
-    → for_each ComposeDraft
-    → ConstraintGate
-    → ComposeReview（矩阵口径，不放宽 Gate）
-    → 草稿包 SSE
+COMPOSE_FLOW  → 见写帖规格：route emit compose|rewrite
+               → collect emit WRITE(list) → for_each Draft+Gate → Review → Package
+               → 失败 emit PACKAGE，跳过 for_each
 
 REPLY_FLOW
     → 快照（硬规则 / 品牌 / 评论卡片）
@@ -150,7 +148,7 @@ REPLY_FLOW
     → 草稿包 SSE
 ```
 
-两套 Flow 共用 TaskService、SSE、ConstraintGate、RetrieveCases。图不同、Prompt 不同。REPLY_FLOW 没有趋势工位。约束层仍包住各自 Brief / RAG / Draft / Gate / Review。检索未命中不等于放行。
+两套 Flow 共用 TaskService、SSE、ConstraintGate、RetrieveCases。图不同、Prompt 不同。REPLY_FLOW 没有趋势工位。约束层仍包住各自 Brief / RAG / Draft / Gate / Review。检索未命中不等于放行。写帖 P0 不考虑企业微信。
 
 ### 4.2 五类材料，五种接法
 
@@ -191,7 +189,7 @@ P0 不拆独立 `run_matrix.py`。客户端不直连 TaskService。附件仍钉 
 | 节点 | 所有者 | 决策 | 拆开原因 |
 |---|---|---|---|
 | snapshot | 宿主 | 签发 brand / platform / policy / comment 短 key | 无快照不得开写 |
-| fetch_trends | Action + 宿主校验 | 仅 `COMPOSE_FLOW` 且 `need_trends` | 新观察，结果必须先成卡片 |
+| fetch_trends / TikHub | 宿主 Confirm + `fetch`；trending 看 `need_trends`；其余 method/params 由模型 Thought | 写帖见创作规格 §5.5。回评无此节点 | 新观察必须先成卡片 |
 | compose_brief / reply_brief | ModelRequest | 按平台或按评论拆 work_items | 入口已绑定场景；Brief 不分类 |
 | retrieve_cases | Action + 宿主投影 | 检索案例，签发 offered refs | 各自 Brief 之后的新观察；空结果标 empty |
 | compose_draft[*] / reply_draft[*] | ModelRequest | 评理、正文、引用；回复另裁 decision | 项间可并行；skip ⇒ 空正文 |
@@ -351,7 +349,9 @@ P0 使用设计夹具，例如 `data/matrix/cases/x-twitter.json`（12 条 Twitt
 | scenario | `compose` \| `reply`；入口已绑定则由宿主写入，禁止 `auto` |
 | platform_keys[] | 创作矩阵；回复可空，平台固定 `x-twitter` |
 | account_key / brand_key | 矩阵账号人设 |
-| need_trends | 仅 compose；true 才跑抓取。reply 请求携带则忽略 |
+| need_trends | 仅 compose；前端传。true 才打 `fetch_trending`。reply 携带则忽略 |
+| post_count | 仅 compose；1–10。省略则模型在平台上限内决定。改写忽略 |
+| force_intent | 仅 compose 可选；纠错分流。不另开 scenario |
 | comments[] | 仅 reply；compose 请求携带则 422。省略则用 text 签发一条评论 |
 | requester / channel | 审计，不进模型身份 |
 
@@ -359,13 +359,9 @@ Gateway 纯文本落到 matrix 时绑定 `COMPOSE_FLOW`。回评走 HTTP `commen
 
 ### 8.2 TaskResult
 
-- `status`：`completed` \| `partial`
+- `status`：`completed` \| `partial` \| **`failed`（写帖签发失败必须用 failed，见写帖规格 §7.6）**
 - `task_type`：`compose_post` \| `reply_comment`（由所跑 Flow 决定，禁止 `mixed`）
-- `summary`：运营可读整包摘要
-- `drafts[]`：`draft_key`、`kind`、`decision`、`text`、`rationale`、`risk_flags`、`evidence_ids`、`degrade_op`、`status`
-- `evidence[]`：本次 offered 卡片摘要
-- `limitations[]`
-- `snapshot_id` / `trace_ref`
+- 写帖包另含 `intent`、`drafts[].media[]`（`preview_url`）。回评包不含媒体字段。其余字段以所跑 Flow 的契约为准。
 
 ### 8.3 HTTP 与 SSE
 
@@ -381,17 +377,18 @@ GET  /v1/matrix/tasks/{id}/events
 
 SSE：`task.submitted`、`stage.*`、`work_item.ready`、`draft.ready`、一次 `package.ready`、`task.completed|failed`。Gateway 把 `package.ready` 译成一次 `message.delta`。
 
-### 8.4 六条 ModelRequest
+### 8.4 ModelRequest
 
-两套 Flow 各三条，契约不共用。禁止一个 Brief schema 用 `scenario` 兼做分类器。
+回评仍是 Brief / Draft / Review 三条。写帖在三条之外另有 M3 有界 `tikhub_react`（见写帖规格 §7.5）。禁止一个 Brief schema 用 `scenario` 兼做分类器。
 
-**COMPOSE_FLOW**
+**COMPOSE_FLOW**（完整契约见写帖规格 §7；下表是总案索引）
 
 | 请求 | input | info | 必填输出 | 宿主验收 |
 |---|---|---|---|---|
-| compose_brief | 用户原文、渠道 | offered 平台卡片、品牌摘要、约束卡片、可选趋势卡片 | normalized_brief、requirements、work_items | id 唯一；覆盖完整；`platform_key` ∈ offered |
-| compose_draft | 单条 work_item、平台上限 | 人设、政策、offered refs | stance_assessment、draft_text、rationale、evidence_ids | 引用合法；不得输出 `reply_decision` |
-| compose_review | brief + 已校验草稿 | 同一 snapshot | item_verdicts、package_summary、limitations | draft_key ∈ 已有；revise 再过 Gate |
+| tikhub_react | 用户原文 | need_trends、候选、观察、allowlist | thought、next、method、params | Confirm 不过不 HTTP |
+| compose_brief | 用户原文、渠道 | offered 平台卡片、品牌摘要、约束卡片、可选趋势/对标卡 | normalized_brief、requirements、work_items | id 唯一；覆盖完整；`platform_key` ∈ offered |
+| compose_draft | 单条 work_item、平台上限 | 人设、政策、offered refs；改写另含 source_* | stance_assessment、draft_text、rationale、evidence_ids | 引用合法；不得输出 `reply_decision` |
+| compose_review | brief + 已校验草稿 | 同一 snapshot；改写另含 source_post | item_verdicts、package_summary、limitations | draft_key ∈ 已有；revise 再过 Gate |
 
 **REPLY_FLOW**
 

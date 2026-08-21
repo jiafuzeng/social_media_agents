@@ -5,6 +5,7 @@ __pycache__/
 *logs/
 workspace/identity/
 workspace/rag/
+workspace/tikhub/
 # C extensions
 *.so
 

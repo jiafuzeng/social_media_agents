@@ -4,6 +4,7 @@
 |---|---|
 | 评审对象 | P0 工程落地，不含发送 |
 | 产品方案 | [MatrixCopilot-项目方案.md](./MatrixCopilot-项目方案.md) |
+| 写帖规格 | [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md)（**v1.0 定版**，创作落地以该文为准） |
 | 知识库制品 | [MatrixCopilot-知识库制品管理.md](./MatrixCopilot-知识库制品管理.md) |
 | RAG 计划表 | [MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md) |
 | 参照实现 | `integrated_agent/runtimes/question/` |
