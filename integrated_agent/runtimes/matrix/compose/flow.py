@@ -13,16 +13,34 @@ from integrated_agent.runtimes.matrix.host.snapshots import SnapshotError, bind_
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
 from .branch_hold import compose_branch_hold
 from .init import compose_init
+from .intel import (
+    INTEL_SUBFLOW_CAPTURE,
+    INTEL_SUBFLOW_WRITE_BACK,
+    build_intel_subflow,
+)
 from .package import compose_package
 from .route import compose_route
+from .source import (
+    SOURCE_SUBFLOW_CAPTURE,
+    SOURCE_SUBFLOW_WRITE_BACK,
+    build_source_subflow,
+)
 
 
 PIPELINE_VERSION = "matrix-compose-v1"
 
 COMPOSE_FLOW = TriggerFlow(name="matrix-compose-v1")
 COMPOSE_FLOW.to(compose_init).to(compose_route)
-COMPOSE_FLOW.when("compose").to(compose_branch_hold)
-COMPOSE_FLOW.when("rewrite").to(compose_branch_hold)
+COMPOSE_FLOW.when("compose").to_sub_flow(
+    build_intel_subflow(),
+    capture=INTEL_SUBFLOW_CAPTURE,
+    write_back=INTEL_SUBFLOW_WRITE_BACK,
+).to(compose_branch_hold)
+COMPOSE_FLOW.when("rewrite").to_sub_flow(
+    build_source_subflow(),
+    capture=SOURCE_SUBFLOW_CAPTURE,
+    write_back=SOURCE_SUBFLOW_WRITE_BACK,
+).to(compose_branch_hold)
 COMPOSE_FLOW.when("PACKAGE").to(compose_package)
 
 
