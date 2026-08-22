@@ -26,6 +26,12 @@ from .source import (
     build_source_subflow,
 )
 
+from .originaltweet import (
+    build_original_tweet_subflow,
+    ORIGINAL_TWEET_SUBFLOW_CAPTURE,
+    ORIGINAL_TWEET_SUBFLOW_WRITE_BACK,
+)
+
 
 PIPELINE_VERSION = "matrix-compose-v1"
 
@@ -35,7 +41,12 @@ COMPOSE_FLOW.when("compose").to_sub_flow(
     build_intel_subflow(),
     capture=INTEL_SUBFLOW_CAPTURE,
     write_back=INTEL_SUBFLOW_WRITE_BACK,
-).to(compose_branch_hold)
+).to_sub_flow(
+    build_original_tweet_subflow(),
+    capture=ORIGINAL_TWEET_SUBFLOW_CAPTURE,
+    write_back=ORIGINAL_TWEET_SUBFLOW_WRITE_BACK,
+)
+
 COMPOSE_FLOW.when("rewrite").to_sub_flow(
     build_source_subflow(),
     capture=SOURCE_SUBFLOW_CAPTURE,

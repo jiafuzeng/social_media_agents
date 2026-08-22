@@ -18,6 +18,10 @@ MAX_PLAN_TASKS = 4
 MAX_ACTION_ROUNDS = 2
 
 
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 def _search_browse_actions() -> list[Any]:
     return [
         Search(
@@ -290,6 +294,11 @@ async def merge_material(data: TriggerFlowRuntimeData) -> dict[str, Any]:
 
     material_list = _dedupe_materials(merged)
     plan_summary = str(data.get_state("plan_summary") or "").strip()
+    material_plan = [
+        item
+        for item in _as_list(data.get_state("material_plan"))
+        if isinstance(item, dict)
+    ]
     if not material_list and not any(
         str(item.get("error") or "") for item in task_results if isinstance(item, dict)
     ):
@@ -323,6 +332,8 @@ async def merge_material(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     return {
         "material_list": material_list,
         "intel_result": intel_result,
+        "plan_summary": plan_summary,
+        "material_plan": material_plan,
         "tool_logs": task_results,
         "limitations": limitations,
     }
@@ -363,6 +374,8 @@ INTEL_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
         "tweet_cards": "result.tweet_cards",
         "trend_cards": "result.trend_cards",
         "material_list": "result.material_list",
+        "material_plan": "result.material_plan",
+        "plan_summary": "result.plan_summary",
         "tool_logs": "result.tool_logs",
         "intel_result": "result.intel_result",
         "limitations": "result.limitations",

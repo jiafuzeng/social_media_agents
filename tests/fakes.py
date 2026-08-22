@@ -166,6 +166,36 @@ async def _dispatch_compose_reply(
     context = info.get("context") if isinstance(info, dict) else info
     if name == "matrix-compose-route-intent":
         return await model.route_intent(text=input_data.get("text") or "", info=info)
+    if name == "matrix-compose-intel-plan":
+        text = input_data if isinstance(input_data, str) else str(input_data or "")
+        return {
+            "plan_summary": "测试素材计划",
+            "tasks": [{"task_id": "m1", "goal": text or "创作素材"}],
+        }
+    if name == "matrix-compose-intel-task":
+        goal = ""
+        if isinstance(input_data, dict):
+            goal = str(input_data.get("goal") or "")
+        return {
+            "answer": "已采集测试素材",
+            "material_list": [
+                {
+                    "kind": "article",
+                    "title": goal or "测试素材",
+                    "text": "测试素材正文",
+                    "link": "",
+                    "media_links": [],
+                }
+            ],
+        }
+    if name == "matrix-compose-original-draft":
+        work = info.get("work_item") if isinstance(info, dict) else {}
+        draft_key = str((work or {}).get("draft_key") or "d1")
+        draft_index = str((work or {}).get("draft_index") or draft_key.lstrip("d") or "1")
+        return {
+            "draft_text": f"秋季上新草稿{draft_index}，详情见官方说明。",
+            "rationale": f"测试草稿 {draft_key}。",
+        }
     if name == "matrix-compose-brief":
         return await model.compose_brief(text=input_data["text"], info=snapshot)
     if name == "matrix-compose-draft":
