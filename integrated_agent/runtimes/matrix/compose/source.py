@@ -19,11 +19,7 @@ from agently.types.trigger_flow.trigger_flow import (
 )
 
 from integrated_agent.runtimes.matrix.compose.materialize import materialize_tool_batch
-from integrated_agent.runtimes.matrix.host.tikhubtools import (
-    COMPOSE_TOOL_FUNCS,
-    TWITTER_WEB_TOOLS,
-    register_twitter_web_tools,
-)
+from integrated_agent.runtimes.matrix.host.tikhubtools import source_tools_list
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 MAX_STEPS = 3
@@ -31,16 +27,6 @@ MAX_STEPS = 3
 _REACT_SESSION_MAX_LENGTH = 64_000
 _REACT_MAX_TOKENS = 8_192
 
-_SOURCE_TOOL_FUNCS = list(COMPOSE_TOOL_FUNCS)
-_SOURCE_TOOL_NAMES = tuple(fn.__name__ for fn in _SOURCE_TOOL_FUNCS)
-
-
-def _source_tools() -> dict[str, dict[str, Any]]:
-    return {
-        name: TWITTER_WEB_TOOLS[name]
-        for name in _SOURCE_TOOL_NAMES
-        if name in TWITTER_WEB_TOOLS
-    }
 
 
 async def _run_one_tool(
@@ -101,7 +87,7 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
     state = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
     step = int(state.get("step") or 0) + 1
     budget_left = MAX_STEPS - step
-    tools = _source_tools()
+    tools = source_tools_list
     tools_schema = [
         {"name": k, "desc": v["desc"], "args": v["args"]} for k, v in tools.items()
     ]
@@ -218,7 +204,7 @@ async def source_act(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     """执行 pending_tools；本批原始结果交给 clean。"""
     state = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
     pending = state.get("pending_tools") or []
-    tools = _source_tools()
+    tools = source_tools_list
     results = await asyncio.gather(
         *[
             _run_one_tool(

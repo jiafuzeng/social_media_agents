@@ -1,59 +1,97 @@
-"""M3 Intel 子图：prelude → Reason ↔ Act 信号环（s06）。
-
-- intel_reason：对照可用工具与任务目标，只决策 name+args（pending_tools）
-- intel_act：执行 pending_tools，结果写入 history，再回到 Reason
-"""
+"""M3 Intel 子图：prelude → plan_material → for_each(intel_reason) → merge_material。"""
 
 from __future__ import annotations
 
-import asyncio
+import os
 from typing import Any, cast
 
 from agently import Agently, TriggerFlow, TriggerFlowRuntimeData
+from agently.builtins.actions import Browse, Search
 from agently.types.trigger_flow.trigger_flow import (
     TriggerFlowSubFlowCapture,
     TriggerFlowSubFlowWriteBack,
 )
 
-from integrated_agent.runtimes.matrix.host.tikhubtools import (
-    TWITTER_WEB_TOOLS,
-    fetch_trending,
-)
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
-MAX_STEPS = 8
-
-# 写帖常用子集（与 COMPOSE_TOOL_FUNCS 对齐）
-_COMPOSE_TOOL_NAMES = (
-    "fetch_tweet_detail",
-    "fetch_user_profile",
-    "fetch_user_post_tweet",
-    "fetch_user_media",
-    "fetch_search_timeline",
-    "fetch_trending",
-)
+MAX_PLAN_TASKS = 4
+MAX_ACTION_ROUNDS = 5
 
 
-def _compose_tools(*, need_trends: bool) -> dict[str, dict[str, Any]]:
-    names = list(_COMPOSE_TOOL_NAMES)
-    if not need_trends:
-        names = [n for n in names if n != "fetch_trending"]
-    return {name: TWITTER_WEB_TOOLS[name] for name in names if name in TWITTER_WEB_TOOLS}
+def _search_browse_actions() -> list[Any]:
+    return [
+        Search(
+            proxy=os.environ.get("http_proxy", ""),
+            timeout=20,
+            backend="yahoo",
+            max_attempts=1,
+            region="cn-zh",
+        ),
+        Browse(
+            proxy=os.environ.get("http_proxy", ""),
+            timeout=20,
+            fallback_order=("bs4",),
+            enable_playwright=False,
+            enable_bs4=True,
+            max_content_length=12_000,
+        ),
+    ]
 
 
-async def _run_one_tool(name: str, args: dict[str, Any], tools: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    try:
-        if name not in tools:
-            result: Any = {"error": f"未知工具: {name}"}
-        else:
-            result = await asyncio.to_thread(tools[name]["func"], **(args or {}))
-    except Exception as exc:
-        result = {"error": str(exc)}
-    return {"tool": name, "args": args or {}, "result": result}
+def _intel_context(data: TriggerFlowRuntimeData, state: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = state or cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
+    request = cast(dict[str, Any], data.get_state("request") or {})
+    user_instruction = str(
+        payload.get("user_instruction")
+        or data.get_state("user_instruction")
+        or request.get("text")
+        or ""
+    ).strip()
+    return {
+        "user_instruction": user_instruction,
+        "intent": str(payload.get("intent") or data.get_state("intent") or "compose"),
+        "source_kind": str(payload.get("source_kind") or data.get_state("source_kind") or "none"),
+        "source_anchor": str(payload.get("source_anchor") or data.get_state("source_anchor") or "").strip(),
+        "need_trends": bool(payload.get("need_trends") or data.get_state("need_trends")),
+        "task_id": str(payload.get("task_id") or data.get_state("task_id") or ""),
+    }
+
+
+def _tasks_from_plan(raw_tasks: Any) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    for index, item in enumerate(raw_tasks if isinstance(raw_tasks, list) else [], start=1):
+        if not isinstance(item, dict):
+            continue
+        goal = str(item.get("goal") or "").strip()
+        if not goal:
+            continue
+        tasks.append(
+            {
+                "task_id": str(item.get("task_id") or f"m{index}"),
+                "goal": goal,
+            }
+        )
+        if len(tasks) >= MAX_PLAN_TASKS:
+            break
+    return tasks
+
+
+def _dedupe_materials(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("link") or item.get("title") or item.get("text") or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
 
 
 async def intel_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """接收父图 capture；need_trends 时 emit Reason 进入信号环。"""
+    """接收父图 capture，初始化本单 state。"""
     payload = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
     request = cast(dict[str, Any], data.get_state("request") or {})
     intent = str(data.get_state("intent") or payload.get("intent") or "compose")
@@ -74,7 +112,7 @@ async def intel_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("need_trends", need_trends, emit=False)
     await data.async_set_state("limitations", limitations, emit=False)
 
-    base = {
+    return {
         "intent": intent,
         "source_kind": source_kind,
         "source_anchor": source_anchor,
@@ -83,238 +121,201 @@ async def intel_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         "task_id": task_id,
     }
 
-    if not need_trends:
-        await data.async_set_state("tweet_cards", [], emit=False)
-        await data.async_set_state("trend_cards", [], emit=False)
-        await data.async_set_state("tool_logs", [], emit=False)
-        await data.async_set_state("intel_result", "", emit=False)
-        trace = cast(TraceLog, data.require_resource("trace"))
-        trace.log(
-            layer="business",
-            event_type="business.matrix.intel",
-            status="completed",
-            subject_id=task_id,
-            facts={"skipped_react": True, "need_trends": False},
-        )
-        return base
 
-    data.emit_nowait(
-        "Reason",
-        {
-            "question": user_instruction,
-            "history": [],
-            "step": 0,
-            "need_trends": True,
-            "task_id": task_id,
-        },
-    )
-    return base
-
-
-async def intel_reason(data: TriggerFlowRuntimeData) -> None:
-    """根据任务目标与可用工具，决定调用哪些函数并填写入参；不执行。
-
-    - type=tool → emit Act，载荷含 pending_tools=[{name, args}, ...]
-    - type=final / 预算耗尽 → 收尾写 state，不再 emit
-    """
-    state = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    step = int(state.get("step") or 0) + 1
-    budget_left = MAX_STEPS - step
-    need_trends = bool(state.get("need_trends"))
-    tools = _compose_tools(need_trends=need_trends)
-    tools_schema = [
-        {"name": k, "desc": v["desc"], "args": v["args"]} for k, v in tools.items()
-    ]
-    session_id = str(data.require_resource("session_id"))
-    limitations = list(cast(list[str], data.get_state("limitations") or []))
-
-    extra: list[str] = []
-    if budget_left <= 1:
-        extra.append(
-            f"步骤预算只剩 {budget_left} 步，请直接基于现有观察给出结论（type=final），不要再声明工具"
-        )
-
+async def plan_material(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
+    """按用户意图拆解为若干可并行执行的素材采集子任务。"""
+    ctx = _intel_context(data)
+    user_instruction = ctx["user_instruction"]
+    plan_summary = ""
+    tasks: list[dict[str, Any]] = []
     try:
         raw = await (
-            Agently.create_agent(name="matrix-compose-tikhub-react")
-            .activate_session(session_id=session_id)
-            .input(state.get("question") or "")
-            .info(
-                {
-                    "job": "为创作采集对标/热搜材料；够用就 final。不要写正文。",
-                    "branch": "intel",
-                    "可用工具": tools_schema,
-                    "已完成步骤": (state.get("history") or [])[-6:],
-                    "budget": {
-                        "step": step,
-                        "max_steps": MAX_STEPS,
-                        "budget_left": budget_left,
-                    },
-                }
-            )
+            Agently.create_agent(name="matrix-compose-intel-plan")
+            .activate_session(session_id=str(data.require_resource("session_id")))
+            .input(user_instruction)
+            .info(ctx)
             .instruct(
                 [
-                    "你只做决策，不执行工具。",
-                    "对照「可用工具」与「已完成步骤」，判断还缺什么材料。",
-                    "若需采集：type=tool，在 tool_calls 中列出要调用的函数名与完整入参（可一次多个）。",
-                    "name 必须来自可用工具；args 只填该工具声明的字段。",
-                    "材料已够：type=final，填写 answer 简短结论；tool_calls 置空。",
-                    *extra,
+                    "根据用户创作意图，拆解 1 到 4 个素材采集子任务，供下游并行执行。",
+                    "每个子任务只覆盖一个检索角度，goal 写清楚要采集什么。",
+                    "不要写推文正文，只输出任务计划。",
                 ]
             )
             .output(
                 {
-                    "type": (str, "tool 或 final", "not_null"),
-                    "reasoning": (str, "推理：目标还缺什么、为何选这些工具", "not_null"),
-                    "tool_calls": (
-                        list,
-                        "type==tool 时填 [{name: 工具名, args: 入参字典}]；否则 []",
+                    "plan_summary": (str, "整体拆解说明", "not_null"),
+                    "tasks": (
+                        [
+                            {
+                                "task_id": (str, "子任务 id，如 m1", "not_null"),
+                                "goal": (str, "该子任务目标", "not_null"),
+                            }
+                        ],
+                        "not_null",
                     ),
-                    "answer": (str, "type==final 时填最终结论，否则空串"),
+                },
+                format="json",
+            )
+            .async_start()
+        )
+        if isinstance(raw, dict):
+            plan_summary = str(raw.get("plan_summary") or "")
+            tasks = _tasks_from_plan(raw.get("tasks"))
+        if not tasks:
+            tasks = [{"task_id": "m1", "goal": user_instruction or "创作素材"}]
+    except Exception as exc:
+        limitations = list(cast(list[str], data.get_state("limitations") or []))
+        code = f"intel_plan_error:{type(exc).__name__}"
+        if code not in limitations:
+            limitations.append(code)
+        await data.async_set_state("limitations", limitations, emit=False)
+        tasks = [{"task_id": "m1", "goal": user_instruction or "创作素材"}]
+
+    await data.async_set_state("material_plan", tasks, emit=False)
+    await data.async_set_state("plan_summary", plan_summary, emit=False)
+    return tasks
+
+
+async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """执行单个子任务：Search/Browse 采集素材卡。"""
+    task = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
+    ctx = _intel_context(data)
+    goal = str(task.get("goal") or "").strip()
+    task_id = str(task.get("task_id") or "")
+
+    try:
+        raw = await (
+            Agently.create_agent(name="matrix-compose-intel-task")
+            .activate_session(session_id=str(data.require_resource("session_id")))
+            .input({"goal": goal})
+            .info({**ctx, "task": task})
+            .use_actions(_search_browse_actions())
+            .set_action_loop(max_rounds=MAX_ACTION_ROUNDS)
+            .instruct(
+                [
+                    "只完成当前子任务，整理素材卡；不要写推文正文。",
+                    "最多 Search 1 次、Browse 2 个链接；完成后立刻输出。",
+                    "每条素材：kind（tweet/article/trend）、title、text、link、media_links（可空）。",
+                    "搜不到配图时 media_links 留空，不要反复搜索。",
+                ]
+            )
+            .output(
+                {
+                    "answer": (str, "该子任务采集结论", "not_null"),
+                    "material_list": (
+                        list,
+                        "[{kind, title, text, link, media_links:[{type, thumb, video_url}]}]",
+                    ),
                 },
                 format="json",
             )
             .async_start()
         )
     except Exception as exc:
-        code = f"tikhub_react_error:{type(exc).__name__}"
-        if code not in limitations:
-            limitations.append(code)
-        await _finalize_intel(
-            data,
-            history=list(state.get("history") or []),
-            answer="",
-            limitations=limitations,
-            need_trends=need_trends,
-            task_id=str(state.get("task_id") or ""),
-            step=step,
-        )
-        return
+        return {
+            "task_id": task_id,
+            "goal": goal,
+            "ok": False,
+            "error": str(exc),
+            "answer": "",
+            "material_list": [],
+        }
 
     if not isinstance(raw, dict):
         raw = {}
-    decision = str(raw.get("type") or "final").strip().lower()
-    if decision not in {"tool", "final"}:
-        decision = "final"
-
-    pending_tools: list[dict[str, Any]] = []
-    for item in raw.get("tool_calls") or []:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        args = item.get("args") if isinstance(item.get("args"), dict) else {}
-        if not name:
-            continue
-        pending_tools.append({"name": name, "args": cast(dict[str, Any], args)})
-
-    answer = str(raw.get("answer") or "")
-    new_state = {**state, "step": step}
-
-    if budget_left <= 0 or decision == "final" or not pending_tools:
-        await _finalize_intel(
-            data,
-            history=list(state.get("history") or []),
-            answer=answer or ("已达到最大步骤数" if budget_left <= 0 else ""),
-            limitations=limitations,
-            need_trends=need_trends,
-            task_id=str(state.get("task_id") or ""),
-            step=step,
-        )
-        return
-
-    # 只把「函数名 + 入参」交给 Act 执行
-    data.emit_nowait("Act", {**new_state, "pending_tools": pending_tools})
-
-
-async def intel_act(data: TriggerFlowRuntimeData) -> None:
-    """执行 Reason 声明的 pending_tools，把结果追加进 history，再 emit Reason。"""
-    state = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    pending = state.get("pending_tools") or []
-    need_trends = bool(state.get("need_trends"))
-    tools = _compose_tools(need_trends=need_trends)
-    results = await asyncio.gather(
-        *[
-            _run_one_tool(
-                str(tc.get("name") or ""),
-                cast(dict[str, Any], tc.get("args") or {}),
-                tools,
-            )
-            for tc in pending
-            if isinstance(tc, dict)
-        ]
-    )
-    data.emit_nowait(
-        "Reason",
-        {
-            **state,
-            "history": list(state.get("history") or []) + list(results),
-        },
-    )
-
-
-async def _finalize_intel(
-    data: TriggerFlowRuntimeData,
-    *,
-    history: list[dict[str, Any]],
-    answer: str,
-    limitations: list[str],
-    need_trends: bool,
-    task_id: str,
-    step: int,
-) -> None:
-    tool_logs = list(history)
-    used = {
-        str(item.get("tool") or "").strip()
-        for item in tool_logs
-        if str(item.get("tool") or "").strip()
+    material_list = raw.get("material_list") or []
+    if not isinstance(material_list, list):
+        material_list = []
+    cleaned = [item for item in material_list if isinstance(item, dict)]
+    for item in cleaned:
+        item.setdefault("source_task_id", task_id)
+        item.setdefault("source_goal", goal)
+    return {
+        "task_id": task_id,
+        "goal": goal,
+        "ok": True,
+        "answer": str(raw.get("answer") or ""),
+        "material_list": cleaned,
     }
-    if need_trends and "fetch_trending" not in used:
-        try:
-            trend_result = await fetch_trending(country="China")
-            tool_logs.append(
-                {
-                    "tool": "fetch_trending",
-                    "args": {"country": "China"},
-                    "result": trend_result,
-                    "source": "host_ensure",
-                }
-            )
-            used.add("fetch_trending")
-        except Exception as exc:
-            code = f"trending_ensure_error:{type(exc).__name__}"
+
+
+async def merge_material(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """汇总 for_each 子任务结果，写回父图所需 state。"""
+    ctx = _intel_context(data)
+    task_results = [
+        item for item in cast(list[Any], data.input or []) if isinstance(item, dict)
+    ]
+    merged: list[dict[str, Any]] = []
+    answers: list[str] = []
+    limitations = list(cast(list[str], data.get_state("limitations") or []))
+
+    for result in task_results:
+        answer = str(result.get("answer") or "").strip()
+        if answer:
+            answers.append(answer)
+        if not result.get("ok", True):
+            code = f"intel_task_failed:{result.get('task_id') or 'unknown'}"
             if code not in limitations:
                 limitations.append(code)
+        merged.extend(
+            item
+            for item in cast(list[Any], result.get("material_list") or [])
+            if isinstance(item, dict)
+        )
 
-    await data.async_set_state("tool_logs", tool_logs, emit=False)
-    await data.async_set_state("intel_result", answer, emit=False)
+    material_list = _dedupe_materials(merged)
+    plan_summary = str(data.get_state("plan_summary") or "").strip()
+    if plan_summary:
+        answers.insert(0, plan_summary)
+    if not material_list and not any(
+        str(item.get("error") or "") for item in task_results if isinstance(item, dict)
+    ):
+        limitations.append("intel_empty")
+
+    intel_result = "；".join(part for part in answers if part) or (
+        f"共采集 {len(material_list)} 条素材" if material_list else "未采集到可用素材"
+    )
+
+    await data.async_set_state("material_list", material_list, emit=False)
+    await data.async_set_state("intel_result", intel_result, emit=False)
+    await data.async_set_state("tool_logs", task_results, emit=False)
     await data.async_set_state("tweet_cards", [], emit=False)
     await data.async_set_state("trend_cards", [], emit=False)
     await data.async_set_state("limitations", limitations, emit=False)
+
     trace = cast(TraceLog, data.require_resource("trace"))
     trace.log(
         layer="business",
         event_type="business.matrix.intel",
         status="completed",
-        subject_id=task_id,
+        subject_id=ctx["task_id"],
         facts={
-            "need_trends": need_trends,
-            "tool_calls": len(tool_logs),
-            "tool_names": sorted(used),
-            "react_steps": step,
+            "plan_tasks": len(task_results),
+            "material_list": len(material_list),
             "limitations": limitations,
         },
     )
+    return {
+        "material_list": material_list,
+        "intel_result": intel_result,
+        "tool_logs": task_results,
+        "limitations": limitations,
+    }
 
 
 def build_intel_subflow() -> TriggerFlow:
     flow = TriggerFlow(name="matrix-compose-intel-v1")
-    flow.to(intel_prelude)
-    flow.when("Act").to(intel_act)
-    flow.when("Reason").to(intel_reason)
+    (
+        flow.to(intel_prelude)
+        .to(plan_material)
+        .for_each(concurrency=4)
+        .to(intel_reason)
+        .end_for_each()
+        .to(merge_material)
+    )
     return flow
 
 
-# 父 when("compose") → 本 subflow 的数据桥
 INTEL_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
     "input": "value",
     "runtime_data": {
@@ -336,6 +337,7 @@ INTEL_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
     "runtime_data": {
         "tweet_cards": "result.tweet_cards",
         "trend_cards": "result.trend_cards",
+        "material_list": "result.material_list",
         "tool_logs": "result.tool_logs",
         "intel_result": "result.intel_result",
         "limitations": "result.limitations",
@@ -347,7 +349,8 @@ __all__ = [
     "INTEL_SUBFLOW_CAPTURE",
     "INTEL_SUBFLOW_WRITE_BACK",
     "build_intel_subflow",
-    "intel_act",
     "intel_prelude",
     "intel_reason",
+    "merge_material",
+    "plan_material",
 ]

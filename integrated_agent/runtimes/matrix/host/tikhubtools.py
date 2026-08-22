@@ -222,23 +222,6 @@ TWITTER_WEB_TOOL_FUNCS: list[Callable[..., Any]] = [
     fetch_retweet_user_list,
 ]
 
-# 写帖常用子集（创作 / 改写）；评论与粉丝类留给回评
-COMPOSE_TOOL_FUNCS: list[Callable[..., Any]] = [
-    fetch_tweet_detail,
-    fetch_user_profile,
-    fetch_user_post_tweet,
-    fetch_user_media,
-    fetch_search_timeline,
-    fetch_trending,
-]
-
-REPLY_TOOL_FUNCS: list[Callable[..., Any]] = [
-    fetch_post_comments,
-    fetch_latest_post_comments,
-    fetch_user_tweet_replies,
-]
-
-
 def _sync_call(method: str, **params: Any) -> Any:
     """s03 ReAct 同步入口。"""
     return _call_twitter_web(method, **params)
@@ -323,6 +306,28 @@ TWITTER_WEB_TOOLS: dict[str, dict[str, Any]] = {
     },
 }
 
+# 创作常用子集 → 供 Intel ReAct 直接取用
+compose_tools_list: dict[str, dict[str, Any]] = {
+    "fetch_search_timeline": TWITTER_WEB_TOOLS["fetch_search_timeline"],
+    "fetch_user_profile": TWITTER_WEB_TOOLS["fetch_user_profile"],
+    "fetch_user_post_tweet": TWITTER_WEB_TOOLS["fetch_user_post_tweet"],
+    "fetch_user_media": TWITTER_WEB_TOOLS["fetch_user_media"],
+    "fetch_trending": TWITTER_WEB_TOOLS["fetch_trending"],
+}
+# 改写常用子集 → 供 Source ReAct 直接取用
+source_tools_list: dict[str, dict[str, Any]] = {
+    "fetch_tweet_detail": TWITTER_WEB_TOOLS["fetch_tweet_detail"],
+    "fetch_search_timeline": TWITTER_WEB_TOOLS["fetch_search_timeline"],
+    "fetch_user_profile": TWITTER_WEB_TOOLS["fetch_user_profile"],
+    "fetch_user_post_tweet": TWITTER_WEB_TOOLS["fetch_user_post_tweet"],
+}
+
+# 回评常用子集（评论 / 粉丝）→ 供 Reply ReAct 直接取用
+reply_tools_list: dict[str, dict[str, Any]] = {
+    "fetch_post_comments": TWITTER_WEB_TOOLS["fetch_post_comments"],
+    "fetch_latest_post_comments": TWITTER_WEB_TOOLS["fetch_latest_post_comments"],
+    "fetch_user_tweet_replies": TWITTER_WEB_TOOLS["fetch_user_tweet_replies"],
+}
 
 def register_twitter_web_tools(agent: Any, *, funcs: list[Callable[..., Any]] | None = None) -> list[str]:
     """把工具挂到指定 agent，返回已注册工具名。
@@ -339,10 +344,11 @@ def register_twitter_web_tools(agent: Any, *, funcs: list[Callable[..., Any]] | 
 
 
 __all__ = [
-    "COMPOSE_TOOL_FUNCS",
-    "REPLY_TOOL_FUNCS",
     "TWITTER_WEB_TOOL_FUNCS",
     "TWITTER_WEB_TOOLS",
+    "compose_tools_list",
+    "source_tools_list",
+    "reply_tools_list",
     "fetch_latest_post_comments",
     "fetch_post_comments",
     "fetch_retweet_user_list",
