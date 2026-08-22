@@ -196,6 +196,21 @@ async def _dispatch_compose_reply(
             "draft_text": f"秋季上新草稿{draft_index}，详情见官方说明。",
             "rationale": f"测试草稿 {draft_key}。",
         }
+    if name == "matrix-compose-rewrite-draft":
+        work = info.get("work_item") if isinstance(info, dict) else {}
+        draft_key = str((work or {}).get("draft_key") or "d1")
+        draft_index = str((work or {}).get("draft_index") or draft_key.lstrip("d") or "1")
+        return {
+            "draft_text": f"改写草稿{draft_index}，已按我们口吻调整。",
+            "rationale": f"测试改写草稿 {draft_key}。",
+        }
+    if name == "matrix-compose-source-react":
+        return {
+            "type": "final",
+            "reasoning": "测试环境跳过工具调用。",
+            "tool_calls": [],
+            "answer": "已拿到粘贴原文。",
+        }
     if name == "matrix-compose-brief":
         return await model.compose_brief(text=input_data["text"], info=snapshot)
     if name == "matrix-compose-draft":

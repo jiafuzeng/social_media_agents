@@ -11,7 +11,6 @@ from agently import TriggerFlow
 from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 from integrated_agent.runtimes.matrix.host.snapshots import SnapshotError, bind_snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
-from .branch_hold import compose_branch_hold
 from .init import compose_init
 from .intel import (
     INTEL_SUBFLOW_CAPTURE,
@@ -20,6 +19,11 @@ from .intel import (
 )
 from .package import compose_package
 from .route import compose_route
+from .rewritetweet import (
+    REWRITE_TWEET_SUBFLOW_CAPTURE,
+    REWRITE_TWEET_SUBFLOW_WRITE_BACK,
+    build_rewrite_tweet_subflow,
+)
 from .source import (
     SOURCE_SUBFLOW_CAPTURE,
     SOURCE_SUBFLOW_WRITE_BACK,
@@ -51,7 +55,11 @@ COMPOSE_FLOW.when("rewrite").to_sub_flow(
     build_source_subflow(),
     capture=SOURCE_SUBFLOW_CAPTURE,
     write_back=SOURCE_SUBFLOW_WRITE_BACK,
-).to(compose_branch_hold)
+).to_sub_flow(
+    build_rewrite_tweet_subflow(),
+    capture=REWRITE_TWEET_SUBFLOW_CAPTURE,
+    write_back=REWRITE_TWEET_SUBFLOW_WRITE_BACK,
+)
 COMPOSE_FLOW.when("PACKAGE").to(compose_package)
 
 

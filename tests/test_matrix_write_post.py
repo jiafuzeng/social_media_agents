@@ -86,7 +86,38 @@ async def test_m2_rewrite_from_route_intent(tmp_path, monkeypatch) -> None:
     )
     assert run["intent"] == "rewrite"
     assert run["source_anchor"] == "1234567890123456789"
+    assert len(run["drafts"]) == 1
+    assert run["drafts"][0]["text"]
     assert any(name == "matrix-compose-route-intent" for name, _ in model.agent_sessions)
+    assert any(name == "matrix-compose-rewrite-draft" for name, _ in model.agent_sessions)
+
+
+@pytest.mark.asyncio
+async def test_rewrite_post_count_fans_out_drafts(tmp_path, monkeypatch) -> None:
+    model = ScriptedMatrixModel(
+        route_intent_out={
+            "reason": "有帖链接且要求改口吻。",
+            "intent": "rewrite",
+            "source_kind": "url",
+            "source_anchor": "1234567890123456789",
+            "user_instruction": "改成我们口吻",
+            "confidence": "high",
+        }
+    )
+    install_compose_ask(monkeypatch, model)
+    run = await run_compose(
+        _request(
+            "m2-rewrite-multi",
+            f"改成我们口吻 {STATUS_A}",
+            post_count=2,
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "m2-rewrite-multi",
+    )
+    assert run["intent"] == "rewrite"
+    assert len(run["drafts"]) == 2
+    assert {item["draft_key"] for item in run["drafts"]} == {"d1", "d2"}
+    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-rewrite-draft") == 2
 
 
 def test_accounts_default_snapshot_binds() -> None:
