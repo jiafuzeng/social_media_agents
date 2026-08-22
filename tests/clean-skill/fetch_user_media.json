@@ -1,0 +1,329 @@
+{
+  "code": 200,
+  "request_id": "7e396b28-c4c0-4cae-95dd-709930179123",
+  "message": "Request successful. This request will incur a charge.",
+  "message_zh": "请求成功，本次请求将被计费。",
+  "support": "Discord: https://discord.gg/aMEAS8Xsvz",
+  "time": "2026-08-21 20:11:31",
+  "time_stamp": 1787368291,
+  "time_zone": "America/Los_Angeles",
+  "docs": "https://api.tikhub.io/#/Twitter-Web-API/fetch_user_media_api_v1_twitter_web_fetch_user_media_get",
+  "cache_message": "This response is cached and accessible via the URL below for 24 hours at no extra cost. The cache is for request tracing only — it doesn't affect the API's data freshness and won't be returned through the API again.",
+  "cache_message_zh": "本次响应已缓存，可通过下方 URL 直接查看，有效期 24 小时，访问缓存链接无额外费用。缓存仅用于请求溯源，不影响接口数据的时效性，也不会再次通过接口返回。",
+  "cache_url": "https://cache.tikhub.io/api/v1/cache/public/7e396b28-c4c0-4cae-95dd-709930179123?sign=8d634bd89e17dd8fe1d9e24c2b958486b1cb9454ea09e3895c6c67ebb3ce36e4",
+  "router": "/api/v1/twitter/web/fetch_user_media",
+  "params": {
+    "screen_name": "elonmusk",
+    "rest_id": "44196397"
+  },
+  "data": {
+    "timeline": [
+      {
+        "tweet_id": "2090853140543545636",
+        "bookmarks": 62,
+        "created_at": "Fri Aug 21 17:26:49 +0000 2026",
+        "favorites": 1547,
+        "text": "@wudijo https://t.co/ZJs4lyzcHM",
+        "lang": "qme",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "reply_to": "2090757722861912539",
+        "views": "155510",
+        "quotes": 30,
+        "sensitive": false,
+        "replies": 234,
+        "retweets": 114,
+        "conversation_id": "2090757722861912539",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HQQz2QZagAAIIwN.jpg",
+              "id": "2090853134214266880"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        }
+      },
+      {
+        "tweet_id": "2090655236155384288",
+        "bookmarks": 1613,
+        "created_at": "Fri Aug 21 04:20:25 +0000 2026",
+        "favorites": 69823,
+        "text": "Starship is so sci-fi https://t.co/G9IMCLmmiC",
+        "lang": "en",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "6857835",
+        "quotes": 431,
+        "sensitive": false,
+        "replies": 3253,
+        "retweets": 4741,
+        "conversation_id": "2090655236155384288",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HQN_2q3acAARIH_.jpg",
+              "id": "2090655229226414080"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        }
+      },
+      {
+        "tweet_id": "2090138513421512999",
+        "bookmarks": 1375,
+        "created_at": "Wed Aug 19 18:07:09 +0000 2026",
+        "favorites": 14089,
+        "text": "Nothing is guaranteed https://t.co/Pykv7610E7",
+        "lang": "en",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "4278666",
+        "quotes": 157,
+        "sensitive": false,
+        "replies": 858,
+        "retweets": 1213,
+        "conversation_id": "2090138513421512999",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HQGp5shaQAAOTQX.jpg",
+              "id": "2090138510745550848"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090076460866244855",
+          "bookmarks": 1230,
+          "created_at": "Wed Aug 19 14:00:34 +0000 2026",
+          "favorites": 5067,
+          "text": "If an alien visited earth and asked you: “Show me one chart that sits upstream of everything your species has accomplished or will ever accomplish.”\n\nWhat would you show them?\n\nI would show them the chart below. \n\nFrom my perspective, as long as we keep this chart going, we will https://t.co/yxMzEa5Byb",
+          "lang": "en",
+          "views": "3474676",
+          "quotes": 76,
+          "sensitive": false,
+          "replies": 354,
+          "retweets": 330,
+          "conversation_id": "2090076460866244855",
+          "author": {
+            "rest_id": "3291691",
+            "name": "Chamath Palihapitiya",
+            "screen_name": "chamath",
+            "avatar": null,
+            "blue_verified": true
+          },
+          "media": {
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HQFxdjkXkAAOlvZ.jpg",
+                "id": "2090076454654545920"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090101763399700963",
+        "bookmarks": 64,
+        "created_at": "Wed Aug 19 15:41:07 +0000 2026",
+        "favorites": 1315,
+        "text": "Playing Incognito https://t.co/OVdNqfxSnZ",
+        "lang": "en",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "reply_to": "2088124576685281766",
+        "views": "320090",
+        "quotes": 51,
+        "sensitive": false,
+        "replies": 285,
+        "retweets": 193,
+        "conversation_id": "2088124576685281766",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HQGIeahakAA0eML.jpg",
+              "id": "2090101758173548544"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        }
+      },
+      {
+        "tweet_id": "2088124576685281766",
+        "bookmarks": 1439,
+        "created_at": "Fri Aug 14 04:44:29 +0000 2026",
+        "favorites": 30573,
+        "text": "Kekius Maximus https://t.co/OD24y3viQv",
+        "lang": "lt",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "5328517",
+        "quotes": 539,
+        "sensitive": false,
+        "replies": 2791,
+        "retweets": 2396,
+        "conversation_id": "2088124576685281766",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HPqCO-YXIAA60nD.jpg",
+              "id": "2088124571014602752"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        }
+      },
+      {
+        "tweet_id": "2087586063682596905",
+        "bookmarks": 699,
+        "created_at": "Wed Aug 12 17:04:37 +0000 2026",
+        "favorites": 12504,
+        "text": "Grok 4.6 is objectively #1 when considering intelligence, speed &amp; cost https://t.co/1SowBEzlJV",
+        "lang": "en",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "7419231",
+        "quotes": 180,
+        "sensitive": false,
+        "replies": 827,
+        "retweets": 1475,
+        "conversation_id": "2087586063682596905",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HPiYdmfa4AAJASU.jpg",
+              "id": "2087586061602185216"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2087564648325530099",
+          "bookmarks": 464,
+          "created_at": "Wed Aug 12 15:39:31 +0000 2026",
+          "favorites": 3441,
+          "text": "SpaceXAI's Grok 4.6 scores 61 on the Artificial Analysis Intelligence Index, joining the frontier in line with GPT-5.6 Sol, with standout agentic performance at lower cost\n\nGrok 4.6 gains 5 points over Grok 4.5 on the Intelligence Index just over one month after its release, or https://t.co/QeqrKpVUjk",
+          "lang": "en",
+          "views": "9207134",
+          "quotes": 180,
+          "sensitive": false,
+          "replies": 160,
+          "retweets": 368,
+          "conversation_id": "2087564648325530099",
+          "author": {
+            "rest_id": "1743487864934162432",
+            "name": "Artificial Analysis",
+            "screen_name": "ArtificialAnlys",
+            "avatar": null,
+            "blue_verified": true
+          },
+          "media": {
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HPiEg4XaEAAJ4LX.jpg",
+                "id": "2087564127707467776"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2086554608348873008",
+        "bookmarks": 4973,
+        "created_at": "Sun Aug 09 20:45:59 +0000 2026",
+        "favorites": 24534,
+        "text": "AI agentic Internet traffic will obviously VASTLY exceed human usage. Not a close call at all. \n\nCloudflare’s forecast is accurate. https://t.co/Wo4FiRKjPU",
+        "lang": "en",
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "8621785",
+        "quotes": 808,
+        "sensitive": false,
+        "replies": 1971,
+        "retweets": 3849,
+        "conversation_id": "2086554608348873008",
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HPTuWyYXcAAmx9G.jpg",
+              "id": "2086554602627887104"
+            }
+          ]
+        },
+        "author": {
+          "rest_id": "44196397",
+          "name": "Elon Musk",
+          "screen_name": "elonmusk",
+          "avatar": null,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2086538843323236435",
+          "bookmarks": 335,
+          "created_at": "Sun Aug 09 19:43:20 +0000 2026",
+          "favorites": 1322,
+          "text": "For context, Global bandwidth  is somewhere between 2-8 Pbps (2,000-8,000 Tbps) depending on if your measuring fiber public backhaul (like international fiber) or all public and private connections.\n\n100,000 V3 Starlinks equals 100 Pbps 10x-50x the total bandwidth available",
+          "lang": "en",
+          "views": "7418825",
+          "quotes": 36,
+          "sensitive": null,
+          "replies": 50,
+          "retweets": 164,
+          "conversation_id": "2086538843323236435",
+          "author": {
+            "rest_id": "331865640",
+            "name": "Aaron Burnett",
+            "screen_name": "aaronburnett",
+            "avatar": null,
+            "blue_verified": true
+          },
+          "media": []
+        }
+      }
+    ],
+    "next_cursor": "DAABCgABHQS5rVh___0KAAIc9O5cexbBMAgAAwAAAAIAAA",
+    "status": "ok",
+    "user": {
+      "profile": "elonmusk",
+      "id": "44196397",
+      "avatar": null,
+      "desc": "https://t.co/ZdBx5WABYx",
+      "name": "Elon Musk",
+      "friends": 1394,
+      "sub_count": 241459360,
+      "pinned_tweet_ids_str": [
+        "2090990558798078361"
+      ]
+    }
+  }
+}

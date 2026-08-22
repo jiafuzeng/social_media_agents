@@ -1,0 +1,161 @@
+{
+  "code": 200,
+  "request_id": "a5f1ce98-8fd7-43a6-a271-c3df07addbdb",
+  "message": "Request successful. This request will incur a charge.",
+  "message_zh": "请求成功，本次请求将被计费。",
+  "support": "Discord: https://discord.gg/aMEAS8Xsvz",
+  "time": "2026-08-21 20:07:57",
+  "time_stamp": 1787368077,
+  "time_zone": "America/Los_Angeles",
+  "docs": "https://api.tikhub.io/#/Twitter-Web-API/fetch_tweet_detail_api_v1_twitter_web_fetch_tweet_detail_get",
+  "cache_message": "This response is cached and accessible via the URL below for 24 hours at no extra cost. The cache is for request tracing only — it doesn't affect the API's data freshness and won't be returned through the API again.",
+  "cache_message_zh": "本次响应已缓存，可通过下方 URL 直接查看，有效期 24 小时，访问缓存链接无额外费用。缓存仅用于请求溯源，不影响接口数据的时效性，也不会再次通过接口返回。",
+  "cache_url": "https://cache.tikhub.io/api/v1/cache/public/a5f1ce98-8fd7-43a6-a271-c3df07addbdb?sign=26e8db5623b6da4c1f1846ed95aaca101df09ea660428970c76c255398d45e48",
+  "router": "/api/v1/twitter/web/fetch_tweet_detail",
+  "params": {
+    "tweet_id": "1808168603721650364"
+  },
+  "data": {
+    "likes": 284190,
+    "created_at": "Tue Jul 02 15:59:23 +0000 2024",
+    "status": "active",
+    "text": "The New York Times is attacking *your* freedom of speech! https://t.co/TRIa13TWdY",
+    "display_text": "The New York Times is attacking *your* freedom of speech!",
+    "retweets": 52546,
+    "bookmarks": 6624,
+    "quotes": 3901,
+    "reply_to": null,
+    "replies": 19209,
+    "lang": "en",
+    "in_reply_to_screen_name": null,
+    "in_reply_to_status_id_str": null,
+    "in_reply_to_user_id_str": null,
+    "sensitive": false,
+    "views": "53720687",
+    "conversation_id": "1808168603721650364",
+    "entities": {
+      "media": [
+        {
+          "display_url": "pic.x.com/TRIa13TWdY",
+          "expanded_url": "https://x.com/elonmusk/status/1808168603721650364/photo/1",
+          "ext_media_availability": {
+            "status": "Available"
+          },
+          "features": {
+            "large": {
+              "faces": []
+            },
+            "medium": {
+              "faces": []
+            },
+            "orig": {
+              "faces": []
+            },
+            "small": {
+              "faces": []
+            }
+          },
+          "id_str": "1808168600894689280",
+          "indices": [
+            58,
+            81
+          ],
+          "media_key": "3_1808168600894689280",
+          "media_results": {
+            "result": {
+              "media_key": "3_1808168600894689280"
+            }
+          },
+          "media_url_https": "https://pbs.twimg.com/media/GRfnwy5X0AAwIK2.jpg",
+          "original_info": {
+            "focus_rects": [
+              {
+                "h": 355,
+                "w": 634,
+                "x": 20,
+                "y": 0
+              },
+              {
+                "h": 355,
+                "w": 355,
+                "x": 160,
+                "y": 0
+              },
+              {
+                "h": 355,
+                "w": 311,
+                "x": 182,
+                "y": 0
+              },
+              {
+                "h": 355,
+                "w": 178,
+                "x": 248,
+                "y": 0
+              },
+              {
+                "h": 355,
+                "w": 712,
+                "x": 0,
+                "y": 0
+              }
+            ],
+            "height": 355,
+            "width": 712
+          },
+          "sizes": {
+            "large": {
+              "h": 355,
+              "resize": "fit",
+              "w": 712
+            },
+            "medium": {
+              "h": 355,
+              "resize": "fit",
+              "w": 712
+            },
+            "small": {
+              "h": 339,
+              "resize": "fit",
+              "w": 680
+            },
+            "thumb": {
+              "h": 150,
+              "resize": "crop",
+              "w": 150
+            }
+          },
+          "type": "photo",
+          "url": "https://t.co/TRIa13TWdY"
+        }
+      ],
+      "hashtags": [],
+      "symbols": [],
+      "timestamps": [],
+      "urls": [],
+      "user_mentions": []
+    },
+    "conversation_control": {
+      "policy": null
+    },
+    "initial_tweets": null,
+    "author": {
+      "rest_id": "44196397",
+      "name": "Elon Musk",
+      "screen_name": "elonmusk",
+      "image": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+      "blue_verified": true,
+      "verification": null,
+      "sub_count": 241459297
+    },
+    "media": {
+      "photo": [
+        {
+          "media_url_https": "https://pbs.twimg.com/media/GRfnwy5X0AAwIK2.jpg",
+          "id": "1808168600894689280"
+        }
+      ]
+    },
+    "id": "1808168603721650364"
+  }
+}

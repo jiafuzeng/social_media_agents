@@ -1,0 +1,272 @@
+{
+  "code": 200,
+  "request_id": "555a9e0a-b6e2-41ce-90ae-30047c1decd4",
+  "message": "Request successful. This request will incur a charge.",
+  "message_zh": "请求成功，本次请求将被计费。",
+  "support": "Discord: https://discord.gg/aMEAS8Xsvz",
+  "time": "2026-08-21 20:12:20",
+  "time_stamp": 1787368340,
+  "time_zone": "America/Los_Angeles",
+  "docs": "https://api.tikhub.io/#/Twitter-Web-API/fetch_trending_api_v1_twitter_web_fetch_trending_get",
+  "cache_message": "This response is cached and accessible via the URL below for 24 hours at no extra cost. The cache is for request tracing only — it doesn't affect the API's data freshness and won't be returned through the API again.",
+  "cache_message_zh": "本次响应已缓存，可通过下方 URL 直接查看，有效期 24 小时，访问缓存链接无额外费用。缓存仅用于请求溯源，不影响接口数据的时效性，也不会再次通过接口返回。",
+  "cache_url": "https://cache.tikhub.io/api/v1/cache/public/555a9e0a-b6e2-41ce-90ae-30047c1decd4?sign=caa93c3a3874e936029e40bc6ad01cd0b7be5adb273cc9a8693deaa49ead4d56",
+  "router": "/api/v1/twitter/web/fetch_trending",
+  "params": {
+    "country": "china"
+  },
+  "data": {
+    "trends": [
+      {
+        "name": "Coventry",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Pretoria",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "President Cyril Ramaphosa",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "zimbabwe and south africa",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "national sports stadium",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Collins",
+        "description": null,
+        "context": "Politics · Trending"
+      },
+      {
+        "name": "Chamisa",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Kelsea Tafirenyika",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Arsenal",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Savinho",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Hopewell",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Tzolis",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "First Family",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "ramon catala",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Ricky",
+        "description": null,
+        "context": "Movies & TV · Trending"
+      },
+      {
+        "name": "Parliament",
+        "description": null,
+        "context": "Politics · Trending"
+      },
+      {
+        "name": "Spurs",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Premier League",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "#BBNaija",
+        "description": null,
+        "context": "Movies & TV · Trending"
+      },
+      {
+        "name": "Haaland",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Tottenham",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Manchester City",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "zifa",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Tshabangu",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Belarus",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Warriors",
+        "description": null,
+        "context": "NBA · Trending"
+      },
+      {
+        "name": "Spain",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "mutare",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Beitbridge",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Newcastle",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Journalist",
+        "description": null,
+        "context": "News · Trending"
+      },
+      {
+        "name": "First Lady",
+        "description": null,
+        "context": "Politics · Trending"
+      },
+      {
+        "name": "ZANU",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Southern Africa",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Dubai",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "#vakazimbabwe",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Rwanda",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Baleba",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Kindly DM",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Nero",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Ronaldo",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Jacinta",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Alvarez",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Liverpool",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "President Mnangagwa",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Brighton",
+        "description": null,
+        "context": "Football · Trending"
+      },
+      {
+        "name": "Shona",
+        "description": null,
+        "context": "Trending"
+      },
+      {
+        "name": "Nigeria",
+        "description": null,
+        "context": "Politics · Trending"
+      },
+      {
+        "name": "England",
+        "description": null,
+        "context": "Sports · Trending"
+      },
+      {
+        "name": "#edworks",
+        "description": null,
+        "context": "Trending"
+      }
+    ]
+  }
+}

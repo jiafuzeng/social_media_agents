@@ -1,0 +1,2253 @@
+{
+  "code": 200,
+  "request_id": "6d4cb55b-a0be-4897-86d2-3885cf115d2c",
+  "message": "Request successful. This request will incur a charge.",
+  "message_zh": "请求成功，本次请求将被计费。",
+  "support": "Discord: https://discord.gg/aMEAS8Xsvz",
+  "time": "2026-08-21 20:09:50",
+  "time_stamp": 1787368190,
+  "time_zone": "America/Los_Angeles",
+  "docs": "https://api.tikhub.io/#/Twitter-Web-API/fetch_user_post_tweet_api_v1_twitter_web_fetch_user_post_tweet_get",
+  "cache_message": "This response is cached and accessible via the URL below for 24 hours at no extra cost. The cache is for request tracing only — it doesn't affect the API's data freshness and won't be returned through the API again.",
+  "cache_message_zh": "本次响应已缓存，可通过下方 URL 直接查看，有效期 24 小时，访问缓存链接无额外费用。缓存仅用于请求溯源，不影响接口数据的时效性，也不会再次通过接口返回。",
+  "cache_url": "https://cache.tikhub.io/api/v1/cache/public/6d4cb55b-a0be-4897-86d2-3885cf115d2c?sign=9cd65f043cbd1adc254d3d9174c4cd56386b63f98b2ff7842fd8bc3fb1c40b71",
+  "router": "/api/v1/twitter/web/fetch_user_post_tweet",
+  "params": {
+    "screen_name": "elonmusk",
+    "rest_id": "44196397"
+  },
+  "data": {
+    "pinned": {
+      "tweet_id": "2090990558798078361",
+      "bookmarks": 254,
+      "created_at": "Sat Aug 22 02:32:52 +0000 2026",
+      "favorites": 10117,
+      "text": "The greatest privilege of my life is being able to work with incredible people to create amazing products",
+      "lang": "en",
+      "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+      "views": "542290",
+      "sensitive": null,
+      "quotes": 133,
+      "replies": 1250,
+      "retweets": 763,
+      "conversation_id": "2090990558798078361",
+      "media": [],
+      "author": {
+        "rest_id": "44196397",
+        "name": null,
+        "screen_name": null,
+        "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+        "followers_count": 241459342,
+        "blue_verified": true
+      }
+    },
+    "timeline": [
+      {
+        "tweet_id": "2090992086766280819",
+        "bookmarks": 0,
+        "created_at": "Sat Aug 22 02:38:56 +0000 2026",
+        "favorites": 0,
+        "text": "RT @gailalfaratx: Comedy is legal on 𝕏",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "338856",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1233929232432205827",
+              "name": "Gail Alfar",
+              "screen_name": "gailalfaratx"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 84,
+        "conversation_id": "2090992086766280819",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090972591640990200"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090972591640990200",
+          "bookmarks": 18,
+          "created_at": "Sat Aug 22 01:21:28 +0000 2026",
+          "favorites": 862,
+          "text": "Comedy is legal on 𝕏",
+          "lang": "en",
+          "sensitive": null,
+          "views": "96118",
+          "quotes": 8,
+          "entities": [],
+          "replies": 128,
+          "retweets": 84,
+          "conversation_id": "2090972591640990200",
+          "author": {
+            "rest_id": "1233929232432205827",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2085860721951166464/69E7D-C-_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090981607499059486",
+        "bookmarks": 0,
+        "created_at": "Sat Aug 22 01:57:18 +0000 2026",
+        "favorites": 0,
+        "text": "RT @eyishazyer: Second time trying Grok Bot and I'm still not over it.\n\nIt took my whole growth engine and split into 4 of itself. One's on…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "376773",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1443532663575429122",
+              "name": "Eyisha Zyer",
+              "screen_name": "eyishazyer"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 81,
+        "conversation_id": "2090981607499059486",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090710587995304242"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090710587995304242",
+          "bookmarks": 110,
+          "created_at": "Fri Aug 21 08:00:22 +0000 2026",
+          "favorites": 547,
+          "text": "Second time trying Grok Bot and I'm still not over it.\n\nIt took my whole growth engine and split into 4 of itself. One's on content, one's on scheduling, one's watching engagement, one pulls it all into reports at the end.\n\nThere's a master orchestrator on top deciding who does what and when, and I genuinely didn't set that part up, it figured out the division of labor on its own.\n\nI haven't touched it since I hit go. It just moves through the queue and only comes to me when something actually needs a yes or no.\n\nI keep forgetting this is still just @grok. What @xAI and @elonmusk are building here plays more like a team that clocked in already knowing the job, not a bot waiting for instructions.",
+          "lang": "en",
+          "sensitive": false,
+          "views": "251084",
+          "quotes": 4,
+          "entities": {
+            "media": [
+              {
+                "additional_media_info": {
+                  "monetizable": false
+                },
+                "display_url": "pic.x.com/4sFVQ2dIA0",
+                "expanded_url": "https://x.com/eyishazyer/status/2090710587995304242/video/1",
+                "ext_media_availability": {
+                  "status": "Available"
+                },
+                "id_str": "2090708054190985216",
+                "indices": [
+                  279,
+                  302
+                ],
+                "media_key": "13_2090708054190985216",
+                "media_results": {
+                  "result": {
+                    "media_key": "13_2090708054190985216"
+                  }
+                },
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090708054190985216/img/Ct028lX2pkkmYS69.jpg",
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 1080,
+                  "width": 1920
+                },
+                "sizes": {
+                  "large": {
+                    "h": 1080,
+                    "resize": "fit",
+                    "w": 1920
+                  },
+                  "medium": {
+                    "h": 675,
+                    "resize": "fit",
+                    "w": 1200
+                  },
+                  "small": {
+                    "h": 383,
+                    "resize": "fit",
+                    "w": 680
+                  },
+                  "thumb": {
+                    "h": 150,
+                    "resize": "crop",
+                    "w": 150
+                  }
+                },
+                "type": "video",
+                "url": "https://t.co/4sFVQ2dIA0",
+                "video_info": {
+                  "aspect_ratio": [
+                    16,
+                    9
+                  ],
+                  "duration_millis": 175066,
+                  "variants": [
+                    {
+                      "content_type": "application/x-mpegURL",
+                      "url": "https://video.twimg.com/amplify_video/2090708054190985216/pl/k9hTEpjqeDytdd_h.m3u8?tag=29&v=cfc"
+                    },
+                    {
+                      "bitrate": 256000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/480x270/LMeqgzWi2n8nP6jJ.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 832000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/640x360/tPWHVFD4R5qzWx5a.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 2176000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/1280x720/LDw4kKWzwo74FzdC.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 10368000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/1920x1080/KNSd4lTpthUV5dAu.mp4?tag=29"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "replies": 63,
+          "retweets": 81,
+          "conversation_id": "2090710587995304242",
+          "quoted": {
+            "tweet_id": "2090432734833594752",
+            "bookmarks": 9,
+            "created_at": "Thu Aug 20 13:36:17 +0000 2026",
+            "favorites": 41,
+            "text": "WILDEST PART OF MY WEEK: told @bot Grok Bot to watch how I file expense reports once. Just once. Next day it had already processed the backlog.\n\nLogged into the portal, matched receipts to line items, flagged two duplicates I would've missed. Without me touching it again.\n\nDidn't https://t.co/5MUTv7zOHi",
+            "lang": "en",
+            "views": "282541",
+            "sensitive": false,
+            "quotes": 0,
+            "replies": 20,
+            "retweets": 1,
+            "conversation_id": "2090432734833594752",
+            "author": {
+              "rest_id": "1443532663575429122",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/2073654480571346944/qgdoSeBb_normal.jpg",
+              "followers_count": 127163,
+              "blue_verified": true
+            },
+            "media": {
+              "photo": [
+                {
+                  "media_url_https": "https://pbs.twimg.com/media/HQK1e22bsAEY9IG.jpg",
+                  "id": "2090432718777856001",
+                  "sizes": {
+                    "h": 675,
+                    "w": 1200
+                  }
+                }
+              ]
+            }
+          },
+          "author": {
+            "rest_id": "1443532663575429122",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2073654480571346944/qgdoSeBb_normal.jpg",
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090708054190985216/img/Ct028lX2pkkmYS69.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090708054190985216/pl/k9hTEpjqeDytdd_h.m3u8?tag=29&v=cfc"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/480x270/LMeqgzWi2n8nP6jJ.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/640x360/tPWHVFD4R5qzWx5a.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/1280x720/LDw4kKWzwo74FzdC.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 10368000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090708054190985216/vid/avc1/1920x1080/KNSd4lTpthUV5dAu.mp4?tag=29"
+                  }
+                ],
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration": 175066,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 1080,
+                  "width": 1920
+                },
+                "id": "2090708054190985216"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090981357967307067",
+        "bookmarks": 0,
+        "created_at": "Sat Aug 22 01:56:18 +0000 2026",
+        "favorites": 0,
+        "text": "RT @monokern: everyone is looking at grok bot like it is five new employees\n\nthe more interesting part is that they are not five isolated e…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "320308",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "3049366699",
+              "name": "monokern",
+              "screen_name": "monokern"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 81,
+        "conversation_id": "2090981357967307067",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090882144658719015"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090882144658719015",
+          "bookmarks": 414,
+          "created_at": "Fri Aug 21 19:22:04 +0000 2026",
+          "favorites": 544,
+          "text": "everyone is looking at grok bot like it is five new employees\n\nthe more interesting part is that they are not five isolated employees\n\nthey share one persistent cloud environment: the same browser sessions, terminal, filesystem and authenticated tools - while a chief of staff can route work between them without waiting for you to open the laptop\n\nthat turns one login into infrastructure\n\na research bot can collect leads, pass them to a writer, hand the result to a designer and let an ops bot update the workflow all inside the same running machine\n\nthe upside is obvious: less copying, fewer handoffs and work that continues while you sleep\n\nthe blast radius is just as obvious:\n\n- authenticate only the services the whole agent fleet is allowed to reach\n- give every bot a narrow role description, because that description becomes its place in the org chart\n- keep irreversible actions behind human approval: sending, publishing, spending and production changes\n- store skills, configuration and long-term state inside `/workspace`, because the rest of the VM may disappear during an update\n- treat shared sessions as shared authority, not as separate bot identities\n\nthe same architecture that makes grok bot useful is what makes it dangerous to configure casually\n\nmy take: the breakthrough is not that you can hire five AI workers\n\nit is that they can operate like one persistent company inside your real tools and your job changes from prompting every task to designing the permissions, boundaries and handoffs\n\nthe full chief-of-staff setup, session handoff model, approval matrix and `/workspace` survival strategy are mapped out in the article ↓",
+          "lang": "en",
+          "sensitive": false,
+          "views": "244293",
+          "quotes": 6,
+          "entities": {
+            "media": [
+              {
+                "additional_media_info": {
+                  "monetizable": false
+                },
+                "allow_download_status": {
+                  "allow_download": true
+                },
+                "display_url": "pic.x.com/8K2TUgtZXC",
+                "expanded_url": "https://x.com/monokern/status/2090882144658719015/video/1",
+                "ext_media_availability": {
+                  "status": "Available"
+                },
+                "id_str": "2090882052409212928",
+                "indices": [
+                  281,
+                  304
+                ],
+                "media_key": "13_2090882052409212928",
+                "media_results": {
+                  "result": {
+                    "media_key": "13_2090882052409212928"
+                  }
+                },
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090882052409212928/img/1-LPc2nZ2eaAexa9.jpg",
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 702
+                },
+                "sizes": {
+                  "large": {
+                    "h": 720,
+                    "resize": "fit",
+                    "w": 702
+                  },
+                  "medium": {
+                    "h": 720,
+                    "resize": "fit",
+                    "w": 702
+                  },
+                  "small": {
+                    "h": 680,
+                    "resize": "fit",
+                    "w": 663
+                  },
+                  "thumb": {
+                    "h": 150,
+                    "resize": "crop",
+                    "w": 150
+                  }
+                },
+                "type": "video",
+                "url": "https://t.co/8K2TUgtZXC",
+                "video_info": {
+                  "aspect_ratio": [
+                    39,
+                    40
+                  ],
+                  "duration_millis": 13802,
+                  "variants": [
+                    {
+                      "content_type": "application/x-mpegURL",
+                      "url": "https://video.twimg.com/amplify_video/2090882052409212928/pl/bjNBaOyAg56v1dTb.m3u8?tag=29&v=cfc"
+                    },
+                    {
+                      "bitrate": 632000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090882052409212928/vid/avc1/320x328/nz2VqDHjuHNH0diK.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 950000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090882052409212928/vid/avc1/480x492/4dKwHVYJMz0FkeuH.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 2176000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090882052409212928/vid/avc1/702x720/V9VGYf5b3gZtU5Fm.mp4?tag=29"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "replies": 61,
+          "retweets": 81,
+          "conversation_id": "2090882144658719015",
+          "quoted": {
+            "tweet_id": "2090490444224331787",
+            "bookmarks": 167,
+            "created_at": "Thu Aug 20 17:25:35 +0000 2026",
+            "favorites": 83,
+            "text": "https://t.co/Jb6AI7sRZA",
+            "lang": "zxx",
+            "views": "277452",
+            "sensitive": false,
+            "quotes": 5,
+            "replies": 13,
+            "retweets": 9,
+            "conversation_id": "2090490444224331787",
+            "author": {
+              "rest_id": "3049366699",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/2056505537487888384/M08VfjwG_normal.jpg",
+              "followers_count": 3841,
+              "blue_verified": true
+            },
+            "media": []
+          },
+          "author": {
+            "rest_id": "3049366699",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2056505537487888384/M08VfjwG_normal.jpg",
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090882052409212928/img/1-LPc2nZ2eaAexa9.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090882052409212928/pl/bjNBaOyAg56v1dTb.m3u8?tag=29&v=cfc"
+                  },
+                  {
+                    "bitrate": 632000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090882052409212928/vid/avc1/320x328/nz2VqDHjuHNH0diK.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 950000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090882052409212928/vid/avc1/480x492/4dKwHVYJMz0FkeuH.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090882052409212928/vid/avc1/702x720/V9VGYf5b3gZtU5Fm.mp4?tag=29"
+                  }
+                ],
+                "aspect_ratio": [
+                  39,
+                  40
+                ],
+                "duration": 13802,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 702
+                },
+                "id": "2090882052409212928"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090978384310685961",
+        "bookmarks": 0,
+        "created_at": "Sat Aug 22 01:44:29 +0000 2026",
+        "favorites": 0,
+        "text": "RT @adamcarolla: He’s a genius",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "356048",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "10926202",
+              "name": "Adam Carolla",
+              "screen_name": "adamcarolla"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 226,
+        "conversation_id": "2090978384310685961",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090942614917005382"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090942614917005382",
+          "bookmarks": 55,
+          "created_at": "Fri Aug 21 23:22:21 +0000 2026",
+          "favorites": 2531,
+          "text": "He’s a genius",
+          "lang": "en",
+          "sensitive": null,
+          "views": "279020",
+          "quotes": 12,
+          "entities": [],
+          "replies": 125,
+          "retweets": 226,
+          "conversation_id": "2090942614917005382",
+          "quoted": {
+            "tweet_id": "2090940949228564617",
+            "bookmarks": 13,
+            "created_at": "Fri Aug 21 23:15:44 +0000 2026",
+            "favorites": 687,
+            "text": "Hell? https://t.co/b3Jg5Q2rKu",
+            "lang": "en",
+            "views": "327287",
+            "sensitive": false,
+            "quotes": 11,
+            "replies": 42,
+            "retweets": 56,
+            "conversation_id": "2090940949228564617",
+            "author": {
+              "rest_id": "1390762874809761793",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/1428167484406964229/Q8fS7M5X_normal.jpg",
+              "followers_count": 1713051,
+              "blue_verified": true
+            },
+            "media": {
+              "photo": [
+                {
+                  "media_url_https": "https://pbs.twimg.com/media/HQSDtkNXkAAOiiG.jpg",
+                  "id": "2090940945843851264",
+                  "sizes": {
+                    "h": 893,
+                    "w": 1200
+                  }
+                }
+              ]
+            }
+          },
+          "author": {
+            "rest_id": "10926202",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1486913589751402499/JTn7MRT4_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090978233043017756",
+        "bookmarks": 0,
+        "created_at": "Sat Aug 22 01:43:53 +0000 2026",
+        "favorites": 0,
+        "text": "RT @benshapiro: What, precisely, are women protesting outside the Lindsay Clancy trial? What oppression are they opposing? Why are women po…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "301558",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "17995040",
+              "name": "Ben Shapiro",
+              "screen_name": "benshapiro"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 296,
+        "conversation_id": "2090978233043017756",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090913429385281946"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090913429385281946",
+          "bookmarks": 108,
+          "created_at": "Fri Aug 21 21:26:23 +0000 2026",
+          "favorites": 2683,
+          "text": "What, precisely, are women protesting outside the Lindsay Clancy trial? What oppression are they opposing? Why are women posting videos of themselves on TikTok raging at the world about the stresses of motherhood? \n\nWhat, in short, is going on with American women? The answer: we trained several generations of women that they were victims of precisely the institutions that give them – and men! – meaning and happiness. \n\nThen we replaced those institutions with social media contagion and endless victimhood.\n\nhttps://t.co/adRxKOx52K",
+          "lang": "en",
+          "sensitive": null,
+          "views": "414468",
+          "quotes": 30,
+          "entities": [],
+          "replies": 336,
+          "retweets": 296,
+          "conversation_id": "2090913429385281946",
+          "author": {
+            "rest_id": "17995040",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1791135695567740928/nrRmsfkZ_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090978073722462395",
+        "bookmarks": 0,
+        "created_at": "Sat Aug 22 01:43:15 +0000 2026",
+        "favorites": 0,
+        "text": "RT @yunta_tsai: I gave Grok @bot a link to the post below and asked it to take up the cinematography challenge.\n\nDirect the film entirely t…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "325241",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1577705091737432070",
+              "name": "Yun-Ta Tsai",
+              "screen_name": "yunta_tsai"
+            },
+            {
+              "id_str": "2085838061347217408",
+              "name": "Grok Bot",
+              "screen_name": "bot"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 51,
+        "conversation_id": "2090978073722462395",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090974828522299625"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090974828522299625",
+          "bookmarks": 35,
+          "created_at": "Sat Aug 22 01:30:22 +0000 2026",
+          "favorites": 383,
+          "text": "I gave Grok @bot a link to the post below and asked it to take up the cinematography challenge.\n\nDirect the film entirely through the chat casually and nothing else. Pretty wild. https://t.co/khhWrHEIMl",
+          "lang": "en",
+          "sensitive": false,
+          "views": "227516",
+          "quotes": 4,
+          "entities": {
+            "media": [
+              {
+                "additional_media_info": {
+                  "monetizable": false
+                },
+                "allow_download_status": {
+                  "allow_download": true
+                },
+                "display_url": "pic.x.com/khhWrHEIMl",
+                "expanded_url": "https://x.com/yunta_tsai/status/2090974828522299625/video/1",
+                "ext_media_availability": {
+                  "status": "Available"
+                },
+                "id_str": "2090974794288386048",
+                "indices": [
+                  179,
+                  202
+                ],
+                "media_key": "13_2090974794288386048",
+                "media_results": {
+                  "result": {
+                    "media_key": "13_2090974794288386048"
+                  }
+                },
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090974794288386048/img/LsCW_d3tO2iZ5gAx.jpg",
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 1280
+                },
+                "sizes": {
+                  "large": {
+                    "h": 720,
+                    "resize": "fit",
+                    "w": 1280
+                  },
+                  "medium": {
+                    "h": 675,
+                    "resize": "fit",
+                    "w": 1200
+                  },
+                  "small": {
+                    "h": 383,
+                    "resize": "fit",
+                    "w": 680
+                  },
+                  "thumb": {
+                    "h": 150,
+                    "resize": "crop",
+                    "w": 150
+                  }
+                },
+                "type": "video",
+                "url": "https://t.co/khhWrHEIMl",
+                "video_info": {
+                  "aspect_ratio": [
+                    16,
+                    9
+                  ],
+                  "duration_millis": 35916,
+                  "variants": [
+                    {
+                      "content_type": "application/x-mpegURL",
+                      "url": "https://video.twimg.com/amplify_video/2090974794288386048/pl/knzfJwo4KCCTg02O.m3u8?tag=29&v=0b4"
+                    },
+                    {
+                      "bitrate": 256000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090974794288386048/vid/avc1/480x270/wi951Hqf7QN2M3_p.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 832000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090974794288386048/vid/avc1/640x360/ViyKdBJg1VjoPSz5.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 2176000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090974794288386048/vid/avc1/1280x720/UwC90srrvSM59tpb.mp4?tag=29"
+                    }
+                  ]
+                }
+              },
+              {
+                "display_url": "pic.x.com/khhWrHEIMl",
+                "expanded_url": "https://x.com/yunta_tsai/status/2090974828522299625/video/1",
+                "ext_media_availability": {
+                  "status": "Available"
+                },
+                "features": {
+                  "large": {
+                    "faces": []
+                  },
+                  "medium": {
+                    "faces": []
+                  },
+                  "orig": {
+                    "faces": []
+                  },
+                  "small": {
+                    "faces": []
+                  }
+                },
+                "id_str": "2090974794254831616",
+                "indices": [
+                  179,
+                  202
+                ],
+                "media_key": "3_2090974794254831616",
+                "media_results": {
+                  "result": {
+                    "media_key": "3_2090974794254831616"
+                  }
+                },
+                "media_url_https": "https://pbs.twimg.com/media/HQSifzXa0AA_iZU.jpg",
+                "original_info": {
+                  "focus_rects": [
+                    {
+                      "h": 655,
+                      "w": 1169,
+                      "x": 0,
+                      "y": 337
+                    },
+                    {
+                      "h": 1169,
+                      "w": 1169,
+                      "x": 0,
+                      "y": 80
+                    },
+                    {
+                      "h": 1333,
+                      "w": 1169,
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "h": 2048,
+                      "w": 1024,
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "h": 2048,
+                      "w": 1169,
+                      "x": 0,
+                      "y": 0
+                    }
+                  ],
+                  "height": 2048,
+                  "width": 1169
+                },
+                "sizes": {
+                  "large": {
+                    "h": 2048,
+                    "resize": "fit",
+                    "w": 1169
+                  },
+                  "medium": {
+                    "h": 1200,
+                    "resize": "fit",
+                    "w": 685
+                  },
+                  "small": {
+                    "h": 680,
+                    "resize": "fit",
+                    "w": 388
+                  },
+                  "thumb": {
+                    "h": 150,
+                    "resize": "crop",
+                    "w": 150
+                  }
+                },
+                "type": "photo",
+                "url": "https://t.co/khhWrHEIMl"
+              }
+            ],
+            "user_mentions": [
+              {
+                "id_str": "2085838061347217408",
+                "indices": [
+                  12,
+                  16
+                ],
+                "name": "Grok Bot",
+                "screen_name": "bot"
+              }
+            ]
+          },
+          "replies": 41,
+          "retweets": 51,
+          "conversation_id": "2090974828522299625",
+          "quoted": {
+            "tweet_id": "2089443401695470006",
+            "bookmarks": 2688,
+            "created_at": "Mon Aug 17 20:05:01 +0000 2026",
+            "favorites": 6801,
+            "text": "Homer had a lyre. You have Grok Imagine.\n\nCreate a compelling scene from Homer’s The Odyssey that shows what Grok @Imagine’s video and voice capabilities can do. We’re awarding $100K, $50K, and $25K to the top three videos submitted by quoting this post. 🧵 https://t.co/GZpSFEUs7f",
+            "lang": "en",
+            "views": "14035319",
+            "sensitive": false,
+            "quotes": 618,
+            "replies": 819,
+            "retweets": 923,
+            "conversation_id": "2089443401695470006",
+            "author": {
+              "rest_id": "1720665183188922368",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/2057885623374290944/lmj0pawP_normal.jpg",
+              "followers_count": 8994122,
+              "blue_verified": true
+            },
+            "media": {
+              "video": [
+                {
+                  "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2089440735934205952/img/AzsBoitFtU-u43ZB.jpg",
+                  "variants": [
+                    {
+                      "content_type": "application/x-mpegURL",
+                      "url": "https://video.twimg.com/amplify_video/2089440735934205952/pl/R4-Dnsk-G7tgDqeH.m3u8?tag=29&v=cfc"
+                    },
+                    {
+                      "bitrate": 256000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2089440735934205952/vid/avc1/480x270/K4QZUBGKEWbFJMOB.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 832000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2089440735934205952/vid/avc1/640x360/IKmtTaqyJF2VRrH3.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 2176000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2089440735934205952/vid/avc1/1280x720/sNgmIMszJBoYipmy.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 10368000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2089440735934205952/vid/avc1/1920x1080/lDyweIIaLTp_CRR9.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 25128000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2089440735934205952/vid/avc1/3840x2160/Q3d1A4fkYH2n4_pu.mp4?tag=29"
+                    }
+                  ],
+                  "aspect_ratio": [
+                    16,
+                    9
+                  ],
+                  "duration": 31541,
+                  "original_info": {
+                    "focus_rects": [],
+                    "height": 2160,
+                    "width": 3840
+                  },
+                  "id": "2089440735934205952"
+                }
+              ]
+            }
+          },
+          "author": {
+            "rest_id": "1577705091737432070",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2035915849819938816/b6kIsNMe_normal.jpg",
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090974794288386048/img/LsCW_d3tO2iZ5gAx.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090974794288386048/pl/knzfJwo4KCCTg02O.m3u8?tag=29&v=0b4"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090974794288386048/vid/avc1/480x270/wi951Hqf7QN2M3_p.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090974794288386048/vid/avc1/640x360/ViyKdBJg1VjoPSz5.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090974794288386048/vid/avc1/1280x720/UwC90srrvSM59tpb.mp4?tag=29"
+                  }
+                ],
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration": 35916,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 1280
+                },
+                "id": "2090974794288386048"
+              }
+            ],
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HQSifzXa0AA_iZU.jpg",
+                "id": "2090974794254831616",
+                "sizes": {
+                  "h": 1200,
+                  "w": 685
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090966834807984173",
+        "bookmarks": 957,
+        "created_at": "Sat Aug 22 00:58:36 +0000 2026",
+        "favorites": 15518,
+        "text": "The reason Rome fell was because they stopped making Romans",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "1302202",
+        "quotes": 250,
+        "entities": [],
+        "replies": 2102,
+        "retweets": 1954,
+        "conversation_id": "2090966834807984173",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090847857666294046",
+          "bookmarks": 659,
+          "created_at": "Fri Aug 21 17:05:49 +0000 2026",
+          "favorites": 2022,
+          "text": "We think the collapse in birth rates is a modern problem. It is not. The most powerful man in the world once faced the exact same thing, and he was so alarmed he passed laws to force his people to have children.\n\nThis was not a modern government: it was Rome 2000 years ago... https://t.co/rtYAFJ4J8d",
+          "lang": "en",
+          "views": "991833",
+          "sensitive": false,
+          "quotes": 38,
+          "replies": 193,
+          "retweets": 420,
+          "conversation_id": "2090847857666294046",
+          "author": {
+            "rest_id": "1027214104661028864",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1139462117474615296/KmYifXsI_normal.png",
+            "followers_count": 813862,
+            "blue_verified": true
+          },
+          "media": {
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HQQuP9rXgAAWaLy.jpg",
+                "id": "2090846978796126208",
+                "sizes": {
+                  "h": 967,
+                  "w": 1200
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090965365773992400",
+        "bookmarks": 369,
+        "created_at": "Sat Aug 22 00:52:46 +0000 2026",
+        "favorites": 22844,
+        "text": "Murder 1",
+        "lang": "tr",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "1563626",
+        "quotes": 81,
+        "entities": [],
+        "replies": 721,
+        "retweets": 2425,
+        "conversation_id": "2090965365773992400",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090779209522176107",
+          "bookmarks": 1171,
+          "created_at": "Fri Aug 21 12:33:03 +0000 2026",
+          "favorites": 24881,
+          "text": "🚨 UPDATE: The Karmelo Anthony legal team is IN SHAMBLES after bombshell texts came out that he fantasized about m*rder before killing Austin Metcalf\n\n\"How many bullets u want coming out of ur chest?\"\n\n\"When I st*b somebody I'm gonna lick their blood off the blade\"\n\n2 hours https://t.co/dWrcOupaHH",
+          "lang": "en",
+          "views": "1918233",
+          "sensitive": false,
+          "quotes": 206,
+          "replies": 781,
+          "retweets": 4945,
+          "conversation_id": "2090779209522176107",
+          "author": {
+            "rest_id": "763094579491008512",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1946702115037908992/NU6Ro1bl_normal.jpg",
+            "followers_count": 1173321,
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090778408682684416/img/Rp6CUtAUB_kujUVS.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090778408682684416/pl/dnuZ3Qu4bqr6pZKd.m3u8?tag=29&v=c5f"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090778408682684416/vid/avc1/480x270/rABKCj8AItWGzlZd.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090778408682684416/vid/avc1/640x360/CXPrUcWWi-FeUfYM.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090778408682684416/vid/avc1/1280x720/e-847l8W8kraktFs.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 10368000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090778408682684416/vid/avc1/1920x1080/ZtqYbeQqgE9C3x9d.mp4?tag=29"
+                  }
+                ],
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration": 107933,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 1080,
+                  "width": 1920
+                },
+                "id": "2090778408682684416"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090962975587000493",
+        "bookmarks": 60,
+        "created_at": "Sat Aug 22 00:43:16 +0000 2026",
+        "favorites": 1777,
+        "text": "Grok Voice ranked first",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "889008",
+        "quotes": 22,
+        "entities": [],
+        "replies": 347,
+        "retweets": 265,
+        "conversation_id": "2090962975587000493",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090950611617431742",
+          "bookmarks": 13,
+          "created_at": "Fri Aug 21 23:54:08 +0000 2026",
+          "favorites": 135,
+          "text": "Grok Voice Think Fast 2.0 just ranked #1 on Artificial Analysis’ new Speech Agent Arena for highest Task Success Rate\n\nThis benchmark actually measures what matters\nReal people talk to hidden voice agents across practical scenarios. Task Success Rate tracks whether the AI https://t.co/YF3BK4PJnL",
+          "lang": "en",
+          "views": "555263",
+          "sensitive": false,
+          "quotes": 10,
+          "replies": 18,
+          "retweets": 32,
+          "conversation_id": "2090950611617431742",
+          "author": {
+            "rest_id": "1818311005698678784",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1876785200010539008/2_HFJjq9_normal.jpg",
+            "followers_count": 263162,
+            "blue_verified": true
+          },
+          "media": {
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HQSLzWrXMAAE9yV.jpg",
+                "id": "2090949841383796736",
+                "sizes": {
+                  "h": 758,
+                  "w": 1200
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090960655969099806",
+        "bookmarks": 210,
+        "created_at": "Sat Aug 22 00:34:03 +0000 2026",
+        "favorites": 6226,
+        "text": "The only large-scale lithium battery cathode production in the Americas",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "1170680",
+        "quotes": 43,
+        "entities": [],
+        "replies": 433,
+        "retweets": 745,
+        "conversation_id": "2090960655969099806",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090901581420253482",
+          "bookmarks": 160,
+          "created_at": "Fri Aug 21 20:39:18 +0000 2026",
+          "favorites": 2330,
+          "text": "We are operating the first large scale cathode production facility in North America as part of our 4680 cell production in Austin, TX https://t.co/awgdsmvgH7",
+          "lang": "en",
+          "views": "977675",
+          "sensitive": false,
+          "quotes": 45,
+          "replies": 70,
+          "retweets": 331,
+          "conversation_id": "2090901581420253482",
+          "author": {
+            "rest_id": "1679769205938311169",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1681000114607857665/FLyxuLUB_normal.jpg",
+            "followers_count": 117813,
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090900063505821696/img/Q5QSQ83cj1A6-f8f.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090900063505821696/pl/AT9r6h3KLH2CYizP.m3u8?tag=29&v=91b"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090900063505821696/vid/avc1/480x270/DewViCQWByUoZtEq.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090900063505821696/vid/avc1/640x360/ubyf2qD-5NzZeZTs.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090900063505821696/vid/avc1/1280x720/6LwXP8e8PAaJfgYY.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 10368000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090900063505821696/vid/avc1/1920x1080/pABQX83w5C-1i_u4.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 25128000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090900063505821696/vid/avc1/3840x2160/yCXlf_ZPfoeYdQrX.mp4?tag=29"
+                  }
+                ],
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration": 65109,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 2160,
+                  "width": 3840
+                },
+                "id": "2090900063505821696"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090950876425080851",
+        "bookmarks": 66,
+        "created_at": "Fri Aug 21 23:55:11 +0000 2026",
+        "favorites": 1763,
+        "text": "Interesting",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "1424250",
+        "quotes": 15,
+        "entities": [],
+        "replies": 327,
+        "retweets": 260,
+        "conversation_id": "2090950876425080851",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090837054536262007",
+          "bookmarks": 66,
+          "created_at": "Fri Aug 21 16:22:54 +0000 2026",
+          "favorites": 241,
+          "text": "I am going to start to share the leaderboard at VulcanBench more regularly.\n\nVulcanBench is the only benchmark I know that benchmarks across effort levels, on an eval suite of 100% real engineering tasks.\n\nGetting ready to sunset eval suite 3 and eval suite 4 is almost ready to",
+          "lang": "en",
+          "views": "1090135",
+          "sensitive": null,
+          "quotes": 8,
+          "replies": 42,
+          "retweets": 26,
+          "conversation_id": "2090837054536262007",
+          "author": {
+            "rest_id": "19016936",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2058612692580184064/h0dOdYSc_normal.jpg",
+            "followers_count": 43561,
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090947136250896526",
+        "bookmarks": 252,
+        "created_at": "Fri Aug 21 23:40:19 +0000 2026",
+        "favorites": 9674,
+        "text": "It really doesn’t",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "1835928",
+        "quotes": 37,
+        "entities": [],
+        "replies": 472,
+        "retweets": 1174,
+        "conversation_id": "2090947136250896526",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090801097371779395",
+          "bookmarks": 114,
+          "created_at": "Fri Aug 21 14:00:01 +0000 2026",
+          "favorites": 2422,
+          "text": "Elon Musk: \"Asylum was supposed to mean that if you go back to your country, you'll get k*lled.\"\n\n\"Asylum seekers [now] go on vacation to the country that they're seeking asylum from… That doesn't make any sense.\"\n https://t.co/p0kvD6aQuR",
+          "lang": "en",
+          "views": "1612806",
+          "sensitive": false,
+          "quotes": 19,
+          "replies": 65,
+          "retweets": 329,
+          "conversation_id": "2090801097371779395",
+          "author": {
+            "rest_id": "1441965051414339586",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1777217835036495872/atU7ay85_normal.jpg",
+            "followers_count": 469729,
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2052936655594496003/img/DCYyvyIKHoPpEaYW.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/pl/8fKve1aO3g4jVY_d.m3u8?tag=27&v=042"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/480x270/H988aNZRaaqcGV_O.mp4?tag=27"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/640x360/lI6N945BELGLibf6.mp4?tag=27"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/1280x720/BNLJd5mw4sEVy4nh.mp4?tag=27"
+                  }
+                ],
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration": 36571,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 1280
+                },
+                "id": "2052936655594496003"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090946697929343480",
+        "bookmarks": 0,
+        "created_at": "Fri Aug 21 23:38:35 +0000 2026",
+        "favorites": 0,
+        "text": "RT @SwipeWright: I'm not lying when I tell everyone I don't cherry pick the crazy papers and PhD theses I post on X constantly. \n\nThe modal…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "390730",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1009716150895341568",
+              "name": "Colin Wright",
+              "screen_name": "SwipeWright"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 279,
+        "conversation_id": "2090946697929343480",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090946051003842666"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090946051003842666",
+          "bookmarks": 116,
+          "created_at": "Fri Aug 21 23:36:01 +0000 2026",
+          "favorites": 1851,
+          "text": "I'm not lying when I tell everyone I don't cherry pick the crazy papers and PhD theses I post on X constantly. \n\nThe modal paper published in many fields is activist word salad designed to destroy the West. That's not hyperbole. That's a plain fact.\n\nIt's a total crisis.",
+          "lang": "en",
+          "sensitive": null,
+          "views": "379080",
+          "quotes": 8,
+          "entities": [],
+          "replies": 86,
+          "retweets": 279,
+          "conversation_id": "2090946051003842666",
+          "quoted": {
+            "tweet_id": "2090557043954667834",
+            "bookmarks": 423,
+            "created_at": "Thu Aug 20 21:50:14 +0000 2026",
+            "favorites": 3331,
+            "text": "\"Out of curiosity: I randomly picked 5 universities, and looked up their sociology department faculty. I randomly picked papers written by the faculty. Wow, my mind was blown. At least 60% was similar gibberish. Constant politically charged assertions— no underlying data.",
+            "lang": "en",
+            "views": "513940",
+            "sensitive": null,
+            "quotes": 45,
+            "replies": 139,
+            "retweets": 605,
+            "conversation_id": "2090557043954667834",
+            "author": {
+              "rest_id": "3134292238",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/2090223435091738624/Rt0Vu67F_normal.jpg",
+              "followers_count": 2323,
+              "blue_verified": true
+            },
+            "media": []
+          },
+          "author": {
+            "rest_id": "1009716150895341568",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1520907012602839041/ux2O3s7b_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090940150679499233",
+        "bookmarks": 0,
+        "created_at": "Fri Aug 21 23:12:34 +0000 2026",
+        "favorites": 0,
+        "text": "RT @VladSaigau: Falcon 9 has been priced at ~$70M for many years now, leading many to believe market prices have stayed flat. \n\nHeres what…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "451990",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1496125256624484362",
+              "name": "Vlad Saigau",
+              "screen_name": "VladSaigau"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 123,
+        "conversation_id": "2090940150679499233",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090894834508628276"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090894834508628276",
+          "bookmarks": 53,
+          "created_at": "Fri Aug 21 20:12:30 +0000 2026",
+          "favorites": 798,
+          "text": "Falcon 9 has been priced at ~$70M for many years now, leading many to believe market prices have stayed flat. \n\nHeres what it looks like adjusted for inflation. \n\nF9 customer launch margin has increased from ~breakeven in 2013...\n... to todays prices exceeding internal cost by, what we estimate to be 3.3x. Thats ~70% margin. \n\n(green line is the internal cost of Starlink, which is lower because they get far closer to filling the payload capacity!)\n\nWill be interesting to map these dynamics onto market prices with Starship around the corner....",
+          "lang": "en",
+          "sensitive": false,
+          "views": "232977",
+          "quotes": 5,
+          "entities": {
+            "media": [
+              {
+                "allow_download_status": {
+                  "allow_download": true
+                },
+                "display_url": "pic.x.com/9oWDOUzq24",
+                "expanded_url": "https://x.com/VladSaigau/status/2090894834508628276/photo/1",
+                "ext_media_availability": {
+                  "status": "Available"
+                },
+                "features": {
+                  "large": {
+                    "faces": []
+                  },
+                  "medium": {
+                    "faces": []
+                  },
+                  "orig": {
+                    "faces": []
+                  },
+                  "small": {
+                    "faces": []
+                  }
+                },
+                "id_str": "2090893758204174338",
+                "indices": [
+                  279,
+                  302
+                ],
+                "media_key": "3_2090893758204174338",
+                "media_results": {
+                  "result": {
+                    "media_key": "3_2090893758204174338"
+                  }
+                },
+                "media_url_https": "https://pbs.twimg.com/media/HQRYy4jXYAIU2Fm.png",
+                "original_info": {
+                  "focus_rects": [
+                    {
+                      "h": 489,
+                      "w": 874,
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "h": 720,
+                      "w": 720,
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "h": 720,
+                      "w": 632,
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "h": 720,
+                      "w": 360,
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "h": 720,
+                      "w": 874,
+                      "x": 0,
+                      "y": 0
+                    }
+                  ],
+                  "height": 720,
+                  "width": 874
+                },
+                "sizes": {
+                  "large": {
+                    "h": 720,
+                    "resize": "fit",
+                    "w": 874
+                  },
+                  "medium": {
+                    "h": 720,
+                    "resize": "fit",
+                    "w": 874
+                  },
+                  "small": {
+                    "h": 560,
+                    "resize": "fit",
+                    "w": 680
+                  },
+                  "thumb": {
+                    "h": 150,
+                    "resize": "crop",
+                    "w": 150
+                  }
+                },
+                "type": "photo",
+                "url": "https://t.co/9oWDOUzq24"
+              }
+            ]
+          },
+          "replies": 51,
+          "retweets": 123,
+          "conversation_id": "2090894834508628276",
+          "author": {
+            "rest_id": "1496125256624484362",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2048709268069916672/Nz_BJSKj_normal.jpg",
+            "blue_verified": true
+          },
+          "media": {
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HQRYy4jXYAIU2Fm.png",
+                "id": "2090893758204174338",
+                "sizes": {
+                  "h": 720,
+                  "w": 874
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090939531398975925",
+        "bookmarks": 0,
+        "created_at": "Fri Aug 21 23:10:06 +0000 2026",
+        "favorites": 0,
+        "text": "RT @PeterDiamandis: While pessimism sounds smart, optimism makes money by turning life-changing technologies into reality.",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "393778",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "14710129",
+              "name": "Peter H. Diamandis, MD",
+              "screen_name": "PeterDiamandis"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 225,
+        "conversation_id": "2090939531398975925",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090937401065546197"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090937401065546197",
+          "bookmarks": 89,
+          "created_at": "Fri Aug 21 23:01:38 +0000 2026",
+          "favorites": 1681,
+          "text": "While pessimism sounds smart, optimism makes money by turning life-changing technologies into reality.",
+          "lang": "en",
+          "sensitive": null,
+          "views": "213618",
+          "quotes": 20,
+          "entities": [],
+          "replies": 155,
+          "retweets": 225,
+          "conversation_id": "2090937401065546197",
+          "author": {
+            "rest_id": "14710129",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1270804940936503296/oVhO8Njn_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090939312049426822",
+        "bookmarks": 0,
+        "created_at": "Fri Aug 21 23:09:14 +0000 2026",
+        "favorites": 0,
+        "text": "RT @Starlink: Starlink enabling remote connectivity and live coverage during the solar eclipse 🛰️❤️",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "392754",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1330170106501079041",
+              "name": "Starlink",
+              "screen_name": "Starlink"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 176,
+        "conversation_id": "2090939312049426822",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090927800555352516"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090927800555352516",
+          "bookmarks": 33,
+          "created_at": "Fri Aug 21 22:23:29 +0000 2026",
+          "favorites": 1241,
+          "text": "Starlink enabling remote connectivity and live coverage during the solar eclipse 🛰️❤️",
+          "lang": "en",
+          "sensitive": null,
+          "views": "368792",
+          "quotes": 6,
+          "entities": [],
+          "replies": 88,
+          "retweets": 176,
+          "conversation_id": "2090927800555352516",
+          "quoted": {
+            "tweet_id": "2087872891471741259",
+            "bookmarks": 4,
+            "created_at": "Thu Aug 13 12:04:22 +0000 2026",
+            "favorites": 94,
+            "text": "Underground hero was @Starlink which provided my whole group with internet and allowed @MatthewCappucci to do live TV hits from the middle of nowhere 📡\n\nNote the little crescent sun on the dish, which is a result of lens refraction on the iPhone! https://t.co/3rSYKfpBGx",
+            "lang": "en",
+            "views": "410762",
+            "sensitive": false,
+            "quotes": 0,
+            "replies": 5,
+            "retweets": 10,
+            "conversation_id": "2087872891471741259",
+            "author": {
+              "rest_id": "1688453173",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/1691833360971350016/HEDGs9UC_normal.jpg",
+              "followers_count": 5487,
+              "blue_verified": true
+            },
+            "media": {
+              "photo": [
+                {
+                  "media_url_https": "https://pbs.twimg.com/media/HPmdSEiXIAAjalT.jpg",
+                  "id": "2087872836044005376",
+                  "sizes": {
+                    "h": 1200,
+                    "w": 900
+                  }
+                },
+                {
+                  "media_url_https": "https://pbs.twimg.com/media/HPmdSEpXEAA7LUe.jpg",
+                  "id": "2087872836073361408",
+                  "sizes": {
+                    "h": 800,
+                    "w": 1200
+                  }
+                }
+              ]
+            }
+          },
+          "author": {
+            "rest_id": "1330170106501079041",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1720501511271383040/FXz_jiJu_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090925089923719662",
+        "bookmarks": 0,
+        "created_at": "Fri Aug 21 22:12:43 +0000 2026",
+        "favorites": 0,
+        "text": "RT @dee_bosa: I know it’s been said many times… but just had Starlink on a flight for the first time and wow. \nOne of those Apple-like mome…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "496181",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "272317020",
+              "name": "Deirdre Bosa",
+              "screen_name": "dee_bosa"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 192,
+        "conversation_id": "2090925089923719662",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090888339767619992"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090888339767619992",
+          "bookmarks": 44,
+          "created_at": "Fri Aug 21 19:46:41 +0000 2026",
+          "favorites": 2470,
+          "text": "I know it’s been said many times… but just had Starlink on a flight for the first time and wow. \nOne of those Apple-like moments where tech just *works*\nHard to see ppl going back once they’ve tried it",
+          "lang": "en",
+          "sensitive": null,
+          "views": "294523",
+          "quotes": 25,
+          "entities": [],
+          "replies": 142,
+          "retweets": 192,
+          "conversation_id": "2090888339767619992",
+          "author": {
+            "rest_id": "272317020",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1364440198201806852/fFTPuWxa_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "tweet_id": "2090924607889105014",
+        "bookmarks": 0,
+        "created_at": "Fri Aug 21 22:10:48 +0000 2026",
+        "favorites": 0,
+        "text": "RT @deezzex: SpaceX AI employee just dropped the tunes for GROK BOT to make it reach its maximum potential.\n\nalready tried that myself and…",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "430323",
+        "quotes": 0,
+        "entities": {
+          "user_mentions": [
+            {
+              "id_str": "1511363843913572352",
+              "name": "deezzex",
+              "screen_name": "deezzex"
+            }
+          ]
+        },
+        "replies": 0,
+        "retweets": 145,
+        "conversation_id": "2090924607889105014",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "retweeted": {
+          "id": "2090842745787031620"
+        },
+        "retweeted_tweet": {
+          "tweet_id": "2090842745787031620",
+          "bookmarks": 1033,
+          "created_at": "Fri Aug 21 16:45:31 +0000 2026",
+          "favorites": 943,
+          "text": "SpaceX AI employee just dropped the tunes for GROK BOT to make it reach its maximum potential.\n\nalready tried that myself and it shows AMAZING results. here is the list:\n\n- add a self-check pass before it returns anything. ask the agent to verify its own output against the original instruction before finalizing, “did this actually satisfy every requirement, list what’s missing if not.” this single extra step catches more errors than any prompt wording tweak.\n\n- define “DONE” explicitly. “manage my expenses” gets vague output. “flag every transaction over $200 with no matching receipt, format as a table” gets exact output. agents don’t guess well, they execute well.\n\n- force structured output. ask for JSON or a fixed table format instead of free text. structured output is verifiable, free text just sounds confident either way.\n\n- scope tool access per task, not globally. an agent with read access to everything “just in case” makes worse decisions than one with exactly the 2 tools this specific task needs. less access, sharper output.\n\nwhich one of these are you actually doing right now?",
+          "lang": "en",
+          "sensitive": false,
+          "views": "440282",
+          "quotes": 4,
+          "entities": {
+            "media": [
+              {
+                "additional_media_info": {
+                  "monetizable": false
+                },
+                "allow_download_status": {
+                  "allow_download": true
+                },
+                "display_url": "pic.x.com/zi49P9ij2U",
+                "expanded_url": "https://x.com/deezzex/status/2090842745787031620/video/1",
+                "ext_media_availability": {
+                  "status": "Available"
+                },
+                "id_str": "2090842722051489792",
+                "indices": [
+                  274,
+                  297
+                ],
+                "media_key": "13_2090842722051489792",
+                "media_results": {
+                  "result": {
+                    "media_key": "13_2090842722051489792"
+                  }
+                },
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090842722051489792/img/ysynkpXlJoblwTyt.jpg",
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 1280
+                },
+                "sizes": {
+                  "large": {
+                    "h": 720,
+                    "resize": "fit",
+                    "w": 1280
+                  },
+                  "medium": {
+                    "h": 675,
+                    "resize": "fit",
+                    "w": 1200
+                  },
+                  "small": {
+                    "h": 383,
+                    "resize": "fit",
+                    "w": 680
+                  },
+                  "thumb": {
+                    "h": 150,
+                    "resize": "crop",
+                    "w": 150
+                  }
+                },
+                "type": "video",
+                "url": "https://t.co/zi49P9ij2U",
+                "video_info": {
+                  "aspect_ratio": [
+                    16,
+                    9
+                  ],
+                  "duration_millis": 10000,
+                  "variants": [
+                    {
+                      "content_type": "application/x-mpegURL",
+                      "url": "https://video.twimg.com/amplify_video/2090842722051489792/pl/iL2rpOE5gJ-k23d-.m3u8?tag=29&v=cfc"
+                    },
+                    {
+                      "bitrate": 256000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090842722051489792/vid/avc1/480x270/DsfNX744DGiRa9jT.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 832000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090842722051489792/vid/avc1/640x360/z2IpZMqPBsbjuk11.mp4?tag=29"
+                    },
+                    {
+                      "bitrate": 2176000,
+                      "content_type": "video/mp4",
+                      "url": "https://video.twimg.com/amplify_video/2090842722051489792/vid/avc1/1280x720/3z9ZZ8-SArAj0Tcc.mp4?tag=29"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "replies": 52,
+          "retweets": 145,
+          "conversation_id": "2090842745787031620",
+          "quoted": {
+            "tweet_id": "2089657097244024858",
+            "bookmarks": 1809,
+            "created_at": "Tue Aug 18 10:14:10 +0000 2026",
+            "favorites": 983,
+            "text": "https://t.co/bdAT018tFs",
+            "lang": "zxx",
+            "views": "688431",
+            "sensitive": false,
+            "quotes": 16,
+            "replies": 39,
+            "retweets": 112,
+            "conversation_id": "2089657097244024858",
+            "author": {
+              "rest_id": "1175166450832687104",
+              "name": null,
+              "screen_name": null,
+              "avatar": "https://pbs.twimg.com/profile_images/1868297128801390593/Ovl677JQ_normal.jpg",
+              "followers_count": 74202,
+              "blue_verified": true
+            },
+            "media": []
+          },
+          "author": {
+            "rest_id": "1511363843913572352",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/2088782897075367936/Y_RHpnO0_normal.jpg",
+            "blue_verified": true
+          },
+          "media": {
+            "video": [
+              {
+                "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090842722051489792/img/ysynkpXlJoblwTyt.jpg",
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090842722051489792/pl/iL2rpOE5gJ-k23d-.m3u8?tag=29&v=cfc"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090842722051489792/vid/avc1/480x270/DsfNX744DGiRa9jT.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090842722051489792/vid/avc1/640x360/z2IpZMqPBsbjuk11.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090842722051489792/vid/avc1/1280x720/3z9ZZ8-SArAj0Tcc.mp4?tag=29"
+                  }
+                ],
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration": 10000,
+                "original_info": {
+                  "focus_rects": [],
+                  "height": 720,
+                  "width": 1280
+                },
+                "id": "2090842722051489792"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "tweet_id": "2090921783746789880",
+        "bookmarks": 1193,
+        "created_at": "Fri Aug 21 21:59:35 +0000 2026",
+        "favorites": 18494,
+        "text": "This is how bad it was",
+        "lang": "en",
+        "sensitive": null,
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "views": "2950536",
+        "quotes": 92,
+        "entities": [],
+        "replies": 948,
+        "retweets": 2128,
+        "conversation_id": "2090921783746789880",
+        "media": [],
+        "author": {
+          "rest_id": "44196397",
+          "name": null,
+          "screen_name": null,
+          "avatar": "https://pbs.twimg.com/profile_images/2053244804520427520/m8mdWZCG_normal.jpg",
+          "followers_count": 241459342,
+          "blue_verified": true
+        },
+        "quoted": {
+          "tweet_id": "2090919717410148740",
+          "bookmarks": 3905,
+          "created_at": "Fri Aug 21 21:51:22 +0000 2026",
+          "favorites": 17049,
+          "text": "Bloody hell. I’ve been grossly misinformed about Bolshevism.",
+          "lang": "en",
+          "views": "3357258",
+          "sensitive": null,
+          "quotes": 122,
+          "replies": 794,
+          "retweets": 2852,
+          "conversation_id": "2090919717410148740",
+          "author": {
+            "rest_id": "19562228",
+            "name": null,
+            "screen_name": null,
+            "avatar": "https://pbs.twimg.com/profile_images/1935447618533892096/MNVhLCCA_normal.jpg",
+            "followers_count": 10220264,
+            "blue_verified": true
+          },
+          "media": []
+        }
+      }
+    ],
+    "next_cursor": "DAAHCgABHQS5Sr4__-sLAAIAAAATMjA5MDkyMTc4Mzc0Njc4OTg4MAgAAwAAAAIAAA",
+    "prev_cursor": "DAAHCgABHQS5Sr5AJxELAAIAAAATMjA5MDk5MjA4Njc2NjI4MDgxOQgAAwAAAAEAAA",
+    "status": "ok",
+    "user": {
+      "profile": null,
+      "id": "44196397",
+      "created_at": null,
+      "avatar": null,
+      "blue_verified": true,
+      "affiliates": {
+        "label": {
+          "badge": {
+            "url": "https://pbs.twimg.com/profile_images/1955359038532653056/OSHY3ewP_bigger.jpg"
+          },
+          "description": "X",
+          "url": {
+            "url": "https://twitter.com/X",
+            "urlType": "DeepLink"
+          },
+          "userLabelDisplayType": "Badge",
+          "userLabelType": "BusinessLabel"
+        }
+      },
+      "header_image": "https://pbs.twimg.com/profile_banners/44196397/1774145451",
+      "desc": "https://t.co/ZdBx5WABYx",
+      "name": null,
+      "protected": null,
+      "location": "",
+      "friends": 1394,
+      "sub_count": 241459342,
+      "statuses_count": 107505,
+      "media_count": 4709
+    }
+  }
+}

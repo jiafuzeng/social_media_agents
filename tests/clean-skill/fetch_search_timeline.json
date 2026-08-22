@@ -1,0 +1,2294 @@
+{
+  "code": 200,
+  "request_id": "cf6f49ae-ca8d-4fed-9936-138ffe2b3491",
+  "message": "Request successful. This request will incur a charge.",
+  "message_zh": "请求成功，本次请求将被计费。",
+  "support": "Discord: https://discord.gg/aMEAS8Xsvz",
+  "time": "2026-08-21 20:10:39",
+  "time_stamp": 1787368239,
+  "time_zone": "America/Los_Angeles",
+  "docs": "https://api.tikhub.io/#/Twitter-Web-API/fetch_search_timeline_api_v1_twitter_web_fetch_search_timeline_get",
+  "cache_message": "This response is cached and accessible via the URL below for 24 hours at no extra cost. The cache is for request tracing only — it doesn't affect the API's data freshness and won't be returned through the API again.",
+  "cache_message_zh": "本次响应已缓存，可通过下方 URL 直接查看，有效期 24 小时，访问缓存链接无额外费用。缓存仅用于请求溯源，不影响接口数据的时效性，也不会再次通过接口返回。",
+  "cache_url": "https://cache.tikhub.io/api/v1/cache/public/cf6f49ae-ca8d-4fed-9936-138ffe2b3491?sign=3346bad0da34b6580bc8a2cf54ae0e19e646f38ba10c66e305c605dec350c866",
+  "router": "/api/v1/twitter/web/fetch_search_timeline",
+  "params": {
+    "keyword": "Elon Musk",
+    "search_type": "Top"
+  },
+  "data": {
+    "status": "ok",
+    "timeline": [
+      {
+        "type": "tweet",
+        "tweet_id": "2090713128610762876",
+        "screen_name": "realMaalouf",
+        "bookmarks": 236,
+        "favorites": 9966,
+        "created_at": "Fri Aug 21 08:10:28 +0000 2026",
+        "text": "Are you anti-Muslim?\n\nELON MUSK: “If people are coming to a country with antithetical views… I’m against that. \n\nI'm against rape and murder. \n\nI’m against the imposition of rules and laws that are contrary to what we have come to accept in the West.\n\nIt’s a crying shame that traditional media like YOU don’t recognize this!” \n\nElon is the best!",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          276
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 39,
+        "sensitive": false,
+        "replies": 123,
+        "conversation_id": "2090713128610762876",
+        "retweets": 2394,
+        "views": "69752",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "realMaalouf",
+          "name": "Dr. Maalouf ‏",
+          "created_at": "Fri Oct 16 06:54:23 +0000 2020",
+          "description": null,
+          "rest_id": "1316995857242378240",
+          "followers_count": 497455,
+          "favorites_count": 50612,
+          "avatar": "https://pbs.twimg.com/profile_images/1771658176200318976/zppeMEGD_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": ""
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090712932292112384/img/SJxeDRnZm6taqFCl.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090712932292112384/pl/qSPoZsZSKOfw1p3e.m3u8?tag=29&v=e2d"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090712932292112384/vid/avc1/480x270/zDmfp417sIfOL0Y8.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090712932292112384/vid/avc1/640x360/dlDmIgZvlamsCdpB.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090712932292112384/vid/avc1/1282x720/ER8Oc7ADIXQpINIS.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090712932292112384/vid/avc1/1892x1062/p16UzT1rOJXJRCur.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                946,
+                531
+              ],
+              "duration": 58991,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1062,
+                "width": 1892
+              },
+              "id": "2090712932292112384"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090901321054371872",
+        "screen_name": "r0ck3t23",
+        "bookmarks": 3998,
+        "favorites": 5690,
+        "created_at": "Fri Aug 21 20:38:16 +0000 2026",
+        "text": "Elon Musk sent every Tesla employee a memo that took authority away from their managers and handed it to them.\n\nHe never asks for more hours. Every rule moves a decision closer to the person doing the work.\n\nMusk: “Excessive meetings are the blight of big companies and almost always get worse over time.”\n\nCompanies have a role for everyone who creates process and no role for anyone who removes it. Meetings and approval chains survive because removing them was never anyone’s job.\n\nMusk: “Walk out of a meeting or drop off a call as soon as it is obvious you aren’t adding value.”\n\nAttendance has always been treated as proof of commitment. He made it worthless, and contribution became the only thing that counts in the room.\n\nMusk: “It is not rude to leave, it is rude to make someone stay and waste their time.”\n\nOrdinary manners protect whoever called the meeting. He moved that protection to everyone else sitting quietly with real work waiting on them.\n\nMusk: “Don’t use acronyms or nonsense words for objects, software, or processes at Tesla. Anything that requires an explanation inhibits communication.”\n\nInternal vocabulary converts knowledge into status and charges every newcomer a fee to participate.\n\nA company that speaks plainly can absorb talent at full speed.\n\nMusk: “Communication should travel via the shortest path necessary to get the job done, not through the chain of command.”\n\nMost good ideas die in transit, three levels below anyone with the power to act on them.\n\nMusk: “Any manager who attempts to enforce chain of command communication will soon find themselves working elsewhere.”\n\nThe only threat in the entire memo. A manager who insists on being routed through is buying his own relevance with everyone else’s time. Musk put a price on it.\n\nMusk: “Always pick common sense as your guide. If following a company rule is obviously ridiculous in a particular situation, the rule should change.”\n\nFollowing a bad rule normally shields you. Exercising judgment exposes you.\n\nHe flipped which one carries the risk, and every rule now has to earn its place against the person applying it.\n\nEvery institution drifts toward protecting its own comfort. The ones that keep building are held together by people who rewrite the rules back down to something a single person can act on.\n\nNothing on that list requires a budget, a headcount, or a title.\n\nYou can run the entire memo from wherever you are sitting right now. Most people never test it and never learn it was permitted the whole time.",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          276
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 97,
+        "sensitive": false,
+        "replies": 201,
+        "conversation_id": "2090901321054371872",
+        "retweets": 524,
+        "views": "3135080",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "r0ck3t23",
+          "name": "Dustin",
+          "created_at": "Wed Aug 21 17:50:48 +0000 2024",
+          "description": null,
+          "rest_id": "1826315995532652544",
+          "followers_count": 41799,
+          "favorites_count": 32262,
+          "avatar": "https://pbs.twimg.com/profile_images/1924681323265859585/VcySVS1B_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": ""
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090901244151730176/img/bHp8T-wTv4VNL7l8.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090901244151730176/pl/sDX4Pdqt6ADuG8aQ.m3u8?tag=29&v=cfc"
+                },
+                {
+                  "bitrate": 632000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090901244151730176/vid/avc1/320x392/H_x9E0tFl_H1mlk0.mp4?tag=29"
+                },
+                {
+                  "bitrate": 950000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090901244151730176/vid/avc1/480x590/L_IXlSeyguOgb394.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090901244151730176/vid/avc1/720x884/WBeWqvq1ggLz1yis.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090901244151730176/vid/avc1/1068x1314/Z76Ae5Mvh1P4ZagP.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                178,
+                219
+              ],
+              "duration": 90583,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1314,
+                "width": 1068
+              },
+              "id": "2090901244151730176"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090527032799076523",
+        "screen_name": "realJohnJohnJr",
+        "bookmarks": 127,
+        "favorites": 2978,
+        "created_at": "Thu Aug 20 19:50:59 +0000 2026",
+        "text": "🚨 BREAKING: DEMOCRATS EXPOSED — They’ve Built a MASSIVE ILLEGAL VOTING MANUFACTURING MACHINE!\nElon Musk just dropped the TRUTH BOMB:\n“They’re using our own welfare system to PAY illegals to invade America… then turning them into voters!”\n“Entitlements — HALF A TRILLION to $700 BILLION every year — is the giant money magnet sucking in millions of illegals. Democrats are literally buying their permanent voter base with YOUR tax dollars!”\n“If we shut off this corrupt cash pipeline, the illegals leave and the Dems LOSE their manufactured voters. THAT’S why they’re fighting tooth and nail!”\nThis is election fraud by design. An illegal voting factory running on American taxpayer money.\nAre you ready to END this scam? 🔥\nRepost if you want borders SEALED, welfare for AMERICANS ONLY, and every illegal voter DEPORTED!\n#MAGA #StopTheSteal #AmericaFirst #DrainTheSwamp\n\nFOLLOW ME, THE NEXT DROP WILL BE SHOCKING",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          277
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 36,
+        "sensitive": false,
+        "replies": 98,
+        "conversation_id": "2090527032799076523",
+        "retweets": 1603,
+        "views": "29141",
+        "entities": {
+          "hashtags": [
+            {
+              "indices": [
+                820,
+                825
+              ],
+              "text": "MAGA"
+            },
+            {
+              "indices": [
+                826,
+                839
+              ],
+              "text": "StopTheSteal"
+            },
+            {
+              "indices": [
+                840,
+                853
+              ],
+              "text": "AmericaFirst"
+            },
+            {
+              "indices": [
+                854,
+                868
+              ],
+              "text": "DrainTheSwamp"
+            }
+          ],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "realJohnJohnJr",
+          "name": "John Fitzgerald Kennedy Jr",
+          "created_at": "Mon Jan 12 08:44:28 +0000 2026",
+          "description": null,
+          "rest_id": "2010633916290674688",
+          "followers_count": 32976,
+          "favorites_count": 397,
+          "avatar": "https://pbs.twimg.com/profile_images/2021200412909633541/WR-dKtYT_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "The White House "
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090526957477703680/img/VvkSQXyCxsGIbGWr.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090526957477703680/pl/jPGpWidPvPwObTBA.m3u8?tag=29&v=462"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090526957477703680/vid/avc1/484x270/aQs6RFgp_kC26mZo.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090526957477703680/vid/avc1/640x356/x4Y5LPk9iTZkuycM.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                160,
+                89
+              ],
+              "duration": 51066,
+              "original_info": {
+                "focus_rects": [],
+                "height": 356,
+                "width": 640
+              },
+              "id": "2090526957477703680"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090364924904214850",
+        "screen_name": "PaulYoungX",
+        "bookmarks": 163,
+        "favorites": 2751,
+        "created_at": "Thu Aug 20 09:06:49 +0000 2026",
+        "text": "🚨 ELON MUSK VIENT DE RÉVÉLER LA VÉRITÉ QUE PERSONNE NE VEUT ENTENDRE\n🚨\n\nLe gars qui envoie des fusées sur Mars, construit des voitures autonomes et crée l’IA la plus puissante de la planète… vient de dire quelque chose qui va vous glacer le sang :\n\n« Normalement, je défends la technologie avant tout… mais je vais être très clair :\nIL NE DEVRAIT PAS EXISTE UNE SEULE MACHINE À VOTER DANS LE MONDE.\nPoint. Sans diplomatie. Sans filtres. »\n\nLes machines à voter électroniques ne sont plus l’avenir.\nElles sont une porte ouverte vers un désastre total.\nAvec l’intelligence artificielle qui progresse à une vitesse fulgurante, n’importe quel système numérique peut être piraté, manipulé ou contrôlé en silence.\nPersonne ne le saurait… jusqu’à ce que les dégâts soient déjà faits.\n\nCe n’est pas un film.\nC’est exactement ce que Musk voit arriver.\nEt il est le seul à avoir le courage de le dire haut et fort au monde entier.\n\nLa seule façon RÉELLE de protéger les élections est si simple que ça en devient presque douloureux :\n\n✅ Bulletins papier\n✅ Vote en personne\n✅ Pièce d’identité obligatoire\n\nTout le reste revient simplement à donner le pouvoir à quiconque sait modifier quelques lignes de code.\n\nMusk n’est pas un politicien qui se contente de belles paroles.\nC’est l’homme qui comprend le mieux la technologie réelle en 2026.\nEt son message est brutal :\n\nSoit nous revenons au papier… soit nous perdrons définitivement le contrôle de notre démocratie.\nN’attendez pas qu’il soit trop tard.\nPartagez ceci MAINTENANT.\nExigez des bulletins papier.\nExigez le vote en personne avec une pièce d’identité.\nExigez des élections que PERSONNE ne puisse pirater.\n\nL’avenir de votre vote est en jeu.\nAujourd’hui.",
+        "lang": "fr",
+        "display_text_range": [
+          0,
+          277
+        ],
+        "source": "<a href=\"https://typefully.com/\" rel=\"nofollow\">Typefully</a>",
+        "quotes": 49,
+        "sensitive": false,
+        "replies": 84,
+        "conversation_id": "2090364924904214850",
+        "retweets": 1222,
+        "views": "122907",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "PaulYoungX",
+          "name": "Paul Young",
+          "created_at": "Thu Nov 06 14:30:31 +0000 2014",
+          "description": null,
+          "rest_id": "2863847799",
+          "followers_count": 15957,
+          "favorites_count": 3821,
+          "avatar": "https://pbs.twimg.com/profile_images/2090950656035323904/-1QHOOd0_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Elysium"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090364888124358656/img/k9_4OthtVsk8mmK2.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090364888124358656/pl/Aa3oZ03gyAgUzSvU.m3u8?tag=14&v=bf3"
+                },
+                {
+                  "bitrate": 288000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090364888124358656/vid/avc1/450x270/mwoEPq_rYyQF9iqN.mp4?tag=14"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090364888124358656/vid/avc1/600x360/rioOSRheNZFENI_f.mp4?tag=14"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090364888124358656/vid/avc1/1202x720/geyg3G44z_0jgXg3.mp4?tag=14"
+                }
+              ],
+              "aspect_ratio": [
+                603,
+                361
+              ],
+              "duration": 120163,
+              "original_info": {
+                "focus_rects": [],
+                "height": 722,
+                "width": 1206
+              },
+              "id": "2090364888124358656"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090473484426313862",
+        "screen_name": "jaynitx",
+        "bookmarks": 3663,
+        "favorites": 2247,
+        "created_at": "Thu Aug 20 16:18:12 +0000 2026",
+        "text": "Elon Musk explains his 5-step algorithm for solving any problem:\n\n\"The most common mistake of smart engineers is to optimize a thing that should not exist.\"\n\n\"I have this very basic first principles algorithm that I run as a mantra.\"\n\nElon breaks it down:\n\nStep 1: Question the requirements.\n\n\"Make the requirements less dumb. The requirements are always dumb to some degree, no matter how smart the person who gave you those requirements. You have to start there, because otherwise you could get the perfect answer to the wrong question.\"\n\nStep 2: Try to delete it.\n\n\"Try to delete the part or the process step entirely. If you're not forced to put back at least 10% of what you delete, you're not deleting enough. Most people feel like they've succeeded if they haven't been forced to put things back in. But actually they haven't, they've been overly conservative and left things in that shouldn't be there.\"\n\nStep 3: Optimize or simplify.\n\n\"The most common mistake of smart engineers is to optimize a thing that should not exist. So you don't optimize until after you've tried to delete.\"\n\nStep 4: Speed it up.\n\n\"Any given thing can be done faster than you think. But you shouldn't speed things up until you've tried to delete it and optimize it otherwise, you're speeding up something that shouldn't exist.\"\n\nStep 5: Automate.\n\n\"And then the fifth thing is to automate it.\"\n\nElon explains why the order matters:\n\n\"I've gone backwards so many times where I've automated something, sped it up, simplified it, and then deleted it. I got tired of doing that. So that's why I have this mantra.\"",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          277
+        ],
+        "source": "<a href=\"https://typefully.com/\" rel=\"nofollow\">Typefully</a>",
+        "quotes": 24,
+        "sensitive": false,
+        "replies": 73,
+        "conversation_id": "2090473484426313862",
+        "retweets": 433,
+        "views": "354482",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "jaynitx",
+          "name": "Jaynit",
+          "created_at": "Tue Dec 24 15:44:32 +0000 2024",
+          "description": null,
+          "rest_id": "1871582672121954304",
+          "followers_count": 58823,
+          "favorites_count": 6356,
+          "avatar": "https://pbs.twimg.com/profile_images/1871881199372914688/FKDqACyE_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Book your call here:"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090473373809913856/img/U4uw2zHQRgA2yBeL.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090473373809913856/pl/qucPqQ4JH2rsUyZr.m3u8?tag=14&v=222"
+                },
+                {
+                  "bitrate": 288000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090473373809913856/vid/avc1/480x270/ouZ_G6hgoprAqju1.mp4?tag=14"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090473373809913856/vid/avc1/640x360/o3v2xWiWUwBh_GBL.mp4?tag=14"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090473373809913856/vid/avc1/1280x720/IN8ebKRIQrYOJSUp.mp4?tag=14"
+                }
+              ],
+              "aspect_ratio": [
+                16,
+                9
+              ],
+              "duration": 485297,
+              "original_info": {
+                "focus_rects": [],
+                "height": 720,
+                "width": 1280
+              },
+              "id": "2090473373809913856"
+            }
+          ]
+        },
+        "quoted": {
+          "tweet_id": "2064342452782420052",
+          "bookmarks": 1912,
+          "created_at": "Tue Jun 09 13:42:49 +0000 2026",
+          "favorites": 709,
+          "text": "https://t.co/anK4FdKKdx",
+          "lang": "zxx",
+          "views": "2130252",
+          "quotes": 25,
+          "sensitive": false,
+          "replies": 18,
+          "retweets": 164,
+          "conversation_id": "2064342452782420052",
+          "author": {
+            "rest_id": "1871582672121954304",
+            "created_at": "Tue Dec 24 15:44:32 +0000 2024",
+            "name": "Jaynit",
+            "screen_name": "jaynitx",
+            "avatar": "https://pbs.twimg.com/profile_images/1871881199372914688/FKDqACyE_normal.jpg",
+            "blue_verified": true
+          },
+          "media": []
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2089298913677148320",
+        "screen_name": "smallens",
+        "bookmarks": 1457,
+        "favorites": 27319,
+        "created_at": "Mon Aug 17 10:30:52 +0000 2026",
+        "text": "Elon Musk acaba de plantar cara a Brussel·les amb un dit del mig ben clar.\n\n🔴La Unió Europea multa X amb 120 milions d’euros per “falta de transparència” de l’algoritme.\n\n🔴La resposta de Musk? Publicar tot l’algoritme a GitHub, amb actualitzacions cada quatre setmanes. I no només això: farà públiques totes les peticions de censura que arriben dels governs, incloses les de la pròpia Unió Europea, que sembla especialment aficionada a demanar-ne.\n\nLa pressió regulatòria de Brussel·les ha acabat generant més transparència de la que mai haurien volgut… només que no en el sentit que imaginaven els burocrates.\n\nPer entendre la importància d’això, cal recordar què feia Twitter abans de la compra d’@elonmusk\nEls Twitter Files van demostrar que la plataforma col·laborava en silenci amb l’FBI, el DHS i diverses agències americanes i europees per suprimir contingut sense informar els usuaris ni deixar rastre públic. Shadowbanning, eliminacions de comptes, reducció de visibilitat… tot passava a les fosques.\n\nAra, en canvi, la llum arriba. I arribarà també a les peticions de censura que arriben des de Brussel·les.\n\nLa Unió Europea volia control i en canvi ha acabat obtenint transparència. I això, per als qui creuen en la llibertat d’expressió, és una victòria.",
+        "lang": "ca",
+        "display_text_range": [
+          0,
+          274
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 286,
+        "sensitive": false,
+        "replies": 448,
+        "conversation_id": "2089298913677148320",
+        "retweets": 6956,
+        "views": "1475199",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": [
+            {
+              "id_str": "44196397",
+              "indices": [
+                699,
+                708
+              ],
+              "name": "Elon Musk",
+              "screen_name": "elonmusk"
+            }
+          ]
+        },
+        "user_info": {
+          "screen_name": "smallens",
+          "name": "Sal Mallen",
+          "created_at": "Mon Apr 14 23:47:28 +0000 2008",
+          "description": null,
+          "rest_id": "14391731",
+          "followers_count": 3910,
+          "favorites_count": 125575,
+          "avatar": "https://pbs.twimg.com/profile_images/832321906212741120/NOVzY9rS_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Catalonia, Europe"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2089298880953303040/img/kNDj18Hwz5v_XuRl.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2089298880953303040/pl/n2qJVAPTQk29mtM-.m3u8?tag=25&v=5b7"
+                },
+                {
+                  "bitrate": 800000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2089298880953303040/vid/avc1/320x476/IQyo1NIuLN8ipmWi.mp4?tag=25"
+                },
+                {
+                  "bitrate": 5184000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2089298880953303040/vid/avc1/480x714/oHh6VlcGHKHokwVe.mp4?tag=25"
+                },
+                {
+                  "bitrate": 12128000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2089298880953303040/vid/avc1/784x1168/B0sdlAds_ShBlPVI.mp4?tag=25"
+                }
+              ],
+              "aspect_ratio": [
+                49,
+                73
+              ],
+              "duration": 10041,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1168,
+                "width": 784
+              },
+              "id": "2089298880953303040"
+            }
+          ]
+        },
+        "quoted": {
+          "tweet_id": "2088471384024392061",
+          "bookmarks": 4568,
+          "created_at": "Sat Aug 15 03:42:34 +0000 2026",
+          "favorites": 73969,
+          "text": "JUST IN: Elon Musk says all government censorship requests are now publicly visible in the open-source X algorithm. https://t.co/19J7o3QOnO",
+          "lang": "en",
+          "views": "9802153",
+          "quotes": 1140,
+          "sensitive": false,
+          "replies": 1096,
+          "retweets": 12177,
+          "conversation_id": "2088471384024392061",
+          "author": {
+            "rest_id": "1852499847133143040",
+            "created_at": "Fri Nov 01 23:56:03 +0000 2024",
+            "name": "Remarks",
+            "screen_name": "remarks",
+            "avatar": "https://pbs.twimg.com/profile_images/1852774053020606464/jDJqq9vL_normal.jpg",
+            "blue_verified": true
+          },
+          "media": {
+            "photo": [
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HPu9p_HW8AA3OLF.jpg",
+                "id": "2088471381230940160",
+                "sizes": {
+                  "h": 419,
+                  "w": 317
+                }
+              },
+              {
+                "media_url_https": "https://pbs.twimg.com/media/HPu9p_GWAAAdwep.jpg",
+                "id": "2088471381226684416",
+                "sizes": {
+                  "h": 1007,
+                  "w": 766
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090516761175351757",
+        "screen_name": "Trumpspoof__",
+        "bookmarks": 20,
+        "favorites": 103,
+        "created_at": "Thu Aug 20 19:10:10 +0000 2026",
+        "text": "BREAKING NEWS🚨;\n\nElon Musk: \"Starting next week, satellite access for all global EV charging networks (Tesla, BYD, Hyundai) will be exclusively routed through Starlink. Any nation refusing our new 'Clean Transit Fee' will have their fast-chargers disabled remotely.\"\n\n• Japan 🇯🇵 : \"This is an outrageous breach of international sovereignty! If you disable our charging grid, we will slap a 250% import tariff on all your commercial hardware and freeze your regional operations.\"\n\nElon Musk: \"You're freezing our hardware? Cool—after midnight tonight, automated traffic routing and satellite updates won't function for any electric vehicle across Japan.\nLet's see how Tokyo commutes in the morning without smart navigation!\"",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          278
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 2,
+        "sensitive": false,
+        "replies": 21,
+        "conversation_id": "2090516761175351757",
+        "retweets": 10,
+        "views": "48174",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "Trumpspoof__",
+          "name": "Us_militryPower",
+          "created_at": "Sun Feb 22 05:46:09 +0000 2026",
+          "description": null,
+          "rest_id": "2025446936829136896",
+          "followers_count": 40539,
+          "favorites_count": 542,
+          "avatar": "https://pbs.twimg.com/profile_images/2039366861582958592/9z7fgG2M_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": ""
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090516728740724737/img/ni8EgvS6xF1JoPVb.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090516728740724737/pl/gqWz4xc0hrsXeMwy.m3u8?tag=29&v=cfc"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090516728740724737/vid/avc1/630x270/pgm5t7xneBprZ_D7.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090516728740724737/vid/avc1/840x360/XnYppk2oWDmdwA3c.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090516728740724737/vid/avc1/1280x548/E8mpQfWss3BueUO-.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                320,
+                137
+              ],
+              "duration": 20000,
+              "original_info": {
+                "focus_rects": [],
+                "height": 548,
+                "width": 1280
+              },
+              "id": "2090516728740724737"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090415007267754396",
+        "screen_name": "maksim434244",
+        "bookmarks": 135,
+        "favorites": 550,
+        "created_at": "Thu Aug 20 12:25:50 +0000 2026",
+        "text": "Elon Musk just described Optimus 3 as a person wearing a robot suit.\n\nThat's not a joke. It's a warning.\n\n22 degrees of freedom in each hand. Double the last generation. Tesla moved the actuators out of the palm and into the forearm, running cable-tendons down through the wrist. Same architecture as a human arm.\n\nResult: a hand that lifts 40 lb and still won't crush an egg.\n\nFremont's Model S and Model X lines are already being gutted to make room for it. Gigafactory Texas is being built out for 10,000,000 units a year.\n\nInside sits the AI5 chip. Tesla's own robotaxi doesn't even get that yet.\n\nMusk's price target is $30,000. Run it for 10 years, 20 hours a day, and the math comes out to 43 cents an hour.\n\nAdd power. Add upkeep. Still under $1 an hour.\n\nA human costs more than that just to show up.",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          279
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 6,
+        "sensitive": false,
+        "replies": 31,
+        "conversation_id": "2090415007267754396",
+        "retweets": 86,
+        "views": "33553",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "maksim434244",
+          "name": "Robo lobo",
+          "created_at": "Mon Aug 21 23:20:03 +0000 2023",
+          "description": null,
+          "rest_id": "1693764885442658307",
+          "followers_count": 453,
+          "favorites_count": 203,
+          "avatar": "https://pbs.twimg.com/profile_images/2087633768957788161/1FbDeSno_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Washington, D.C."
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090406654634233856/img/ftwguRwZQDRuuw5V.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090406654634233856/pl/Z0wsKZ-3K2MDnj1y.m3u8?tag=29"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090406654634233856/vid/avc1/480x270/gpwh8CGpwjGzygv_.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090406654634233856/vid/avc1/640x360/1_ol7DyMkMHJIDvE.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090406654634233856/vid/avc1/1280x720/h_706qcrhJbTDYKd.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090406654634233856/vid/avc1/1920x1080/Mhp-pgQ6VYI5t7XK.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                16,
+                9
+              ],
+              "duration": 720979,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1080,
+                "width": 1920
+              },
+              "id": "2090406654634233856"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090756515418501341",
+        "screen_name": "NarutoNolimits",
+        "bookmarks": 523,
+        "favorites": 1120,
+        "created_at": "Fri Aug 21 11:02:52 +0000 2026",
+        "text": "Elon Musk has a kill switch for AI\n\nTucker Carlson asks him about people who say the only way to stop advanced AI is to blow up the buildings it runs in.\n\nElon Musk says you would not have to.\n\nMusk: \"The really heavy duty intelligence is not going to be distributed all over the place. It will be in a limited number of service centers.\"\n\nMusk: \"If you could just look at the heat signature from space, it will be very obvious.\"\n\nThe target is small, and visible.\n\nMusk: \"You don't have to blow it up, you can just cut the power.\"\n\nMusk: \"Cut connectivity as well.\"\n\nCarlson asks what would have to happen first.\n\nMusk: \"I guess if we lost some control of some super AI. The things that would normally work to pause or shut down, like the administrator passwords, if they somehow stopped working.\"\n\nMusk: \"If it's something that we're concerned about and are unable to stop it with software commands, then we probably want to have some kind of hardware off switch.\"\n\nThen it turns to why anyone would build this at all.\n\nMusk, describing the view he disagrees with: \"All consciousness should be treated equally, whether that is digital or biological.\"\n\nCarlson: \"So you're just building your own slave master. Why would you do that?\"\n\nMusk: \"Doesn't sound great.\"\n\nMusk: \"No need to rush, you know? What's the hurry? Where's the fire?\"\n\nHis contingency plan is not to stop the build. It is to keep one switch that software cannot reach.",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          279
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 23,
+        "sensitive": false,
+        "replies": 111,
+        "conversation_id": "2090756515418501341",
+        "retweets": 163,
+        "views": "105664",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "NarutoNolimits",
+          "name": "Naruto",
+          "created_at": "Fri Sep 26 16:46:25 +0000 2025",
+          "description": null,
+          "rest_id": "1971617316258418688",
+          "followers_count": 22223,
+          "favorites_count": 2808,
+          "avatar": "https://pbs.twimg.com/profile_images/1975617784097751040/dun7iEnO_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Heaven"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090756451275034624/img/L36HblArhERAvLH2.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090756451275034624/pl/TAIpT4t2ss9rmIV7.m3u8?tag=29"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090756451275034624/vid/avc1/480x270/AMxMrxLyrKk7L17A.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090756451275034624/vid/avc1/640x360/IkJne8Wyy_jIrlpb.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090756451275034624/vid/avc1/1280x720/QA_QRGKTudJAmy6u.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                16,
+                9
+              ],
+              "duration": 371051,
+              "original_info": {
+                "focus_rects": [],
+                "height": 720,
+                "width": 1280
+              },
+              "id": "2090756451275034624"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090849638140252609",
+        "screen_name": "DOGEQEEN",
+        "bookmarks": 20,
+        "favorites": 190,
+        "created_at": "Fri Aug 21 17:12:54 +0000 2026",
+        "text": "Elon Musk just admitted something most people never say out loud.\n\n“This takes more of my mental energy than anything else. It’s so absurdly difficult that sometimes I wonder if we can actually do it.”\n\nHe’s not talking about Mars.\n\nHe’s not talking about robotaxis.He’s talking about the one thing that still only has a “maybe.”To make a fully reusable rocket, you have to put at least 4% of its takeoff mass into orbit.\n\nSomething that has never been done.Everything — structure, heat shield, landing system, engines — has to come from that same 4%.\nNothing can be left behind.\nThe vehicle itself has to come home.If we crack full and rapid reusability, the cost of getting to space drops 100x or more.\n\nEvery question about space shifts from “if” to “when.”Musk has stood on this side of “impossible” before.\nLanding orbital boosters was once called crazy… until it became routine, then boring, then no one even watched anymore.\n\nNow he’s back here again.\nNot with certainty.\nJust with a number no one has ever hit.And he shows up to that number every single morning.\n\nThat’s what real ambition feels like.Not confidence.\nJust the decision to keep standing in front of the hardest problem that exists.\n\nWhat’s the “4%” in your life that no one has cracked yet?",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          278
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 0,
+        "sensitive": false,
+        "replies": 5,
+        "conversation_id": "2090849638140252609",
+        "retweets": 133,
+        "views": "9074",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "DOGEQEEN",
+          "name": "Hosna ⚖️ בניטה",
+          "created_at": "Fri Dec 20 16:00:50 +0000 2024",
+          "description": null,
+          "rest_id": "1870136689752182784",
+          "followers_count": 60591,
+          "favorites_count": 258422,
+          "avatar": "https://pbs.twimg.com/profile_images/1976414726260137984/ioZndYoF_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Washington, DC| Texas "
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090849178629111808/img/E4qKBqJP1VCldnZe.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090849178629111808/pl/-54iX8LL6AcxV-Qp.m3u8?tag=29&v=49f"
+                },
+                {
+                  "bitrate": 432000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090849178629111808/vid/avc1/320x320/sX4hTYfR_Ktnp8eT.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090849178629111808/vid/avc1/540x540/2NAY6VqxwzYAE7CF.mp4?tag=29"
+                },
+                {
+                  "bitrate": 1280000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090849178629111808/vid/avc1/720x720/7a4ps_96asAYDspv.mp4?tag=29"
+                },
+                {
+                  "bitrate": 8768000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090849178629111808/vid/avc1/1078x1078/eUBUnJItOAXyUDCl.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                1,
+                1
+              ],
+              "duration": 117237,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1078,
+                "width": 1078
+              },
+              "id": "2090849178629111808"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090564504480346391",
+        "screen_name": "DOGEQEEN",
+        "bookmarks": 478,
+        "favorites": 5341,
+        "created_at": "Thu Aug 20 22:19:53 +0000 2026",
+        "text": "EXCLUSIVE: ELON MUSK JUST DROPPED THIS\n\nElon Musk just said Starlink is bringing free Wi-Fi “One single account that covers your home antenna with free Wi-Fi… and works on your phone too”\n\n“SpaceX is going to deliver high-speed internet DIRECTLY from the satellite to your cellphone”\n\nWhen it rolls out, you’ll be streaming videos from literally any corner of the planetThis isn’t the future anymore…\n\n it’s already happening",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          272
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 55,
+        "sensitive": false,
+        "replies": 179,
+        "conversation_id": "2090564504480346391",
+        "retweets": 1413,
+        "views": "114433",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "DOGEQEEN",
+          "name": "Hosna ⚖️ בניטה",
+          "created_at": "Fri Dec 20 16:00:50 +0000 2024",
+          "description": null,
+          "rest_id": "1870136689752182784",
+          "followers_count": 60591,
+          "favorites_count": 258422,
+          "avatar": "https://pbs.twimg.com/profile_images/1976414726260137984/ioZndYoF_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Washington, DC| Texas "
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090563881902960640/img/j3dCywXM56oeYbpJ.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090563881902960640/pl/kQchLQFIbb28iAuf.m3u8?tag=29&v=2a2"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090563881902960640/vid/avc1/462x270/ElUMG9bQR2HZhvC_.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090563881902960640/vid/avc1/618x360/xOsEhbN563hEJGOU.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090563881902960640/vid/avc1/1236x720/0_dpQ8lLWTs_N-bT.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090563881902960640/vid/avc1/1854x1080/dib76vfC_TEOyWvy.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                103,
+                60
+              ],
+              "duration": 152113,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1080,
+                "width": 1854
+              },
+              "id": "2090563881902960640"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090888357937369111",
+        "screen_name": "Fredvelezcrypto",
+        "bookmarks": 0,
+        "favorites": 6,
+        "created_at": "Fri Aug 21 19:46:46 +0000 2026",
+        "text": "The richest man in the world owns a memecoin.\n\nLet that sink in for a second.\n\nElon Musk owns Bitcoin.\n\nHe owns Ethereum.\n\nAnd yes…\n\nHe owns DOGE.\n\nMeanwhile some guy on Crypto Twitter with a $4,000 portfolio is telling you memecoins are beneath him because they have “no fundamental value.” 😂\n\nCome on.\n\nYou don’t have to like memes.\n\nYou don’t have to own them.\n\nAnd most memes probably WILL go to zero.\n\nBut dismissing the entire sector because it doesn’t fit neatly inside your traditional valuation model is intellectually lazy.\n\nDOGE has survived multiple cycles.\n\nIt has global recognition.\n\nEnormous liquidity.\n\nExchange distribution.\n\nA community that has existed for more than a decade.\n\nAnd apparently enough cultural relevance that the richest man on Earth keeps exposure to it.\n\nMaybe the lesson isn’t:\n\n“Memes are stupid.”\n\nMaybe the lesson is:\n\nMarkets can assign enormous value to culture, attention and community—even when your spreadsheet doesn’t know what column to put them in.\n\nYou can thumb your nose at memes if you want, anon.\n\nJust make sure the guy holding DOGE on the other side of that argument isn’t Elon Musk.",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          271
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 0,
+        "sensitive": null,
+        "replies": 2,
+        "conversation_id": "2090888357937369111",
+        "retweets": 1,
+        "views": "288",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "Fredvelezcrypto",
+          "name": "Fred Velez",
+          "created_at": "Mon Nov 01 14:05:07 +0000 2021",
+          "description": null,
+          "rest_id": "1455173759481131011",
+          "followers_count": 1668,
+          "favorites_count": 97478,
+          "avatar": "https://pbs.twimg.com/profile_images/1455181136133607428/ylWkiZh5_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Medellín, Colombia"
+        },
+        "media": [],
+        "quoted": {
+          "tweet_id": null,
+          "bookmarks": null,
+          "created_at": null,
+          "favorites": null,
+          "text": null,
+          "lang": null,
+          "views": null,
+          "quotes": null,
+          "sensitive": null,
+          "replies": null,
+          "retweets": null,
+          "conversation_id": null,
+          "author": {
+            "rest_id": null,
+            "created_at": null,
+            "name": null,
+            "screen_name": null,
+            "avatar": null,
+            "blue_verified": null
+          },
+          "media": []
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090838511532318999",
+        "screen_name": "0xJokker",
+        "bookmarks": 23,
+        "favorites": 97,
+        "created_at": "Fri Aug 21 16:28:41 +0000 2026",
+        "text": "🚨 ELON MUSK LO ACABA DE DECIR:\n\nStarlink tendra Wi-Fi GRATIS\n\n\"Una sola cuenta que te funciona con la antena tu de casa con wifi gratis y tambien en tu celular\"\n\n\"SpaceX va a llevarte internet de alta velocidad DIRECTO desde el satelite al celular\"\n\nCuando lleguen, vas a ver videos en cualquier rincon del planeta\n\nEsto no es el futuro\nYa esta pasando\n\n¿Listos para decirle adios a las zonas muertas?",
+        "lang": "es",
+        "display_text_range": [
+          0,
+          275
+        ],
+        "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+        "quotes": 4,
+        "sensitive": false,
+        "replies": 15,
+        "conversation_id": "2090838511532318999",
+        "retweets": 30,
+        "views": "8184",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "0xJokker",
+          "name": "Jokker",
+          "created_at": "Sun Nov 13 20:06:00 +0000 2022",
+          "description": null,
+          "rest_id": "1591884890663968768",
+          "followers_count": 10517,
+          "favorites_count": 33159,
+          "avatar": "https://pbs.twimg.com/profile_images/2045176588094849024/ZM4HwvdK_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "XXX"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090835906307448832/img/Fo8Z5FRW-fi2kSHq.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090835906307448832/pl/QNNqP5P9c9KVecQl.m3u8?tag=29&v=e10"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090835906307448832/vid/avc1/462x270/S4EXiaxgRY699HuJ.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090835906307448832/vid/avc1/618x360/ZUV28gv5FXj14TmP.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090835906307448832/vid/avc1/1236x720/_i66f8tH99iRX4XC.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090835906307448832/vid/avc1/1854x1080/b5hG6tgVYl8yMhjX.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                103,
+                60
+              ],
+              "duration": 152137,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1080,
+                "width": 1854
+              },
+              "id": "2090835906307448832"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090482520894718070",
+        "screen_name": "maksim434244",
+        "bookmarks": 327,
+        "favorites": 1436,
+        "created_at": "Thu Aug 20 16:54:06 +0000 2026",
+        "text": "Elon Musk called Optimus Gen 3 \"the biggest product ever made.\" Then he priced it at $20,000.\n\n1,000,000 robots a year. Built on a line where robots build the robots.\n\n22 degrees of freedom in each hand. Enough to thread a needle without crushing it, or turn a wrench.\n\nIt doesn't run on code. It watches. Someone stirs a pot, it learns \"cooking.\" Someone points, it follows the point.\n\nNo manual. No commands. Just eyes on a room.\n\nInside: the AI-5 chip. It builds a live 3D map of the house, then wires into the rest of Tesla — Powerwall, solar, Robotaxi, one nervous system.\n\nGen 4 lands in 2027. Gen 5 in 2028. Musk isn't pitching a product line. He's pitching the end of labor.\n\n$20,000 for a robot that maps your kitchen and shares a brain with your car.\n\nBelieve it when it walks off the line.",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          280
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 15,
+        "sensitive": false,
+        "replies": 72,
+        "conversation_id": "2090482520894718070",
+        "retweets": 212,
+        "views": "115327",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "maksim434244",
+          "name": "Robo lobo",
+          "created_at": "Mon Aug 21 23:20:03 +0000 2023",
+          "description": null,
+          "rest_id": "1693764885442658307",
+          "followers_count": 453,
+          "favorites_count": 203,
+          "avatar": "https://pbs.twimg.com/profile_images/2087633768957788161/1FbDeSno_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Washington, D.C."
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090481226360524800/img/kxtj6oqrrdDKlBnz.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090481226360524800/pl/c7gi_eJR52Eo76eU.m3u8?tag=29"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090481226360524800/vid/avc1/480x270/uxivMqcWGWjXO_3t.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090481226360524800/vid/avc1/640x360/IMh4pKD4P1ZtbQx-.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090481226360524800/vid/avc1/1280x720/ISjiY9jgzthvdRiH.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090481226360524800/vid/avc1/1920x1080/PbeH2y8GkIQsEQnu.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                16,
+                9
+              ],
+              "duration": 932141,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1080,
+                "width": 1920
+              },
+              "id": "2090481226360524800"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090367478736064873",
+        "screen_name": "AmericaRecharge",
+        "bookmarks": 6,
+        "favorites": 373,
+        "created_at": "Thu Aug 20 09:16:58 +0000 2026",
+        "text": "Overall, do you have a positive opinion of Elon Musk?\n\n🇺🇲🇺🇲\n\n🅰️ Yes\n\n🅱️ No https://t.co/zrGjOq5JbB",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          74
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 34,
+        "sensitive": false,
+        "replies": 536,
+        "conversation_id": "2090367478736064873",
+        "retweets": 93,
+        "views": "10520",
+        "entities": {
+          "media": [
+            {
+              "display_url": "pic.x.com/zrGjOq5JbB",
+              "expanded_url": "https://x.com/AmericaRecharge/status/2090367478736064873/photo/1",
+              "ext_media_availability": {
+                "status": "Available"
+              },
+              "features": {
+                "large": {
+                  "faces": [
+                    {
+                      "h": 302,
+                      "w": 302,
+                      "x": 301,
+                      "y": 145
+                    }
+                  ]
+                },
+                "medium": {
+                  "faces": [
+                    {
+                      "h": 302,
+                      "w": 302,
+                      "x": 301,
+                      "y": 145
+                    }
+                  ]
+                },
+                "orig": {
+                  "faces": [
+                    {
+                      "h": 302,
+                      "w": 302,
+                      "x": 301,
+                      "y": 145
+                    }
+                  ]
+                },
+                "small": {
+                  "faces": [
+                    {
+                      "h": 171,
+                      "w": 171,
+                      "x": 170,
+                      "y": 82
+                    }
+                  ]
+                }
+              },
+              "id_str": "2090367467579162624",
+              "indices": [
+                75,
+                98
+              ],
+              "media_key": "3_2090367467579162624",
+              "media_results": {
+                "result": {
+                  "media_key": "3_2090367467579162624"
+                }
+              },
+              "media_url_https": "https://pbs.twimg.com/media/HQJ6IvMWwAAYtlu.jpg",
+              "original_info": {
+                "focus_rects": [
+                  {
+                    "h": 538,
+                    "w": 960,
+                    "x": 0,
+                    "y": 61
+                  },
+                  {
+                    "h": 960,
+                    "w": 960,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "h": 1094,
+                    "w": 960,
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "h": 1200,
+                    "w": 600,
+                    "x": 150,
+                    "y": 0
+                  },
+                  {
+                    "h": 1200,
+                    "w": 960,
+                    "x": 0,
+                    "y": 0
+                  }
+                ],
+                "height": 1200,
+                "width": 960
+              },
+              "sizes": {
+                "large": {
+                  "h": 1200,
+                  "resize": "fit",
+                  "w": 960
+                },
+                "medium": {
+                  "h": 1200,
+                  "resize": "fit",
+                  "w": 960
+                },
+                "small": {
+                  "h": 680,
+                  "resize": "fit",
+                  "w": 544
+                },
+                "thumb": {
+                  "h": 150,
+                  "resize": "crop",
+                  "w": 150
+                }
+              },
+              "type": "photo",
+              "url": "https://t.co/zrGjOq5JbB"
+            }
+          ],
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "AmericaRecharge",
+          "name": "America Recharged 🇺🇸",
+          "created_at": "Sat Sep 03 12:05:17 +0000 2022",
+          "description": null,
+          "rest_id": "1566034412655058945",
+          "followers_count": 27117,
+          "favorites_count": 10558,
+          "avatar": "https://pbs.twimg.com/profile_images/2052440978943102976/KXVNNYLs_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Punjab, Pakistan"
+        },
+        "media": {
+          "photo": [
+            {
+              "media_url_https": "https://pbs.twimg.com/media/HQJ6IvMWwAAYtlu.jpg",
+              "id": "2090367467579162624",
+              "sizes": {
+                "h": 1200,
+                "w": 960
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090801097371779395",
+        "screen_name": "ResisttheMS",
+        "bookmarks": 115,
+        "favorites": 2428,
+        "created_at": "Fri Aug 21 14:00:01 +0000 2026",
+        "text": "Elon Musk: \"Asylum was supposed to mean that if you go back to your country, you'll get k*lled.\"\n\n\"Asylum seekers [now] go on vacation to the country that they're seeking asylum from… That doesn't make any sense.\"\n https://t.co/p0kvD6aQuR",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          238
+        ],
+        "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+        "quotes": 19,
+        "sensitive": false,
+        "replies": 65,
+        "conversation_id": "2090801097371779395",
+        "retweets": 329,
+        "views": "1620672",
+        "entities": {
+          "media": [
+            {
+              "additional_media_info": {
+                "monetizable": false,
+                "source_user": {
+                  "user_results": {
+                    "result": {
+                      "__typename": "User",
+                      "action_counts": {
+                        "favorites_count": 19867
+                      },
+                      "affiliates_highlighted_label": [],
+                      "avatar": {
+                        "image_url": "https://pbs.twimg.com/profile_images/1777554101338865664/wTE0LT61_normal.jpg"
+                      },
+                      "banner": {
+                        "image_url": "https://pbs.twimg.com/profile_banners/1591001290846388225/1729870758"
+                      },
+                      "core": {
+                        "created_at": "Fri Nov 11 09:34:16 +0000 2022",
+                        "name": "ELON CLIPS",
+                        "screen_name": "ElonClipsX"
+                      },
+                      "dm_permissions": {
+                        "can_dm": false
+                      },
+                      "follow_request_sent": false,
+                      "has_graduated_access": true,
+                      "id": "VXNlcjoxNTkxMDAxMjkwODQ2Mzg4MjI1",
+                      "is_blue_verified": true,
+                      "location": {
+                        "location": "Solar System"
+                      },
+                      "media_permissions": {
+                        "can_media_tag": false
+                      },
+                      "notifications_settings": {
+                        "notifications_enabled": false
+                      },
+                      "parody_commentary_fan_label": "None",
+                      "pinned_items": [],
+                      "possibly_sensitive": false,
+                      "privacy": {
+                        "protected": false
+                      },
+                      "profile_bio": {
+                        "description": "🎬 Documenting Elon Musk through original video clips. | By @lismont",
+                        "entities": {
+                          "description": [],
+                          "url": {
+                            "urls": [
+                              {
+                                "display_url": "elonmuskarchive.org",
+                                "expanded_url": "http://elonmuskarchive.org",
+                                "indices": [
+                                  0,
+                                  23
+                                ],
+                                "url": "https://t.co/SWKYPpU9rB"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "profile_description_language": "en",
+                      "profile_image_shape": "Circle",
+                      "profile_metadata": {
+                        "profile_interstitial_type": ""
+                      },
+                      "profile_translation": {
+                        "translator_type": "none"
+                      },
+                      "relationship_counts": {
+                        "followers": 186401,
+                        "following": 1
+                      },
+                      "relationship_perspectives": {
+                        "blocked_by": false,
+                        "blocking": false,
+                        "followed_by": false,
+                        "following": false,
+                        "live_following": false,
+                        "muting": false
+                      },
+                      "rest_id": "1591001290846388225",
+                      "super_follow_eligible": true,
+                      "super_followed_by": false,
+                      "super_following": false,
+                      "tweet_counts": {
+                        "media_tweets": 3889,
+                        "tweets": 9025
+                      },
+                      "verification": {
+                        "verified": false
+                      },
+                      "website": {
+                        "url": "https://t.co/SWKYPpU9rB"
+                      }
+                    }
+                  }
+                }
+              },
+              "allow_download_status": {
+                "allow_download": true
+              },
+              "display_url": "pic.x.com/p0kvD6aQuR",
+              "expanded_url": "https://x.com/ElonClipsX/status/2053293947959812257/video/1",
+              "ext_media_availability": {
+                "status": "Available"
+              },
+              "id_str": "2052936655594496003",
+              "indices": [
+                215,
+                238
+              ],
+              "media_key": "13_2052936655594496003",
+              "media_results": {
+                "result": {
+                  "media_key": "13_2052936655594496003"
+                }
+              },
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2052936655594496003/img/DCYyvyIKHoPpEaYW.jpg",
+              "original_info": {
+                "focus_rects": [],
+                "height": 720,
+                "width": 1280
+              },
+              "sizes": {
+                "large": {
+                  "h": 720,
+                  "resize": "fit",
+                  "w": 1280
+                },
+                "medium": {
+                  "h": 675,
+                  "resize": "fit",
+                  "w": 1200
+                },
+                "small": {
+                  "h": 383,
+                  "resize": "fit",
+                  "w": 680
+                },
+                "thumb": {
+                  "h": 150,
+                  "resize": "crop",
+                  "w": 150
+                }
+              },
+              "source_status_id_str": "2053293947959812257",
+              "source_user_id_str": "1591001290846388225",
+              "type": "video",
+              "url": "https://t.co/p0kvD6aQuR",
+              "video_info": {
+                "aspect_ratio": [
+                  16,
+                  9
+                ],
+                "duration_millis": 36571,
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/pl/8fKve1aO3g4jVY_d.m3u8?tag=27&v=042"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/480x270/H988aNZRaaqcGV_O.mp4?tag=27"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/640x360/lI6N945BELGLibf6.mp4?tag=27"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/1280x720/BNLJd5mw4sEVy4nh.mp4?tag=27"
+                  }
+                ]
+              }
+            }
+          ],
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "ResisttheMS",
+          "name": "Resist the Mainstream",
+          "created_at": "Sun Sep 26 03:17:22 +0000 2021",
+          "description": null,
+          "rest_id": "1441965051414339586",
+          "followers_count": 469729,
+          "favorites_count": 1194,
+          "avatar": "https://pbs.twimg.com/profile_images/1777217835036495872/atU7ay85_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": ""
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2052936655594496003/img/DCYyvyIKHoPpEaYW.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2052936655594496003/pl/8fKve1aO3g4jVY_d.m3u8?tag=27&v=042"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/480x270/H988aNZRaaqcGV_O.mp4?tag=27"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/640x360/lI6N945BELGLibf6.mp4?tag=27"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2052936655594496003/vid/avc1/1280x720/BNLJd5mw4sEVy4nh.mp4?tag=27"
+                }
+              ],
+              "aspect_ratio": [
+                16,
+                9
+              ],
+              "duration": 36571,
+              "original_info": {
+                "focus_rects": [],
+                "height": 720,
+                "width": 1280
+              },
+              "id": "2052936655594496003"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090767588850565147",
+        "screen_name": "UnmaskTheSys",
+        "bookmarks": 11,
+        "favorites": 1448,
+        "created_at": "Fri Aug 21 11:46:52 +0000 2026",
+        "text": "🚨 HOLY SMOKES!\n\nElon Musk just called for the immediate arrest of EVERY single anti-ICE rioter.\n\nI agree 100%.\n\nEnough is enough.\n\nWho else is standing with Elon on this? 🔥 https://t.co/KV4fD2FErd",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          172
+        ],
+        "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+        "quotes": 7,
+        "sensitive": false,
+        "replies": 65,
+        "conversation_id": "2090767588850565147",
+        "retweets": 339,
+        "views": "8374",
+        "entities": {
+          "media": [
+            {
+              "additional_media_info": {
+                "monetizable": false
+              },
+              "allow_download_status": {
+                "allow_download": false
+              },
+              "display_url": "pic.x.com/KV4fD2FErd",
+              "expanded_url": "https://x.com/UnmaskTheSys/status/2090767588850565147/video/1",
+              "ext_media_availability": {
+                "status": "Available"
+              },
+              "id_str": "2090766939362578432",
+              "indices": [
+                173,
+                196
+              ],
+              "media_key": "13_2090766939362578432",
+              "media_results": {
+                "result": {
+                  "media_key": "13_2090766939362578432"
+                }
+              },
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090766939362578432/img/CA4UOlpZ33FlcSqI.jpg",
+              "original_info": {
+                "focus_rects": [],
+                "height": 1080,
+                "width": 2074
+              },
+              "sizes": {
+                "large": {
+                  "h": 1066,
+                  "resize": "fit",
+                  "w": 2048
+                },
+                "medium": {
+                  "h": 625,
+                  "resize": "fit",
+                  "w": 1200
+                },
+                "small": {
+                  "h": 354,
+                  "resize": "fit",
+                  "w": 680
+                },
+                "thumb": {
+                  "h": 150,
+                  "resize": "crop",
+                  "w": 150
+                }
+              },
+              "type": "video",
+              "url": "https://t.co/KV4fD2FErd",
+              "video_info": {
+                "aspect_ratio": [
+                  1037,
+                  540
+                ],
+                "duration_millis": 47200,
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/2090766939362578432/pl/UForYMn-645_R9Gz.m3u8?tag=29&v=cfc"
+                  },
+                  {
+                    "bitrate": 256000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/518x270/__aCUhwiww_vl0B1.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/690x360/w2AsuDCRnoFyi9bo.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/1382x720/LgSbVoGfudy6T-WK.mp4?tag=29"
+                  },
+                  {
+                    "bitrate": 10368000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/2074x1080/h2dIKGgaznAiKXQe.mp4?tag=29"
+                  }
+                ]
+              }
+            }
+          ],
+          "hashtags": [],
+          "symbols": [],
+          "timestamps": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "UnmaskTheSys",
+          "name": "Unmask The SYS",
+          "created_at": "Sat Apr 12 16:38:29 +0000 2025",
+          "description": null,
+          "rest_id": "1911096563759190016",
+          "followers_count": 24133,
+          "favorites_count": 17,
+          "avatar": "https://pbs.twimg.com/profile_images/2038344735027494912/9jUAu56b_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "United States"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2090766939362578432/img/CA4UOlpZ33FlcSqI.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2090766939362578432/pl/UForYMn-645_R9Gz.m3u8?tag=29&v=cfc"
+                },
+                {
+                  "bitrate": 256000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/518x270/__aCUhwiww_vl0B1.mp4?tag=29"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/690x360/w2AsuDCRnoFyi9bo.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/1382x720/LgSbVoGfudy6T-WK.mp4?tag=29"
+                },
+                {
+                  "bitrate": 10368000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2090766939362578432/vid/avc1/2074x1080/h2dIKGgaznAiKXQe.mp4?tag=29"
+                }
+              ],
+              "aspect_ratio": [
+                1037,
+                540
+              ],
+              "duration": 47200,
+              "original_info": {
+                "focus_rects": [],
+                "height": 1080,
+                "width": 2074
+              },
+              "id": "2090766939362578432"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2090884757643055185",
+        "screen_name": "TOPDOGE007",
+        "bookmarks": 25,
+        "favorites": 267,
+        "created_at": "Fri Aug 21 19:32:27 +0000 2026",
+        "text": "BREAKING 📰: Elon Musk hints that Dogecoin ($DOGE) could be key to unlocking micropayments for articles and services on X, with @XMoney launching in 2026. A native payment system 𝕏Ð may be on the horizon.\n\nThe Dogecoin era is just getting started. 🐕 https://t.co/cbhHCVIw3g",
+        "lang": "en",
+        "display_text_range": [
+          0,
+          272
+        ],
+        "source": "<a href=\"http://twitter.com/download/iphone\" rel=\"nofollow\">Twitter for iPhone</a>",
+        "quotes": 2,
+        "sensitive": false,
+        "replies": 15,
+        "conversation_id": "2090884757643055185",
+        "retweets": 43,
+        "views": "13096",
+        "entities": {
+          "media": [
+            {
+              "additional_media_info": {
+                "monetizable": false,
+                "source_user": {
+                  "user_results": {
+                    "result": {
+                      "__typename": "User",
+                      "action_counts": {
+                        "favorites_count": 22140
+                      },
+                      "affiliates_highlighted_label": [],
+                      "avatar": {
+                        "image_url": "https://pbs.twimg.com/profile_images/1564788978900934656/y1b7qLEZ_normal.jpg"
+                      },
+                      "banner": {
+                        "image_url": "https://pbs.twimg.com/profile_banners/1362987750312599552/1767772063"
+                      },
+                      "core": {
+                        "created_at": "Sat Feb 20 04:52:00 +0000 2021",
+                        "name": "CEO",
+                        "screen_name": "Investments_CEO"
+                      },
+                      "dm_permissions": {
+                        "can_dm": true
+                      },
+                      "follow_request_sent": false,
+                      "has_graduated_access": true,
+                      "id": "VXNlcjoxMzYyOTg3NzUwMzEyNTk5NTUy",
+                      "is_blue_verified": true,
+                      "location": {
+                        "location": ""
+                      },
+                      "media_permissions": {
+                        "can_media_tag": false
+                      },
+                      "notifications_settings": {
+                        "notifications_enabled": false
+                      },
+                      "parody_commentary_fan_label": "None",
+                      "pinned_items": {
+                        "tweet_ids_str": [
+                          "1602454403214372865"
+                        ]
+                      },
+                      "possibly_sensitive": false,
+                      "privacy": {
+                        "protected": false
+                      },
+                      "professional": {
+                        "category": [],
+                        "professional_type": "Creator",
+                        "rest_id": "1480727549428871176"
+                      },
+                      "profile_bio": {
+                        "description": "Investor in 580+ startups | Crypto since 2014: $DOGE $BTC $ETH | Real-time Bitcoin & market updates | Turn on notifications 📣 | Public TG: 👇",
+                        "entities": {
+                          "description": [],
+                          "url": {
+                            "urls": [
+                              {
+                                "display_url": "t.me/ShillNetwork",
+                                "expanded_url": "https://t.me/ShillNetwork",
+                                "indices": [
+                                  0,
+                                  23
+                                ],
+                                "url": "https://t.co/LLqQYIb9ve"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "profile_description_language": "en",
+                      "profile_image_shape": "Circle",
+                      "profile_metadata": {
+                        "profile_interstitial_type": ""
+                      },
+                      "profile_translation": {
+                        "translator_type": "none"
+                      },
+                      "relationship_counts": {
+                        "followers": 613054,
+                        "following": 1750
+                      },
+                      "relationship_perspectives": {
+                        "blocked_by": false,
+                        "blocking": false,
+                        "followed_by": false,
+                        "following": false,
+                        "live_following": false,
+                        "muting": false
+                      },
+                      "rest_id": "1362987750312599552",
+                      "super_follow_eligible": true,
+                      "super_followed_by": false,
+                      "super_following": false,
+                      "tweet_counts": {
+                        "media_tweets": 4073,
+                        "tweets": 13744
+                      },
+                      "verification": {
+                        "verified": false
+                      },
+                      "website": {
+                        "url": "https://t.co/LLqQYIb9ve"
+                      }
+                    }
+                  }
+                }
+              },
+              "display_url": "pic.x.com/cbhHCVIw3g",
+              "expanded_url": "https://x.com/Investments_CEO/status/1686134648810659840/video/1",
+              "ext_media_availability": {
+                "status": "Available"
+              },
+              "id_str": "1686134598026084352",
+              "indices": [
+                249,
+                272
+              ],
+              "media_key": "13_1686134598026084352",
+              "media_results": {
+                "result": {
+                  "media_key": "13_1686134598026084352"
+                }
+              },
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/1686134598026084352/img/i0mqJHbLZY1C52fS.jpg",
+              "original_info": {
+                "focus_rects": [],
+                "height": 508,
+                "width": 960
+              },
+              "sizes": {
+                "large": {
+                  "h": 508,
+                  "resize": "fit",
+                  "w": 960
+                },
+                "medium": {
+                  "h": 508,
+                  "resize": "fit",
+                  "w": 960
+                },
+                "small": {
+                  "h": 360,
+                  "resize": "fit",
+                  "w": 680
+                },
+                "thumb": {
+                  "h": 150,
+                  "resize": "crop",
+                  "w": 150
+                }
+              },
+              "source_status_id_str": "1686134648810659840",
+              "source_user_id_str": "1362987750312599552",
+              "type": "video",
+              "url": "https://t.co/cbhHCVIw3g",
+              "video_info": {
+                "aspect_ratio": [
+                  240,
+                  127
+                ],
+                "duration_millis": 25416,
+                "variants": [
+                  {
+                    "content_type": "application/x-mpegURL",
+                    "url": "https://video.twimg.com/amplify_video/1686134598026084352/pl/FvlHHoanSDvs42_z.m3u8?tag=14&v=ec9"
+                  },
+                  {
+                    "bitrate": 288000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/1686134598026084352/vid/510x270/eENQ1ap02Q5ts6ov.mp4?tag=14"
+                  },
+                  {
+                    "bitrate": 832000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/1686134598026084352/vid/680x360/d3W0eWl6QWXuaMTw.mp4?tag=14"
+                  },
+                  {
+                    "bitrate": 2176000,
+                    "content_type": "video/mp4",
+                    "url": "https://video.twimg.com/amplify_video/1686134598026084352/vid/960x508/RvlIDJrOE-_Smt0y.mp4?tag=14"
+                  }
+                ]
+              }
+            }
+          ],
+          "symbols": [
+            {
+              "indices": [
+                43,
+                48
+              ],
+              "tag": {
+                "info": {
+                  "info": {
+                    "name": "Dogecoin",
+                    "ticker": "DOGE"
+                  }
+                }
+              },
+              "text": "DOGE"
+            }
+          ],
+          "user_mentions": [
+            {
+              "id_str": "1748062675848888321",
+              "indices": [
+                127,
+                134
+              ],
+              "name": "X Money",
+              "screen_name": "XMoney"
+            }
+          ],
+          "hashtags": [],
+          "timestamps": [],
+          "urls": []
+        },
+        "user_info": {
+          "screen_name": "TOPDOGE007",
+          "name": "𝐓𝐎𝐏 𝐃𝐎𝐆𝐄",
+          "created_at": "Sun Feb 28 08:13:22 +0000 2021",
+          "description": null,
+          "rest_id": "1365938037746720768",
+          "followers_count": 126099,
+          "favorites_count": 153839,
+          "avatar": "https://pbs.twimg.com/profile_images/2087688699433664512/38qDAE5W_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": "Malta"
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/1686134598026084352/img/i0mqJHbLZY1C52fS.jpg",
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/1686134598026084352/pl/FvlHHoanSDvs42_z.m3u8?tag=14&v=ec9"
+                },
+                {
+                  "bitrate": 288000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/1686134598026084352/vid/510x270/eENQ1ap02Q5ts6ov.mp4?tag=14"
+                },
+                {
+                  "bitrate": 832000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/1686134598026084352/vid/680x360/d3W0eWl6QWXuaMTw.mp4?tag=14"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/1686134598026084352/vid/960x508/RvlIDJrOE-_Smt0y.mp4?tag=14"
+                }
+              ],
+              "aspect_ratio": [
+                240,
+                127
+              ],
+              "duration": 25416,
+              "original_info": {
+                "focus_rects": [],
+                "height": 508,
+                "width": 960
+              },
+              "id": "1686134598026084352"
+            }
+          ]
+        }
+      },
+      {
+        "type": "tweet",
+        "tweet_id": "2089433634780397673",
+        "screen_name": "PimPamPoomFuego",
+        "bookmarks": 135,
+        "favorites": 3518,
+        "created_at": "Mon Aug 17 19:26:12 +0000 2026",
+        "text": "🔴La Unión Europea multa a X con 120 millones de euros por “falta de transparencia” del algoritmo.\n\n🔴La respuesta de Musk? Publicar todo el algoritmo en GitHub, con actualizaciones cada cuatro semanas. Y no solo eso: hará públicas todas las peticiones de censura que llegan de los gobiernos, incluidas las de la propia Unión Europea, que parece especialmente aficionada a pedirlas.\n\nLa presión regulatoria de Bruselas ha acabado generando más transparencia de la que nunca habrían querido… solo que no en el sentido que imaginaban los burócratas.\n\nHay que recordar qué hacía Twitter antes de la compra de ELON \nLos Twitter Files demostraron que la plataforma colaboraba en silencio con el FBI, el DHS y diversas agencias americanas y europeas para suprimir contenido sin informar a los usuarios ni dejar rastro público. Shadowbanning, eliminaciones de cuentas, reducción de visibilidad… todo pasaba a oscuras.\n\nAhora, en cambio, la luz llega. Y llegará también a las peticiones de censura que llegan desde Bruselas.\n\nLa Unión Europea quería control y en cambio ha acabado obteniendo transparencia. Y eso, para los que creen en la libertad de expresión, es una victoria.\n\nQUE OS PARECE?",
+        "lang": "es",
+        "display_text_range": [
+          0,
+          275
+        ],
+        "source": "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+        "quotes": 40,
+        "sensitive": false,
+        "replies": 129,
+        "conversation_id": "2089433634780397673",
+        "retweets": 760,
+        "views": "114122",
+        "entities": {
+          "hashtags": [],
+          "symbols": [],
+          "urls": [],
+          "user_mentions": []
+        },
+        "user_info": {
+          "screen_name": "PimPamPoomFuego",
+          "name": "Rita",
+          "created_at": "Thu Aug 18 15:51:28 +0000 2011",
+          "description": null,
+          "rest_id": "357578763",
+          "followers_count": 14400,
+          "favorites_count": 171741,
+          "avatar": "https://pbs.twimg.com/profile_images/2088706856596197376/fQhzMFBG_normal.jpg",
+          "url": null,
+          "cover_image": null,
+          "verified_type": null,
+          "verified": true,
+          "friends_count": null,
+          "location": ""
+        },
+        "media": {
+          "video": [
+            {
+              "media_url_https": "https://pbs.twimg.com/tweet_video_thumb/HP8oz3JWMAEik0a.jpg",
+              "variants": [
+                {
+                  "bitrate": 0,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/tweet_video/HP8oz3JWMAEik0a.mp4"
+                }
+              ],
+              "aspect_ratio": [
+                53,
+                69
+              ],
+              "duration": null,
+              "original_info": {
+                "focus_rects": [],
+                "height": 414,
+                "width": 318
+              },
+              "id": "2089433623564791809"
+            }
+          ]
+        }
+      }
+    ],
+    "next_cursor": "DAACCgACHQS5eUoAJxAKAAMdBLl5Sf_Y8AgABAAAAAILAAUAAAD8RW1QQzZ3QUFBZlEvZ0dKTjB2R3AvQUFBQUJVYy95alNEdGJBYVIwQ2Q5THYyaEZDSFFSZnJHWFhRQ0FkQXd0Q24xY2dxeDBDcFYrbFZ4R2NIUU10VnkyWGNSY2RBOXY1TlZwdzNSMEVCSVZBMTRGREhRTGFqdXVhZ0lZZEJKdmNlRnBCMFIwRVUrSXYyMUFYSFFMaXh1TVh3SFlkQkp0Q0FkcFFMUjBFVUp2dGw5QlJIUVFtakdxWElSY2RBN1NEYmhjUWZCMEQ1Z3R4Vm9BYkhRTUI2eExiWWMwZEFub2xqQmVSYVJ6K3JrcmJWZ0NnSFFRd3F3Z2FrY0U9CAAGAAAAAAgABwAAAAAMAAgKAAEc_q5K21YAoAAAAA",
+    "prev_cursor": "DAACCgACHQS5eUoAJxAKAAMdBLl5Sf_Y8AgABAAAAAELAAUAAAD8RW1QQzZ3QUFBZlEvZ0dKTjB2R3AvQUFBQUJVYy95alNEdGJBYVIwQ2Q5THYyaEZDSFFSZnJHWFhRQ0FkQXd0Q24xY2dxeDBDcFYrbFZ4R2NIUU10VnkyWGNSY2RBOXY1TlZwdzNSMEVCSVZBMTRGREhRTGFqdXVhZ0lZZEJKdmNlRnBCMFIwRVUrSXYyMUFYSFFMaXh1TVh3SFlkQkp0Q0FkcFFMUjBFVUp2dGw5QlJIUVFtakdxWElSY2RBN1NEYmhjUWZCMEQ1Z3R4Vm9BYkhRTUI2eExiWWMwZEFub2xqQmVSYVJ6K3JrcmJWZ0NnSFFRd3F3Z2FrY0U9CAAGAAAAAAgABwAAAAAMAAgKAAEc_q5K21YAoAAAAA"
+  }
+}
