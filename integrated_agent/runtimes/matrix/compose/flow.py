@@ -148,7 +148,8 @@ async def run_compose(
         "user_instruction": state.get("user_instruction"),
         "candidates": state.get("candidates"),
         "limitations": package.get("limitations") or state.get("limitations") or [],
-        "evidence": [],
+        "material_cards": package.get("material_cards") or state.get("material_list") or [],
+        "evidence": state.get("evidence_cards") or [],
         "events": trace.events,
     }
     save_run(run, output_directory)

@@ -15,7 +15,7 @@ from agently.types.trigger_flow.trigger_flow import (
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 MAX_PLAN_TASKS = 4
-MAX_ACTION_ROUNDS = 5
+MAX_ACTION_ROUNDS = 2
 
 
 def _search_browse_actions() -> list[Any]:
@@ -74,6 +74,26 @@ def _tasks_from_plan(raw_tasks: Any) -> list[dict[str, Any]]:
         if len(tasks) >= MAX_PLAN_TASKS:
             break
     return tasks
+
+
+def _material_card_from_answer(
+    answer: str,
+    *,
+    goal: str,
+    task_id: str,
+) -> dict[str, Any] | None:
+    text = str(answer or "").strip()
+    if not text:
+        return None
+    return {
+        "kind": "article",
+        "title": goal or text[:40],
+        "text": text,
+        "link": "",
+        "media_links": [],
+        "source_task_id": task_id,
+        "source_goal": goal,
+    }
 
 
 def _dedupe_materials(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -186,7 +206,6 @@ async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     try:
         raw = await (
             Agently.create_agent(name="matrix-compose-intel-task")
-            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"goal": goal})
             .info({**ctx, "task": task})
             .use_actions(_search_browse_actions())
@@ -194,17 +213,19 @@ async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             .instruct(
                 [
                     "只完成当前子任务，整理素材卡；不要写推文正文。",
-                    "最多 Search 1 次、Browse 2 个链接；完成后立刻输出。",
-                    "每条素材：kind（tweet/article/trend）、title、text、link、media_links（可空）。",
-                    "搜不到配图时 media_links 留空，不要反复搜索。",
+                    "material_list 是主交付物：每条采集结果必须写成一张卡片，禁止只写在 answer 里。",
+                    "最多 Search 1 次、Browse 1 个链接；完成后立刻输出 JSON。",
+                    "每条素材：kind（tweet/article/trend）、title、text、link、media_links（可空数组）。",
+                    "answer 只允许一句话；正文、摘要、诗句等都放进 material_list。",
+                    "即使搜索无结果，也要输出 material_list: []，不要省略该字段。",
                 ]
             )
             .output(
                 {
-                    "answer": (str, "该子任务采集结论", "not_null"),
+                    "answer": (str, "一句话采集结论"),
                     "material_list": (
                         list,
-                        "[{kind, title, text, link, media_links:[{type, thumb, video_url}]}]",
+                        "[{kind, title, text, link, media_links}]",
                     ),
                 },
                 format="json",
@@ -227,6 +248,14 @@ async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     if not isinstance(material_list, list):
         material_list = []
     cleaned = [item for item in material_list if isinstance(item, dict)]
+    if not cleaned:
+        fallback = _material_card_from_answer(
+            str(raw.get("answer") or ""),
+            goal=goal,
+            task_id=task_id,
+        )
+        if fallback is not None:
+            cleaned = [fallback]
     for item in cleaned:
         item.setdefault("source_task_id", task_id)
         item.setdefault("source_goal", goal)
@@ -246,13 +275,9 @@ async def merge_material(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         item for item in cast(list[Any], data.input or []) if isinstance(item, dict)
     ]
     merged: list[dict[str, Any]] = []
-    answers: list[str] = []
     limitations = list(cast(list[str], data.get_state("limitations") or []))
 
     for result in task_results:
-        answer = str(result.get("answer") or "").strip()
-        if answer:
-            answers.append(answer)
         if not result.get("ok", True):
             code = f"intel_task_failed:{result.get('task_id') or 'unknown'}"
             if code not in limitations:
@@ -265,15 +290,15 @@ async def merge_material(data: TriggerFlowRuntimeData) -> dict[str, Any]:
 
     material_list = _dedupe_materials(merged)
     plan_summary = str(data.get_state("plan_summary") or "").strip()
-    if plan_summary:
-        answers.insert(0, plan_summary)
     if not material_list and not any(
         str(item.get("error") or "") for item in task_results if isinstance(item, dict)
     ):
         limitations.append("intel_empty")
 
-    intel_result = "；".join(part for part in answers if part) or (
-        f"共采集 {len(material_list)} 条素材" if material_list else "未采集到可用素材"
+    intel_result = plan_summary or (
+        f"共采集 {len(material_list)} 条素材卡"
+        if material_list
+        else "未采集到可用素材卡"
     )
 
     await data.async_set_state("material_list", material_list, emit=False)
@@ -308,7 +333,7 @@ def build_intel_subflow() -> TriggerFlow:
     (
         flow.to(intel_prelude)
         .to(plan_material)
-        .for_each(concurrency=4)
+        .for_each(concurrency=2)
         .to(intel_reason)
         .end_for_each()
         .to(merge_material)
