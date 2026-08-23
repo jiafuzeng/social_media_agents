@@ -115,7 +115,7 @@ function sessionToThread(session) {
   };
 }
 
-async function loadSessions() {
+async function loadSessions({ resume = true } = {}) {
   if (!window.matrixAuth?.user()) {
     threads.length = 0;
     activeThreadId = null;
@@ -132,15 +132,28 @@ async function loadSessions() {
       threads[index] = { ...threads[index], ...current, title: threads[index].title };
     }
     activeThreadId = current.id;
+    rememberActiveSession(current.id, current.scenario || scenario);
+  } else if (activeThreadId && threads.some(item => item.id === activeThreadId)) {
+    rememberActiveSession(activeThreadId, scenario);
   } else {
-    if (current) {
-      for (const key of Object.keys(lastThreadByScenario)) {
-        if (lastThreadByScenario[key] === current.id) lastThreadByScenario[key] = null;
-      }
-    }
+    if (current) rememberActiveSession(null, current.scenario || scenario);
     if (!threads.some(item => item.id === activeThreadId)) activeThreadId = null;
   }
   renderHistory();
+  if (
+    resume &&
+    !sessionDraftMode &&
+    !activeThreadId &&
+    document.body.dataset.workspace === "task"
+  ) {
+    const resumeId = storedActiveSessionId(scenario);
+    const candidate = threads.find(
+      item => item.id === resumeId && (item.scenario || "compose") === scenario
+    );
+    if (candidate) {
+      await openThread(candidate.id);
+    }
+  }
 }
 
 function selectedAccount() {
@@ -164,6 +177,31 @@ function timeAgo(date) {
 const DOCK_KEY = "matrix.dockHidden";
 const SESSION_COL_KEY = "matrix.sessionCol";
 const ASSIST_COL_KEY = "matrix.assistCol";
+const ACTIVE_SESSION_KEY = "matrix.activeSession";
+let sessionDraftMode = false;
+
+function activeSessionStorageKey(scenarioKey = scenario) {
+  return `${ACTIVE_SESSION_KEY}.${scenarioKey || "compose"}`;
+}
+
+function rememberActiveSession(id, scenarioKey = scenario) {
+  const key = activeSessionStorageKey(scenarioKey);
+  if (!id) {
+    sessionStorage.removeItem(key);
+    lastThreadByScenario[scenarioKey] = null;
+    return;
+  }
+  sessionStorage.setItem(key, id);
+  lastThreadByScenario[scenarioKey] = id;
+}
+
+function storedActiveSessionId(scenarioKey = scenario) {
+  return (
+    sessionStorage.getItem(activeSessionStorageKey(scenarioKey)) ||
+    lastThreadByScenario[scenarioKey] ||
+    null
+  );
+}
 
 function setDockHidden(hidden) {
   document.body.classList.toggle("dock-hidden", hidden);
@@ -289,12 +327,18 @@ function syncChatHeader() {
   const title = document.querySelector("#chatTitle");
   const sub = document.querySelector("#chatSub");
   const thread = activeThread();
-  if (title) title.textContent = thread?.title || "新任务";
+  if (title) {
+    title.textContent = thread?.title || (sessionDraftMode ? "新任务" : "新会话");
+  }
   const play =
     scenario === "reply"
       ? selectedInteraction().display_name || selectedInteraction().interaction_key
       : selectedAccount().display_name || selectedAccount().account_key;
-  if (sub) sub.textContent = `${scenario === "reply" ? "回评" : "写帖"} · ${play || "Twitter"}`;
+  const turnCount = thread?.turns?.length || 0;
+  const turnHint = turnCount ? ` · ${turnCount} 轮` : "";
+  if (sub) {
+    sub.textContent = `${scenario === "reply" ? "回评" : "写帖"} · ${play || "Twitter"}${turnHint}`;
+  }
 }
 
 function setAssistEmpty(empty) {
@@ -371,11 +415,7 @@ function applyScenarioChrome(next) {
   renderArchiveFolders();
 }
 
-function startFreshTask({ forgetLast = false } = {}) {
-  bumpViewEpoch();
-  persistPicks();
-  if (forgetLast) lastThreadByScenario[scenario] = null;
-  activeThreadId = null;
+function resetTaskSurface({ board = "home" } = {}) {
   threadTurns.replaceChildren();
   if (packagePanel) packagePanel.hidden = true;
   setAssistEmpty(true);
@@ -389,9 +429,54 @@ function startFreshTask({ forgetLast = false } = {}) {
   pendingReplySources = [];
   lastReplyJob = { comments: [], sourceKeys: [] };
   setWorkspace("task");
-  setBoard("home");
+  setBoard(board);
   syncChatHeader();
   renderHistory();
+}
+
+function startFreshTask({ forgetLast = false } = {}) {
+  bumpViewEpoch();
+  persistPicks();
+  if (forgetLast) {
+    rememberActiveSession(null);
+    sessionDraftMode = true;
+  }
+  activeThreadId = null;
+  resetTaskSurface({ board: "home" });
+}
+
+async function startNewSession() {
+  bumpViewEpoch();
+  persistPicks();
+  sessionDraftMode = false;
+  const state = composerState();
+  if (!window.matrixAuth?.user()) {
+    activeThreadId = null;
+    resetTaskSurface({ board: "home" });
+    return;
+  }
+  try {
+    const created = await sessionRequest("/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        title: "新会话",
+        last_scenario: state.scenario
+      })
+    });
+    const thread = sessionToThread(created);
+    Object.assign(thread, state);
+    threads.unshift(thread);
+    activeThreadId = thread.id;
+    rememberActiveSession(thread.id, state.scenario);
+    resetTaskSurface({ board: "home" });
+  } catch (error) {
+    sessionDraftMode = true;
+    activeThreadId = null;
+    rememberActiveSession(null, state.scenario);
+    resetTaskSurface({ board: "home" });
+    errorPanel.textContent = error.message;
+    errorPanel.hidden = false;
+  }
 }
 
 function setScenario(next, { resetBoard = true } = {}) {
@@ -399,18 +484,19 @@ function setScenario(next, { resetBoard = true } = {}) {
   if (resetBoard && previous !== next) {
     persistPicks();
     const current = activeThread();
-    if (current) lastThreadByScenario[previous] = current.id;
+    if (current) rememberActiveSession(current.id, previous);
     applyScenarioChrome(next);
     setWorkspace("task");
-    const resumeId = lastThreadByScenario[next];
+    const resumeId = storedActiveSessionId(next);
     const resume = threads.find(
       item => item.id === resumeId && (item.scenario || "compose") === next
     );
     if (resume) {
+      sessionDraftMode = false;
       openThread(resume.id);
       return;
     }
-    startFreshTask();
+    startFreshTask({ forgetLast: true });
     return;
   }
   applyScenarioChrome(next);
@@ -1827,7 +1913,7 @@ function dropLocalThread(id) {
   const index = threads.findIndex(item => item.id === id);
   if (index >= 0) threads.splice(index, 1);
   for (const key of Object.keys(lastThreadByScenario)) {
-    if (lastThreadByScenario[key] === id) lastThreadByScenario[key] = null;
+    if (lastThreadByScenario[key] === id) rememberActiveSession(null, key);
   }
   if (activeThreadId === id) activeThreadId = null;
 }
@@ -1846,13 +1932,14 @@ async function ensureThread(text) {
   const state = composerState();
   const current = activeThread();
   if (current && (current.scenario || "compose") === state.scenario) {
+    sessionDraftMode = false;
     current.turns.push({ text, taskUrl: "", at: new Date() });
     Object.assign(current, state);
     current.at = new Date();
     const rest = threads.filter(item => item.id !== current.id);
     threads.length = 0;
     threads.push(current, ...rest);
-    lastThreadByScenario[state.scenario] = current.id;
+    rememberActiveSession(current.id, state.scenario);
     return current;
   }
   const created = await sessionRequest("/api/sessions", {
@@ -1868,7 +1955,8 @@ async function ensureThread(text) {
   thread.at = new Date();
   threads.unshift(thread);
   activeThreadId = thread.id;
-  lastThreadByScenario[state.scenario] = thread.id;
+  sessionDraftMode = false;
+  rememberActiveSession(thread.id, state.scenario);
   return thread;
 }
 
@@ -1905,7 +1993,8 @@ async function openThread(id) {
     return;
   }
   activeThreadId = id;
-  lastThreadByScenario[thread.scenario || "compose"] = id;
+  sessionDraftMode = false;
+  rememberActiveSession(id, thread.scenario || "compose");
   setWorkspace("task");
   setBoard("done");
   applyComposerState(thread);
@@ -2095,12 +2184,22 @@ if (interactionSelect) {
 }
 
 document.querySelector("#sessionNewBtn")?.addEventListener("click", () => {
-  startFreshTask({ forgetLast: true });
+  startNewSession().catch(error => {
+    errorPanel.textContent = error.message || "无法新建会话";
+    errorPanel.hidden = false;
+  });
 });
 document.querySelectorAll(".nav-item[data-workspace]").forEach(btn => {
   btn.addEventListener("click", () => {
     if (btn.id === "newTaskBtn") {
-      startFreshTask({ forgetLast: true });
+      setWorkspace("task");
+      if (activeThreadId && threadTurns.children.length) {
+        setBoard("done");
+      } else if (activeThreadId) {
+        openThread(activeThreadId).catch(() => {});
+      } else {
+        setBoard("home");
+      }
       return;
     }
     setWorkspace(btn.dataset.workspace);
@@ -2447,6 +2546,10 @@ window.refreshKbDraftHint = refreshKbDraftHint;
 
 function payloadForSubmit(replyComments) {
   const profile = currentDraftKbProfile();
+  const sessionId = activeThreadId;
+  if (!sessionId) {
+    throw new Error("请先选择或新建会话");
+  }
   if (scenario === "reply") {
     const comments = (replyComments || []).map(item => ({
       text: item.text.trim(),
@@ -2459,10 +2562,10 @@ function payloadForSubmit(replyComments) {
           : "按互动规则逐条回复已签发评论。",
       comments,
       interaction_key: selectedInteraction().interaction_key,
-      channel: "web"
+      channel: "web",
+      session_id: sessionId
     };
     if (comments.length === 1) body.reply_count = draftCount();
-    if (activeThreadId) body.session_id = activeThreadId;
     if (profile) body.embedding_profile_id = profile;
     return { url: "/api/reply", body };
   }
@@ -2472,7 +2575,7 @@ function payloadForSubmit(replyComments) {
     post_count: draftCount(),
     account_key: selectedAccount().account_key,
     channel: "web",
-    session_id: activeThreadId
+    session_id: sessionId
   };
   if (profile) body.embedding_profile_id = profile;
   return { url: "/api/create", body };
@@ -2487,7 +2590,8 @@ async function newReplyThread(title) {
   Object.assign(thread, composerState(), { scenario: "reply", turns: [], at: new Date() });
   threads.unshift(thread);
   activeThreadId = thread.id;
-  lastThreadByScenario.reply = thread.id;
+  sessionDraftMode = false;
+  rememberActiveSession(thread.id, "reply");
   return thread;
 }
 

@@ -203,6 +203,7 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
 async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     work_item = WorkItem.model_validate(data.input)
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
+    trace = cast(TraceLog, data.require_resource("trace"))
     comment = next(
         (
             item.model_dump(mode="json")
@@ -219,11 +220,11 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
     ) -> ReplyDraftOut:
         result = await (
             Agently.create_agent(name="matrix-reply-draft")
-            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"work_item": work_item, "repair": repair or {}})
             .info({"context": info})
             .instruct(
                 [
+                    f"work_item_id 必须等于 {work_item['work_item_id']}，不要改成别的 id。",
                     "先裁 reply、acknowledge 或 skip，再写正文。遵循 info.context.interaction.skip_guidance；人身攻击、仇恨或无法核实的诱导默认 skip。",
                     "用 info.context.interaction 的 voice_summary 与 must_do / must_not 回复，不要导关注或报名，不要换成别的身份。",
                     "skip 时 draft_text 必须是空串。不得输出 escalate。",
@@ -248,20 +249,56 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
             )
             .async_start()
         )
-        return ReplyDraftOut.model_validate(result)
+        if isinstance(result, ReplyDraftOut):
+            if result.work_item_id != str(work_item["work_item_id"]):
+                return result.model_copy(
+                    update={"work_item_id": str(work_item["work_item_id"])}
+                )
+            return result
+        payload = dict(result) if isinstance(result, dict) else {}
+        payload["work_item_id"] = str(work_item["work_item_id"])
+        return ReplyDraftOut.model_validate(payload)
 
-    gated, cards, kb_notes = await retrieve_and_gate_draft(
-        work_item=work_item,
-        snapshot=snapshot,
-        data_root=data.require_resource("data_root"),
-        draft_once=reply_draft,
-        trace=cast(TraceLog, data.require_resource("trace")),
-        kind="reply_comment",
-        comment=comment,
-        knowledge=data.require_resource("knowledge"),
-        user_id=str(data.require_resource("kb_user_id") or "") or None,
-        embedding_profile_id=str(data.require_resource("kb_profile_id") or "") or None,
-    )
+    try:
+        gated, cards, kb_notes = await retrieve_and_gate_draft(
+            work_item=work_item,
+            snapshot=snapshot,
+            data_root=data.require_resource("data_root"),
+            draft_once=reply_draft,
+            trace=trace,
+            kind="reply_comment",
+            comment=comment,
+            knowledge=data.require_resource("knowledge"),
+            user_id=str(data.require_resource("kb_user_id") or "") or None,
+            embedding_profile_id=str(data.require_resource("kb_profile_id") or "") or None,
+        )
+    except Exception as exc:
+        error_tag = f"reply_draft_error:{work_item.work_item_id}:{type(exc).__name__}"
+        trace.log(
+            layer="business",
+            event_type="business.matrix.drafted",
+            status="failed",
+            subject_id=work_item.work_item_id,
+            error=exc,
+        )
+        gated = GatedDraft(
+            draft_key=f"d-{work_item.work_item_id}",
+            kind="reply_comment",
+            platform_key=work_item.platform_key,
+            source_comment_key=work_item.source_comment_key,
+            degrade_op="skip",
+            degrade_trace=[],
+            text="",
+            rationale=f"回评写稿失败：{type(exc).__name__}",
+            decision="skip",
+            evidence_ids=[],
+            kb_ids=[],
+            risk_flags=[],
+            status="failed",
+            issues=[error_tag],
+        )
+        cards = []
+        kb_notes = [error_tag]
     if kb_notes:
         limitations = list(cast(list[str], data.get_state("limitations") or []))
         for note in kb_notes:
