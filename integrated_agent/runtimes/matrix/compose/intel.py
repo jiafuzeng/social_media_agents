@@ -37,6 +37,7 @@ from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 MAX_THOUGHTS = 8
 MAX_HTTP = 4
 MAX_SEARCH_BROWSE_ROUNDS = 2
+SEARCH_BROWSE_TIMEOUT_SEC = 45.0
 _URL_RE = re.compile(
     r"https?://(?:www\.)?(?:x\.com|twitter\.com)/[^\s]+",
     re.IGNORECASE,
@@ -84,7 +85,7 @@ async def _resolve_public_material_media(card: dict[str, Any], *, goal: str) -> 
 
     page_url = str(item.get("link") or "").strip()
     if is_public_page_url(page_url):
-        media = await fetch_public_media_from_page(page_url)
+        media = sanitize_public_media_links(await fetch_public_media_from_page(page_url))
         if media:
             item["media_links"] = media[:1]
             return item
@@ -108,7 +109,7 @@ async def _resolve_public_material_media(card: dict[str, Any], *, goal: str) -> 
         ).strip()
         if not is_public_page_url(candidate):
             continue
-        media = await fetch_public_media_from_page(candidate)
+        media = sanitize_public_media_links(await fetch_public_media_from_page(candidate))
         item["link"] = candidate
         title = str(row.get("title") or "").strip()
         if title and not str(item.get("title") or "").strip():
@@ -150,10 +151,11 @@ async def _collect_search_browse_materials(
     session_id: str,
 ) -> list[dict[str, Any]]:
     """TikHub 无卡时的 Search/Browse fallback（仍不写正文）。"""
-    try:
-        raw = await (
+    del session_id  # 不与工作台 session 共享，避免并发污染
+
+    async def _run() -> Any:
+        return await (
             Agently.create_agent(name="matrix-compose-intel-task")
-            .activate_session(session_id=session_id)
             .input({"goal": goal})
             .info({"task": {"task_id": task_id, "goal": goal}})
             .use_actions(_search_browse_actions())
@@ -181,8 +183,11 @@ async def _collect_search_browse_materials(
                 },
                 format="json",
             )
-            .async_start()
+            .async_start(max_retries=1)
         )
+
+    try:
+        raw = await asyncio.wait_for(_run(), timeout=SEARCH_BROWSE_TIMEOUT_SEC)
     except Exception:
         return []
 
@@ -759,7 +764,6 @@ async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any] | None:
     tools_schema = [
         {"name": k, "desc": v["desc"], "args": v["args"]} for k, v in tools.items()
     ]
-    session_id = str(data.require_resource("session_id"))
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     tool_result_cleaned = list(
         cast(list[Any], data.get_state("tool_result_cleaned") or [])
@@ -790,7 +794,6 @@ async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any] | None:
     try:
         raw = await (
             Agently.create_agent(name="matrix-compose-intel-react")
-            .activate_session(session_id=session_id)
             .input(str(state.get("question") or state.get("user_instruction") or ""))
             .info(
                 {
@@ -841,7 +844,7 @@ async def intel_reason(data: TriggerFlowRuntimeData) -> dict[str, Any] | None:
                 },
                 format="json",
             )
-            .async_start()
+            .async_start(max_retries=1)
         )
     except Exception as exc:
         code = f"intel_reason_error:{type(exc).__name__}"

@@ -52,6 +52,16 @@ _META_IMAGE_PATTERNS = (
 
 _IMG_SRC_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.I)
 
+# 站点壳层图（logo/favicon/sprite），不是推文正文配图
+_CHROME_MEDIA_RE = re.compile(
+    r"(?:^|/)(?:"
+    r"favicon|sprite|watermark|placeholder|avatar[-_]?default|"
+    r"siteimages?|static/logo|assets/logo|images?/logo|"
+    r"[^/]*logo[^/]*\.(?:gif|png|svg|ico|webp|jpg|jpeg)"
+    r")(?:$|[/?#])",
+    re.I,
+)
+
 
 def _hostname(url: str) -> str:
     try:
@@ -75,6 +85,30 @@ def is_public_page_url(url: str) -> bool:
     return True
 
 
+def is_site_chrome_media_url(url: str) -> bool:
+    """识别站点 Logo / favicon / siteimages 等壳层图。"""
+    text = str(url or "").strip()
+    if not text:
+        return False
+    path = (urlparse(text).path or "").lower()
+    if _CHROME_MEDIA_RE.search(path):
+        return True
+    lower = text.lower()
+    return any(
+        token in lower
+        for token in (
+            "/siteimages/",
+            "/siteimage/",
+            "favicon",
+            "logo.gif",
+            "logo.png",
+            "logo.svg",
+            "logoweb",
+            "dyfwlog",
+        )
+    )
+
+
 def is_public_media_url(url: str) -> bool:
     text = str(url or "").strip()
     if not is_public_page_url(text):
@@ -84,11 +118,13 @@ def is_public_media_url(url: str) -> bool:
         return False
     if any(token in lower for token in ("pixel", "spacer.gif", "1x1", "tracking")):
         return False
+    if is_site_chrome_media_url(text):
+        return False
     return True
 
 
 def sanitize_public_media_links(raw: Any) -> list[dict[str, Any]]:
-    """去掉 example.com 等占位链接，只保留公网可访问媒体。"""
+    """去掉占位链接与站点壳层图，只保留可用正文配图。"""
     links = media_links_as_dicts(raw)
     kept: list[dict[str, Any]] = []
     for item in links:
@@ -127,6 +163,8 @@ def extract_media_urls_from_html(html: str, base_url: str) -> list[dict[str, Any
         if not is_public_media_url(url):
             continue
         if lower.endswith(".svg") or lower.endswith(".ico"):
+            continue
+        if is_site_chrome_media_url(url):
             continue
         found.append(url)
 
@@ -174,5 +212,6 @@ __all__ = [
     "fetch_public_media_from_page",
     "is_public_media_url",
     "is_public_page_url",
+    "is_site_chrome_media_url",
     "sanitize_public_media_links",
 ]

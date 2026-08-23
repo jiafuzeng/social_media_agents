@@ -53,7 +53,7 @@ def _compose_draft_instruct(
         "正文不超过 info.max_chars 字。",
         "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
         "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
-        "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
+        "仅当 info.offered_media 非空且配图与本条素材相关时，draft_text 用 [[media:m1]] 占位；offered_media 为空则不要写媒体占位，也不要把图片/视频链接写进正文。",
         "证据只能引用 info.offered_refs 的 ref_id，填 evidence_ids；正文不要写 [[ref:]] 或 [[kb:]]。offered_refs 为空时 evidence_ids 必须是 []。",
         "不要输出 hashtags 堆砌；不要编造素材卡中没有的事实。",
         "素材为空时仍可基于用户意图与人设创作，但语气要保守。",
@@ -255,11 +255,32 @@ async def original_tweet_draft_with_review(data: TriggerFlowRuntimeData) -> dict
                 continue
             break
 
-        reviewed, review_notes = await review_compose_draft_item(
-            data,
-            gated,
-            limitations=limitations,
-        )
+        try:
+            reviewed, review_notes = await review_compose_draft_item(
+                data,
+                gated,
+                limitations=limitations,
+            )
+        except Exception as exc:
+            note = f"compose_review_error:{draft_key}:{type(exc).__name__}"
+            if note not in limitations:
+                limitations.append(note)
+            if _is_publishable_compose_draft(gated):
+                last_payload = _draft_payload_from_gated(
+                    gated,
+                    work=work,
+                    base=last_payload,
+                )
+                break
+            if attempt < MAX_DRAFT_REGEN_ATTEMPTS:
+                repair = _regen_repair(
+                    gated=gated,
+                    attempt=attempt,
+                    reason="review_agent_error",
+                    review_notes=str(exc)[:200],
+                )
+                continue
+            break
         for note in review_notes:
             if note not in limitations:
                 limitations.append(note)

@@ -56,7 +56,7 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                 },
                 format="json",
             )
-            .async_start()
+            .async_start(max_retries=1)
         )
         routed = normalize_route_intent(
             RouteIntentOut.model_validate(result),

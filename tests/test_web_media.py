@@ -22,6 +22,26 @@ def test_accepts_real_cdn_urls() -> None:
     assert links[0]["preview_url"] == url
 
 
+def test_rejects_site_chrome_logo_urls() -> None:
+    logo = "https://img.diyifanwen.com/siteimages/DyfwLog.gif"
+    assert not is_public_media_url(logo)
+    assert sanitize_public_media_links(
+        [{"type": "photo", "thumb": logo, "preview_url": logo}]
+    ) == []
+    assert (
+        sanitize_public_media_links(
+            [
+                {
+                    "type": "photo",
+                    "thumb": "https://cdn.example.org/assets/logo/brand.png",
+                    "preview_url": "https://cdn.example.org/assets/logo/brand.png",
+                }
+            ]
+        )
+        == []
+    )
+
+
 def test_normalize_material_card_strips_placeholder_link() -> None:
     card = _normalize_material_card(
         {

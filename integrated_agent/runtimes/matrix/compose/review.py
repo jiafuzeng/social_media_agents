@@ -26,6 +26,36 @@ def _coerce_gated_draft(item: dict[str, Any]) -> GatedDraft:
     )
 
 
+def _slim_brief_for_draft(
+    data: TriggerFlowRuntimeData,
+    draft: GatedDraft,
+) -> dict[str, Any] | None:
+    """单条 Review 只带相关 work_item，避免 10 条计划撑爆 prompt。"""
+    brief_raw = data.get_state("brief")
+    if not isinstance(brief_raw, dict):
+        return None
+    work_items = [
+        item
+        for item in (brief_raw.get("work_items") or [])
+        if isinstance(item, dict)
+    ]
+    draft_key = draft.draft_key
+    draft_index = draft_key.removeprefix("d")
+    matched = [
+        item
+        for item in work_items
+        if str(item.get("work_item_id") or "") == draft_index
+        or str(item.get("work_item_id") or "").endswith(draft_index)
+        or f"d{item.get('work_item_id')}" == draft_key
+    ]
+    picked = matched[:1] if matched else work_items[:1]
+    return {
+        "normalized_brief": brief_raw.get("normalized_brief"),
+        "requirements": list(brief_raw.get("requirements") or [])[:3],
+        "work_items": picked,
+    }
+
+
 def _compose_source_text(data: TriggerFlowRuntimeData) -> str:
     source_text = str(data.get_state("source_text") or "").strip()
     if source_text:
@@ -98,9 +128,10 @@ async def _run_compose_review_agent(
     limitations: list[str],
     intent: str,
     snapshot: Snapshot,
+    brief_override: dict[str, Any] | None = None,
 ) -> ReviewOut:
     review_input: dict[str, Any] = {
-        "brief": data.get_state("brief"),
+        "brief": brief_override if brief_override is not None else data.get_state("brief"),
         "rewrite_plan_card": data.get_state("rewrite_plan_card"),
         "drafts": [item.model_dump(mode="json") for item in drafts],
         "limitations": limitations,
@@ -110,9 +141,9 @@ async def _run_compose_review_agent(
         review_input["source_media"] = data.get_state("source_media") or []
         review_input["author_card"] = data.get_state("author_card")
 
+    # 不挂工作台 session：for_each 并发 Review 会抢同一 session，易空响应/刷 No target data。
     result = await (
         Agently.create_agent(name="matrix-compose-review")
-        .activate_session(session_id=str(data.require_resource("session_id")))
         .input({"package": review_input})
         .info({"snapshot": {"snapshot_id": snapshot.snapshot_id}, "intent": intent})
         .instruct(
@@ -139,7 +170,7 @@ async def _run_compose_review_agent(
             },
             format="json",
         )
-        .async_start()
+        .async_start(max_retries=1)
     )
     return ReviewOut.model_validate(result)
 
@@ -149,6 +180,7 @@ async def review_compose_drafts(
     drafts: list[GatedDraft],
     *,
     limitations: list[str] | None = None,
+    brief_override: dict[str, Any] | None = None,
 ) -> tuple[list[GatedDraft], list[str], str]:
     """对一批 Gate 草稿跑 Review + re_gate，返回 (reviewed, extra_limitations, summary)。"""
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
@@ -163,6 +195,7 @@ async def review_compose_drafts(
         limitations=merged_limits,
         intent=intent,
         snapshot=snapshot,
+        brief_override=brief_override,
     )
     re_gate = _make_compose_re_gate(
         snapshot=snapshot,
@@ -185,6 +218,7 @@ async def review_compose_draft_item(
         data,
         [draft],
         limitations=limitations,
+        brief_override=_slim_brief_for_draft(data, draft),
     )
     return reviewed[0], extra
 

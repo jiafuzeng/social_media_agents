@@ -121,7 +121,12 @@ def align_material_cards(
         return list(cards), "one_to_one"
     aligned = list(cards)
     while len(aligned) < post_count:
-        aligned.append(dict(cards[len(aligned) % len(cards)]))
+        # 补齐条目只复用文案线索，不复用配图，避免 N 条推文挂同一张图。
+        source = cards[len(aligned) % len(cards)]
+        padded = dict(source)
+        padded["media_links"] = []
+        padded["media"] = []
+        aligned.append(padded)
     return aligned, "padded"
 
 

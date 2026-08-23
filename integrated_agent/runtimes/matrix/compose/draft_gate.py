@@ -155,7 +155,7 @@ async def gate_compose_draft(
                 },
                 format="json",
             )
-            .async_start()
+            .async_start(max_retries=1)
         )
         if hasattr(result, "model_dump"):
             payload = result.model_dump(mode="json")

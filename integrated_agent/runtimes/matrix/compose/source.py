@@ -523,7 +523,7 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
                 },
                 format="json",
             )
-            .async_start()
+            .async_start(max_retries=1)
         )
     except Exception as exc:
         code = f"source_reason_error:{type(exc).__name__}"

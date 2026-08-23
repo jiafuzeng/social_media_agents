@@ -766,11 +766,32 @@ async def rewrite_tweet_draft_with_review(data: TriggerFlowRuntimeData) -> dict[
                 continue
             break
 
-        reviewed, review_notes = await review_compose_draft_item(
-            data,
-            gated,
-            limitations=limitations,
-        )
+        try:
+            reviewed, review_notes = await review_compose_draft_item(
+                data,
+                gated,
+                limitations=limitations,
+            )
+        except Exception as exc:
+            note = f"rewrite_review_error:{draft_key}:{type(exc).__name__}"
+            if note not in limitations:
+                limitations.append(note)
+            if _is_publishable_compose_draft(gated):
+                last_payload = _draft_payload_from_gated(
+                    gated,
+                    work=work,
+                    base=last_payload,
+                )
+                break
+            if attempt < MAX_DRAFT_REGEN_ATTEMPTS:
+                repair = _regen_repair(
+                    gated=gated,
+                    attempt=attempt,
+                    reason="review_agent_error",
+                    review_notes=str(exc)[:200],
+                )
+                continue
+            break
         for note in review_notes:
             if note not in limitations:
                 limitations.append(note)

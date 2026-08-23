@@ -143,7 +143,8 @@ class _ScriptedAgent:
         self.session_id = session_id
         return self
 
-    async def async_start(self):
+    async def async_start(self, **kwargs):
+        del kwargs
         return await self._dispatch(
             self._name,
             self._input or {},

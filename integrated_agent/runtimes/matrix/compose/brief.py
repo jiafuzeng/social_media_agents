@@ -14,7 +14,7 @@ from integrated_agent.runtimes.matrix.compose.material import (
     _focus_hint_for_card,
     _resolve_post_count,
 )
-from integrated_agent.runtimes.matrix.host.models import BriefOut, WorkItem
+from integrated_agent.runtimes.matrix.host.models import BriefOut, Requirement, WorkItem
 from integrated_agent.runtimes.matrix.host.snapshots import (
     OFFERED_CLAIM_TYPES,
     Snapshot,
@@ -104,6 +104,37 @@ def _validate_and_fit_brief(
     return brief.model_copy(update={"work_items": kept}), limitations
 
 
+def _fallback_brief(
+    *,
+    user_instruction: str,
+    post_count: int,
+    platform_key: str,
+) -> tuple[BriefOut, list[str]]:
+    """模型 Brief 失败时的确定性兜底，避免整包卡死。"""
+    req = Requirement(requirement_id="req_01", description="写出可核验、可发布的推文")
+    work_items = [
+        WorkItem(
+            work_item_id=f"wi_{index:02d}",
+            kind="compose_post",
+            requirement_ids=[req.requirement_id],
+            platform_key=platform_key,
+            source_comment_key=None,
+            goal=user_instruction or "写出可核验的预热稿",
+            talking_points=[_draft_angle_hint(index)],
+            claim_types=["format"],
+        )
+        for index in range(1, post_count + 1)
+    ]
+    return (
+        BriefOut(
+            normalized_brief=user_instruction or "写出可核验的预热稿",
+            requirements=[req],
+            work_items=work_items,
+        ),
+        ["brief_agent_fallback"],
+    )
+
+
 async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     """包级计划：requirements + 正式 WorkItem 清单。"""
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
@@ -135,7 +166,6 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     try:
         result = await (
             Agently.create_agent(name="matrix-compose-brief")
-            .activate_session(session_id=str(data.require_resource("session_id")))
             .input({"text": user_instruction})
             .info(info)
             .instruct(
@@ -182,7 +212,7 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                 },
                 format="json",
             )
-            .async_start()
+            .async_start(max_retries=1)
         )
         brief = BriefOut.model_validate(result)
         brief, extra = _validate_and_fit_brief(
@@ -194,14 +224,25 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             if note not in limitations:
                 limitations.append(note)
     except Exception as exc:
+        brief, extra = _fallback_brief(
+            user_instruction=user_instruction,
+            post_count=post_count,
+            platform_key=platform_key,
+        )
+        for note in extra:
+            if note not in limitations:
+                limitations.append(note)
+        note = f"brief_agent_error:{type(exc).__name__}"
+        if note not in limitations:
+            limitations.append(note)
         trace.log(
             layer="business",
             event_type="business.matrix.briefed",
             status="failed",
             subject_id=task_id,
             error=exc,
+            facts={"fallback": True, "work_item_count": len(brief.work_items)},
         )
-        raise
 
     await data.async_set_state("brief", brief.model_dump(mode="json"), emit=False)
     await data.async_set_state("work_items", [item.model_dump(mode="json") for item in brief.work_items], emit=False)
