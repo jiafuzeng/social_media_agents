@@ -77,9 +77,20 @@ class ScriptedComposeModel:
         work_item_id = str(work_item["work_item_id"])
         max_chars = int(info.get("max_chars") or 280)
         offered = [str(card["ref_id"]) for card in info.get("offered_refs") or []]
+        source_text = str(info.get("source_text") or info.get("allocated_source_text") or "").strip()
+        draft_index = str(info.get("draft_index") or work_item_id.lstrip("w") or "1")
         text = self.draft_text_overrides.get(work_item_id)
         if text is None:
-            text = "秋季上新已公布成分与用法，详情见官方说明。"
+            if source_text:
+                text = f"改写草稿{draft_index}，已按我们口吻调整。"
+                offered_media = info.get("offered_media") or []
+                if offered_media:
+                    text = f"{text} [[media:m1]]"
+            else:
+                text = f"秋季上新草稿{draft_index}，详情见官方说明。"
+                offered_media = info.get("offered_media") or []
+                if offered_media:
+                    text = f"{text} [[media:m1]]"
         if repair and "over_limit" in (repair.get("issues") or []):
             text = text[:max_chars]
         evidence_ids = self.evidence_overrides.get(work_item_id)

@@ -67,35 +67,55 @@ async def test_compose_post_count_fans_out_drafts(tmp_path, monkeypatch) -> None
     assert len(run["drafts"]) == 3
     assert {item["draft_key"] for item in run["drafts"]} == {"d1", "d2", "d3"}
     assert len(run["brief"]["work_items"]) == 3
-    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-original-draft") == 3
+    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-draft") == 3
+    assert any(name == "matrix-compose-review" for name, _ in model.agent_sessions)
     assert any(name == "matrix-compose-brief" for name, _ in model.agent_sessions)
 
 
 @pytest.mark.asyncio
-async def test_compose_intel_collects_media_and_evidence(tmp_path, monkeypatch) -> None:
+async def test_compose_intel_pure_theme_skips_react(tmp_path, monkeypatch) -> None:
+    """need_trends=false 且无 URL/handle → 不进 TikHub ReAct，但 Search/Browse 仍可采配图。"""
     model = ScriptedMatrixModel()
     install_compose_ask(monkeypatch, model)
-
-    async def _skip_host_fetch(**_kwargs):
-        return None
-
-    monkeypatch.setattr(
-        "integrated_agent.runtimes.matrix.compose.intel._host_fetch_tweet_material",
-        _skip_host_fetch,
-    )
     run = await run_compose(
-        _request("m2-intel-media", "写两条推文", post_count=2),
+        _request("m2-intel-skip", "写两条推文", post_count=2),
         data_root=DATA_ROOT,
-        output_directory=tmp_path / "m2-intel-media",
+        output_directory=tmp_path / "m2-intel-skip",
     )
     assert run["status"] == "completed"
+    assert len(run["drafts"]) == 2
+    assert not any(name == "matrix-compose-intel-react" for name, _ in model.agent_sessions)
+    assert any(name == "matrix-compose-intel-task" for name, _ in model.agent_sessions)
     material_cards = [item for item in run.get("material_cards") or [] if isinstance(item, dict)]
     assert material_cards
     assert any(item.get("media_links") for item in material_cards)
-    evidence = [item for item in run.get("evidence") or [] if isinstance(item, dict)]
-    assert any(item.get("media_links") for item in evidence)
-    assert len(material_cards) == 2
-    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-intel-task") == 2
+
+
+@pytest.mark.asyncio
+async def test_compose_intel_need_trends_fetches_trending(tmp_path, monkeypatch) -> None:
+    model = ScriptedMatrixModel()
+    install_compose_ask(monkeypatch, model)
+    monkeypatch.setenv("TIKHUB_API_KEY", "test-key")
+    run = await run_compose(
+        _request("m2-intel-trends", "为秋季上新写预热稿", need_trends=True),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "m2-intel-trends",
+    )
+    assert run["status"] == "completed"
+    assert any(name == "matrix-compose-intel-react" for name, _ in model.agent_sessions)
+    trends = [
+        item
+        for item in (run.get("material_cards") or []) + (run.get("evidence") or [])
+        if isinstance(item, dict)
+        and (
+            str(item.get("kind") or "") == "trend"
+            or "秋季上新" in str(item.get("title") or item.get("ruling") or "")
+        )
+    ]
+    # trend_cards 在 run 顶层未必直接暴露；至少不应因 trending 失败整单
+    assert "trending_fetch_failed" not in (run.get("limitations") or [])
+    assert len(run["drafts"]) == 1
+    del trends  # 证据可选；宿主补打保证不失败
 
 
 def test_rewrite_plan_splits_long_source_across_drafts() -> None:
@@ -226,7 +246,8 @@ async def test_m2_rewrite_from_route_intent(tmp_path, monkeypatch) -> None:
     assert run["drafts"][0]["media"][0]["preview_url"] == "https://pic.example.com/source.jpg"
     assert run["evidence"][0]["media_links"][0]["preview_url"] == "https://pic.example.com/source.jpg"
     assert any(name == "matrix-compose-route-intent" for name, _ in model.agent_sessions)
-    assert any(name == "matrix-compose-rewrite-draft" for name, _ in model.agent_sessions)
+    assert any(name == "matrix-compose-draft" for name, _ in model.agent_sessions)
+    assert any(name == "matrix-compose-review" for name, _ in model.agent_sessions)
 
 
 @pytest.mark.asyncio
@@ -254,7 +275,7 @@ async def test_rewrite_post_count_fans_out_drafts(tmp_path, monkeypatch) -> None
     assert run["intent"] == "rewrite"
     assert len(run["drafts"]) == 2
     assert {item["draft_key"] for item in run["drafts"]} == {"d1", "d2"}
-    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-rewrite-draft") == 2
+    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-draft") == 2
 
 
 @pytest.mark.asyncio

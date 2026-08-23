@@ -26,17 +26,22 @@ from integrated_agent.runtimes.matrix.compose.source import (
     _source_media_entries,
     _tweet_status_url,
 )
-from integrated_agent.runtimes.matrix.compose.originaltweet import (
-    MAX_DRAFT_CONCURRENCY,
-    _draft_angle_hint,
-    _normalize_draft,
-    _resolve_post_count,
-)
+from integrated_agent.runtimes.matrix.compose.draft_gate import gate_compose_draft
+from integrated_agent.runtimes.matrix.compose.review import compose_review
 from integrated_agent.runtimes.matrix.compose.rewrite_plan import (
     build_rewrite_plan_card,
     build_rewrite_work_item,
 )
-from integrated_agent.runtimes.matrix.host.models import WorkItem
+from integrated_agent.runtimes.matrix.compose.material import (
+    _draft_angle_hint,
+    _resolve_post_count,
+)
+from integrated_agent.runtimes.matrix.compose.originaltweet import (
+    MAX_DRAFT_CONCURRENCY,
+    _normalize_draft,
+)
+from integrated_agent.runtimes.matrix.host.drafting import rollup_status
+from integrated_agent.runtimes.matrix.host.models import GatedDraft, WorkItem
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
@@ -645,148 +650,55 @@ async def plan_rewrite_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, An
 
 
 async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """基于计划阶段分配的原文片段与人设，生成单条改写推文草稿。"""
+    """检索 + 改写写稿 + Gate。"""
     work = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    draft_key = str(work.get("draft_key") or "d1")
     draft_index = int(work.get("draft_index") or 1)
     total_count = int(work.get("total_count") or 1)
-    angle_hint = str(work.get("angle_hint") or _draft_angle_hint(draft_index))
+    draft_key = str(work.get("draft_key") or "d1")
     allocated_source_text = str(
         work.get("allocated_source_text") or data.get_state("source_text") or ""
     ).strip()
-    focus_hint = str(work.get("focus_hint") or angle_hint).strip()
-    reference_tweet = work.get("reference_tweet")
-    reference_tweet_dict = _reference_tweet_for_model(
-        reference_tweet if isinstance(reference_tweet, dict) else None
-    )
-
-    ctx = _rewrite_context(data)
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    account = snapshot.account
-    user_instruction = str(ctx["user_instruction"])
-    offered_media = [
-        item for item in _as_list(work.get("offered_media")) if isinstance(item, dict)
-    ]
-    media_catalog = [
-        item for item in _as_list(work.get("media_catalog")) if isinstance(item, dict)
-    ]
-    if not media_catalog:
-        media_catalog = [
-            item
-            for item in _as_list(data.get_state("rewrite_media_catalog"))
-            if isinstance(item, dict)
-        ]
-
-    offered_cta_urls = [
-        str(item) for item in _as_list(work.get("offered_cta_urls")) if str(item).strip()
-    ]
-    cta_url = str(work.get("cta_url") or "").strip()
-    formal_work = work.get("work_item") if isinstance(work.get("work_item"), dict) else {}
-    plan_card = work.get("rewrite_plan_card") if isinstance(work.get("rewrite_plan_card"), dict) else {}
-
-    model_input = {
-        "user_instruction": user_instruction,
-        "source_text": allocated_source_text,
-    }
-    info: dict[str, Any] = {
-        "intent": "rewrite",
-        "work_item": work,
-        "user_instruction": user_instruction,
-        "source_text": allocated_source_text,
-        "focus_hint": focus_hint,
-        "angle_hint": angle_hint,
-        "allocation_mode": str(work.get("allocation_mode") or ""),
-        "reference_tweet": reference_tweet_dict,
-        "offered_media": offered_media,
-        "max_chars": snapshot.platform.max_chars,
-        "draft_index": draft_index,
-        "total_count": total_count,
-        "draft_key": draft_key,
-        "account": _account_rewrite_hint(account),
-        "rewrite_plan_card": plan_card,
-        "work_item": formal_work,
-        "offered_cta_urls": offered_cta_urls,
-        "cta_url": cta_url,
-    }
-
-    draft_text = ""
-    rationale = ""
-    draft_media: list[dict[str, Any]] = []
-    error = ""
+    focus_hint = str(work.get("focus_hint") or _draft_angle_hint(draft_index)).strip()
     if not allocated_source_text:
-        error = "rewrite_missing_source"
-    else:
-        try:
-            raw = await (
-                Agently.create_agent(name="matrix-compose-rewrite-draft")
-                .input(model_input)
-                .info(info)
-                .instruct(
-                    [
-                        f"本次共需生成 {total_count} 条改写推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
-                        f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
-                        "优先遵循 info.work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
-                        "你是改写支写稿模型：只改写 input.source_text 这一段，并结合 input.user_instruction。",
-                        "input.source_text 是检索到的原文事实；input.user_instruction 只是口吻/写法要求，不得当正文主题。",
-                        "推文主题、人物、事件必须与 input.source_text 一致，不要引入原文没有的新话题。",
-                        "只输出一个 JSON 对象，不要 markdown 代码块，不要额外说明。",
-                        "必须原创表述，禁止整段照抄原文；可保留事实点，但句式与结构要改写。",
-                        "遵守 info.account 的 voice_summary、content_pillars、must_do、must_not。",
-                        f"draft_text 不超过 info.max_chars 字。",
-                        "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
-                        "若 info.cta_url 非空，正文用 [[cta:0]] 占位，不要手写 https。",
-                        "若 info.rewrite_plan_card.media_choice=reuse_source_media 且 info.offered_media 非空，"
-                        "draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
-                        "info.reference_tweet.offered_media 展示参考推文配图信息，可决定是否沿用同样配图策略。",
-                        "无 offered_media 时不要编造 [[media:]]；不要输出 hashtags 堆砌；不要编造原文中没有的事实。",
-                        "info.reference_tweet 只作结构参考，不得把参考推文的话题混入正文。",
-                        "rationale 用一句话说明写法，不要复述原文。",
-                    ]
-                )
-                .output(
-                    {
-                        "draft_text": (str, "推文正文", "not_null"),
-                        "rationale": (str, "写法说明", "not_null"),
-                    },
-                    format="json",
-                )
-                .async_start()
-            )
-            if isinstance(raw, dict):
-                raw_text = str(raw.get("draft_text") or "").strip()
-                rationale = str(raw.get("rationale") or "").strip()
-                draft_text, draft_media = _resolve_draft_media(
-                    raw_text,
-                    media_catalog=media_catalog,
-                    default_reuse=bool(work.get("reuse_media")) and bool(media_catalog),
-                )
-        except Exception as exc:
-            error = f"rewrite_tweet_error:{draft_key}:{type(exc).__name__}"
-
-    if (
-        not draft_media
-        and bool(work.get("reuse_media"))
-        and media_catalog
-    ):
-        _, draft_media = _resolve_draft_media(
-            draft_text,
-            media_catalog=media_catalog,
-            default_reuse=True,
-        )
-
-    return {
-        "draft_key": draft_key,
-        "draft_index": draft_index,
-        "draft_text": draft_text,
-        "rationale": rationale,
-        "media": draft_media,
-        "ok": bool(draft_text),
-        "error": error,
-    }
+        return {
+            "draft_key": draft_key,
+            "draft_index": draft_index,
+            "kind": "compose_post",
+            "platform_key": TWITTER_PLATFORM_KEY,
+            "degrade_op": "skip",
+            "text": "",
+            "rationale": "缺少可改写的原文片段。",
+            "decision": "skip",
+            "status": "skipped",
+            "issues": ["rewrite_missing_source"],
+            "ok": False,
+            "error": "rewrite_missing_source",
+        }
+    return await gate_compose_draft(
+        data,
+        work=work,
+        draft_agent_name="matrix-compose-draft",
+        source_text=allocated_source_text,
+        instruct=[
+            f"本次共需生成 {total_count} 条改写推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
+            f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
+            "优先遵循 work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
+            "只改写 input.source_text 这一段，并结合 input.user_instruction。",
+            "source_text 是原文事实；user_instruction 只是口吻/写法要求，不得当正文主题。",
+            "必须原创表述，禁止整段照抄原文；可保留事实点，但句式与结构要改写。",
+            "遵守 info.account 的 voice、pillars、must_do、must_not。",
+            "正文不超过 info.max_chars 字。",
+            "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
+            "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
+            "若 info.offered_media 非空且计划复用媒体，draft_text 用 [[media:m1]] 占位。",
+            "不要输出 hashtags 堆砌；不要编造原文中没有的事实。",
+            "证据只能引用 info.offered_refs 的 ref_id；offered_refs 为空时 evidence_ids 必须是 []。",
+        ],
+    )
 
 
 async def normalized_output_rewrite(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """汇总 for_each 改写写稿结果，归一化为 package / drafts 结构。"""
+    """汇总 review 后的 Gate 草稿，归一化为 package / drafts 结构。"""
     ctx = _rewrite_context(data)
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     evidence_cards = [
@@ -796,62 +708,44 @@ async def normalized_output_rewrite(data: TriggerFlowRuntimeData) -> dict[str, A
     request = cast(dict[str, Any], data.get_state("request") or {})
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     post_count = _resolve_post_count(request, snapshot)
-    platform_key = snapshot.platform.platform_key or TWITTER_PLATFORM_KEY
 
-    task_results = [
-        item for item in _as_list(data.input) if isinstance(item, dict)
-    ]
-    task_results.sort(key=lambda item: int(item.get("draft_index") or 0))
-
-    plan_by_key = {
-        str(item.get("draft_key") or ""): item
-        for item in _as_list(data.get_state("rewrite_draft_plan"))
-        if isinstance(item, dict)
-    }
+    review_payload = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
+    drafts_raw = list(
+        cast(list[Any], data.get_state("drafts") or review_payload.get("drafts") or [])
+    )
+    summary = str(review_payload.get("review_summary") or "").strip()
 
     drafts: list[dict[str, Any]] = []
-    for result in task_results:
-        error = str(result.get("error") or "").strip()
-        if error and error not in limitations:
-            limitations.append(error)
-        if not result.get("ok", True) and not error:
-            code = f"rewrite_tweet_failed:{result.get('draft_key') or 'unknown'}"
-            if code not in limitations:
-                limitations.append(code)
-
-        draft_media = [
-            item for item in _as_list(result.get("media")) if isinstance(item, dict)
-        ]
-        if not draft_media:
-            work = plan_by_key.get(str(result.get("draft_key") or ""), {})
-            catalog = [
-                item
-                for item in _as_list(work.get("media_catalog"))
-                if isinstance(item, dict)
-            ]
-            if work.get("reuse_media") and catalog:
-                _, draft_media = _resolve_draft_media(
-                    str(result.get("draft_text") or ""),
-                    media_catalog=catalog,
-                    default_reuse=True,
-                )
-        draft = _normalize_rewrite_draft(
-            draft_key=str(result.get("draft_key") or f"d{len(drafts) + 1}"),
-            draft_text=str(result.get("draft_text") or "").strip(),
-            rationale=str(result.get("rationale") or "").strip(),
-            platform_key=platform_key,
-            media=draft_media,
-        )
+    for index, item in enumerate(drafts_raw, start=1):
+        if not isinstance(item, dict):
+            continue
+        gated = GatedDraft.model_validate(item)
+        draft = gated.model_dump(mode="json")
+        if not draft.get("draft_key"):
+            draft["draft_key"] = f"d{index}"
         drafts.append(draft)
 
-    package = _normalize_rewrite_package(
-        drafts=drafts,
-        material_cards=evidence_cards,
-        evidence_cards=evidence_cards,
-        branch_context=branch_context,
-        limitations=limitations,
-        post_count=post_count,
-    )
+    status = str(review_payload.get("rollup_status") or rollup_status(
+        [GatedDraft.model_validate(item) for item in drafts]
+    ))
+    if not summary:
+        ready = sum(1 for item in drafts if str(item.get("text") or "").strip())
+        summary = (
+            f"已生成 {ready} 条改写推文草稿"
+            if ready
+            else "未生成改写推文草稿"
+        )
+
+    package = {
+        "status": status,
+        "intent": "rewrite",
+        "task_type": "compose_post",
+        "summary": summary,
+        "material_cards": evidence_cards,
+        "drafts": drafts,
+        "limitations": limitations,
+        "branch_context": branch_context,
+    }
 
     await data.async_set_state("drafts", drafts, emit=False)
     await data.async_set_state("package", package, emit=False)
@@ -892,6 +786,7 @@ def build_rewrite_tweet_subflow() -> TriggerFlow:
         .for_each(concurrency=MAX_DRAFT_CONCURRENCY)
         .to(rewrite_tweet_reason)
         .end_for_each()
+        .to(compose_review)
         .to(normalized_output_rewrite)
     )
     return flow
@@ -920,6 +815,10 @@ REWRITE_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
         "trace": "resources.trace",
         "session_id": "resources.session_id",
         "snapshot": "resources.snapshot",
+        "data_root": "resources.data_root",
+        "knowledge": "resources.knowledge",
+        "kb_user_id": "resources.kb_user_id",
+        "kb_profile_id": "resources.kb_profile_id",
     },
 }
 
@@ -941,6 +840,7 @@ __all__ = [
     "REWRITE_TWEET_SUBFLOW_CAPTURE",
     "REWRITE_TWEET_SUBFLOW_WRITE_BACK",
     "build_rewrite_tweet_subflow",
+    "compose_review",
     "host_rewrite_plan",
     "normalized_output_rewrite",
     "plan_rewrite_drafts",

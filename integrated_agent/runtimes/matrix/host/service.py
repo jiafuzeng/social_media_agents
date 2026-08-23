@@ -129,13 +129,17 @@ class MatrixTaskService:
                 )
                 result = await self.worker.execute_complex_task(request)
                 await self.tasks.complete(request.task_id, result)
+                event_type = (
+                    "task.failed" if result.status == "failed" else "task.completed"
+                )
                 await self.events.publish(
                     request.task_id,
-                    "task.completed",
+                    event_type,
                     {
                         "status": result.status,
                         "snapshot_id": result.snapshot_id,
                         "trace_ref": result.trace_ref,
+                        "summary": result.summary,
                     },
                 )
             except Exception as exc:

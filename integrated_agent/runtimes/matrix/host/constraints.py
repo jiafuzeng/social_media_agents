@@ -27,7 +27,30 @@ CITATION_CLAIM_TYPES = frozenset(
 ALLOWED_DEGRADE_OPS: frozenset[str] = frozenset(
     {"pass", "rewrite_safe", "template_fallback", "skip"}
 )
-HARD_ISSUE_PREFIXES = ("forbidden_term:", "missing_ref_on_empty_rag")
+HARD_ISSUE_PREFIXES = (
+    "forbidden_term:",
+    "missing_ref_on_empty_rag",
+    "unknown_https",
+    "unknown_media",
+    "unknown_cta",
+    "growth_engagement",
+    "near_duplicate_source",
+)
+GROWTH_ENGAGEMENT_PHRASES: tuple[str, ...] = (
+    "求转",
+    "转发抽奖",
+    "互关",
+    "互粉",
+    "你怎么看",
+    "你觉得呢",
+    "评论区见",
+    "来聊聊",
+)
+CTA_TOKEN_RE = re.compile(r"\[\[cta:(\d+)\]\]")
+MEDIA_TOKEN_RE = re.compile(r"\[\[media:([^\]]+)\]\]")
+URL_RE = re.compile(r"https?://\S+")
+HASHTAG_RE = re.compile(r"#\w")
+URL_CHAR_BUDGET = 23
 KB_CITE_RE = re.compile(r"\[\[kb:([^\]]+)\]\]")
 REF_CITE_RE = re.compile(r"\[\[ref:([^\]]+)\]\]")
 
@@ -118,6 +141,63 @@ def _sanitize_unoffered_cites(
     return cleaned, kept
 
 
+def effective_text_length(text: str) -> int:
+    """剥 media/cta 占位符；正文 URL 按 X 规则各计 23 字。"""
+    body = MEDIA_TOKEN_RE.sub("", text or "")
+    body = CTA_TOKEN_RE.sub(" " * URL_CHAR_BUDGET, body)
+    for match in URL_RE.finditer(body):
+        span = match.span()
+        body = body[: span[0]] + (" " * URL_CHAR_BUDGET) + body[span[1] :]
+    return len(body)
+
+
+def _longest_overlap(left: str, right: str, *, min_len: int = 40) -> bool:
+    a = re.sub(r"\s+", "", left or "")
+    b = re.sub(r"\s+", "", right or "")
+    if len(a) < min_len or len(b) < min_len:
+        return False
+    window = min(len(a), len(b))
+    for size in range(window, min_len - 1, -1):
+        for start in range(0, len(a) - size + 1):
+            chunk = a[start : start + size]
+            if chunk and chunk in b:
+                return True
+    return False
+
+
+def collect_compose_issues(
+    *,
+    text: str,
+    offered_cta_urls: Sequence[str],
+    offered_media_keys: Sequence[str],
+    source_text: str = "",
+) -> list[str]:
+    issues: list[str] = []
+    for phrase in GROWTH_ENGAGEMENT_PHRASES:
+        if phrase in (text or ""):
+            issues.append(f"growth_engagement:{phrase}")
+            break
+    if len(HASHTAG_RE.findall(text or "")) > 1:
+        issues.append("too_many_hashtags")
+    allowed_urls = {str(item).strip() for item in offered_cta_urls if str(item).strip()}
+    for match in CTA_TOKEN_RE.finditer(text or ""):
+        index = int(match.group(1))
+        if index >= len(offered_cta_urls):
+            issues.append("unknown_cta")
+            break
+    for token in MEDIA_TOKEN_RE.findall(text or ""):
+        if token not in set(offered_media_keys):
+            issues.append(f"unknown_media:{token}")
+            break
+    for url in URL_RE.findall(text or ""):
+        if url.rstrip(".,)）]") not in allowed_urls:
+            issues.append("unknown_https")
+            break
+    if source_text.strip() and _longest_overlap(source_text, text):
+        issues.append("near_duplicate_source")
+    return issues
+
+
 def collect_issues(
     *,
     text: str,
@@ -130,13 +210,17 @@ def collect_issues(
     claim_types: Sequence[str],
     retrieval_state: str,
     offered_kbs: Sequence[str] = (),
+    offered_cta_urls: Sequence[str] = (),
+    offered_media_keys: Sequence[str] = (),
+    source_text: str = "",
 ) -> list[str]:
     issues: list[str] = []
     if reply_decision == "skip" and text.strip():
         issues.append("skip_must_be_empty")
     if kind == "reply_comment" and reply_decision != "skip" and not text.strip():
         issues.append("empty_reply")
-    if len(text) > max_chars:
+    measured = effective_text_length(text) if kind == "compose_post" else len(text)
+    if measured > max_chars:
         issues.append("over_limit")
     for term in matcher.find(text):
         issues.append(f"forbidden_term:{term}")
@@ -157,6 +241,15 @@ def collect_issues(
     if requires_citation(claim_types) and not case_ids:
         if retrieval_state == "empty":
             issues.append("missing_ref_on_empty_rag")
+    if kind == "compose_post":
+        issues.extend(
+            collect_compose_issues(
+                text=text,
+                offered_cta_urls=offered_cta_urls,
+                offered_media_keys=offered_media_keys,
+                source_text=source_text,
+            )
+        )
     return issues
 
 
@@ -171,7 +264,8 @@ def _has_hard_issue(issues: Sequence[str]) -> bool:
 def _only_rewriteable(issues: Sequence[str]) -> bool:
     if not issues:
         return False
-    return all(issue == "over_limit" for issue in issues)
+    soft = {"over_limit", "too_many_hashtags"}
+    return all(issue in soft or issue.startswith("over_limit") for issue in issues)
 
 
 def _decision_for(
@@ -221,6 +315,9 @@ async def apply_constraint_gate(
     attempt: int = 1,
     degrade_trace: list[DegradeStep] | None = None,
     offered_kbs: Sequence[str] = (),
+    offered_cta_urls: Sequence[str] = (),
+    offered_media_keys: Sequence[str] = (),
+    source_text: str = "",
 ) -> GatedDraft:
     if proposed_degrade not in ALLOWED_DEGRADE_OPS:
         proposed_degrade = None
@@ -241,6 +338,9 @@ async def apply_constraint_gate(
         claim_types=claim_types,
         retrieval_state=retrieval_state,
         offered_kbs=offered_kbs,
+        offered_cta_urls=offered_cta_urls,
+        offered_media_keys=offered_media_keys,
+        source_text=source_text,
     )
     trace = list(degrade_trace or [])
 
@@ -318,6 +418,9 @@ async def apply_constraint_gate(
             attempt=2,
             degrade_trace=trace,
             offered_kbs=offered_kbs,
+            offered_cta_urls=offered_cta_urls,
+            offered_media_keys=offered_media_keys,
+            source_text=source_text,
         )
 
     unknown_cite = "unknown_ref" in issues or "unknown_kb" in issues

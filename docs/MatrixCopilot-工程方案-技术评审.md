@@ -9,7 +9,7 @@
 | RAG 计划表 | [MatrixCopilot-RAG计划.md](./MatrixCopilot-RAG计划.md) |
 | 参照实现 | `integrated_agent/runtimes/question/` |
 | 框架 | `agently==4.1.4.4`（与现仓库锁定一致） |
-| 评审日期 | 2026-08-15 |
+| 评审日期 | 2026-08-15（2026-08-23 按现网写帖实现增补 §3.5、§4、§7） |
 | 建议结论 | 原则通过，按本文契约实施；下列「待拍板」项当场确认 |
 
 本文给技术评审用：拍板接口、状态机、失败策略和验收反例。产品叙事以项目方案为准，不在此重复。
@@ -91,6 +91,7 @@ MatrixTaskCreate
   account_key: str = "default"
   brand_key: str = "default"
   need_trends: bool = false              # 仅 compose；reply 忽略
+  session_id: str                        # Agently Session；与 task_id 分离
   comments: list[CommentIn] | null = null  # 仅 reply；compose 携带 → 422；省略则签发 text
   requester: str = "course-user"
   channel: str = "web"
@@ -167,13 +168,17 @@ GatedDraft
   draft_key: str                         # 宿主签发 d-<work_item_id>
   degrade_op: pass | rewrite_safe | template_fallback | skip
   degrade_trace: [{op, issues[], attempt}]
-  text: str
+  text: str                              # 出包前已 resolve CTA/媒体占位符
   rationale: str
   decision: reply | acknowledge | skip | publishable
   evidence_ids: [str]
+  kb_ids: [str]                          # compose 可选
+  media: [{media_key, kind, preview_url, ...}]  # compose/rewrite 可选
   status: ready | degraded | skipped | failed
   issues: [str]
 ```
+
+写帖 compose_post 另走 `collect_compose_issues`：`[[cta:N]]` Gate 内校验（按 23 计字）；`[[media:]]` 校验 offered key；增长话术、未知 https、近重复原文为硬伤。Gate 通过后 [`draft_media.resolve_draft_cta`](../integrated_agent/runtimes/matrix/compose/draft_media.py) / `resolve_draft_media` 展开，`text` 不含占位符。
 
 `publishable` 仅表示「可进入 Review」，不是已发送。
 
@@ -186,31 +191,30 @@ ReviewOut
   limitations: [str]
 
 MatrixTaskResult
-  task_id, snapshot_id, trace_ref
-  status: completed | partial
+  task_id, execution_id, snapshot_id, trace_ref
+  status: completed | partial | failed     # 写帖 rewrite 签发失败等须 failed
+  intent: compose | rewrite | null          # 写帖包
   task_type: compose_post | reply_comment   # 由 Flow 决定，禁止 mixed
   summary: str
   drafts: [GatedDraft]                   # Review 后终态
+  material_cards: [...]                   # 写帖可选
   evidence: [{ref_id, title, ruling}]
   limitations: [str]
 ```
 
-任务级 `failed` 仅当：快照缺失、Brief 无法解析、或全部 work_item `failed`。部分项 skip/degraded → `partial`（若至少一条 `ready`）或 `completed`（全部 ready）。建议锁定：
-
-- 全部 ready → `completed`
-- 存在 ready 或 degraded，且存在 skipped/failed → `partial`
-- 零 ready 且零 degraded → `failed`
+任务级 `failed`：快照无效、缺 package、改写无 `source_post`、路由整单失败等（见写帖规格 §7.6）。部分项 skip/degraded 且至少一条 ready/degraded → `partial`。全部 ready → `completed`。零 ready 且零 degraded → `failed`。
 
 ---
 
 ## 4. TriggerFlow 与状态
 
 ```text
-COMPOSE_FLOW
-  [fetch_trends]
-  → compose_brief
-  → for_each(retrieve_and_compose_draft, concurrency=4)
-  → compose_review
+COMPOSE_FLOW（现网，见 compose/flow.py）
+  compose_init → compose_route
+  → when compose: intel 子流 → originaltweet 子流
+       （brief → for_each gate_compose_draft → compose_review → package）
+  → when rewrite: source 子流 → rewritetweet 子流
+  → when PACKAGE: compose_package
 
 REPLY_FLOW
   reply_brief
@@ -218,10 +222,9 @@ REPLY_FLOW
   → reply_review
 ```
 
-`retrieve_and_*_draft` 是 Chunk，内部顺序：RetrieveCases → 对应 Draft ModelRequest → ConstraintGate（必要时 rewrite_safe 一次）→ 返回 GatedDraft。  
-不把 Gate 画成模型节点。不把 retrieve 并进 Brief。不用 `when(scenario)` 把两张图焊回一张。
+`gate_compose_draft`（[`draft_gate.py`](../integrated_agent/runtimes/matrix/compose/draft_gate.py)）= RetrieveCases → Draft → ConstraintGate → resolve_draft_cta/media → GatedDraft。写帖 for_each concurrency 现网 10（与 max_posts 对齐）。
 
-P0 `need_trends=true`：仅 `COMPOSE_FLOW` 前奏用夹具或空列表；失败记 limitation，不失败整单。`REPLY_FLOW` 无此节点。
+P0 `need_trends=true`：Intel 子流打 trending；失败记 limitation，不失败整单。`need_trends=false` 且无 URL/handle 时跳过 TikHub ReAct，Search/Browse 可补配图。`REPLY_FLOW` 无 Intel 节点。
 
 ### 4.1 execution state
 
@@ -245,6 +248,8 @@ if AC.match(text): issues += ["forbidden_term:"+term]
 if any(id not in offered_refs): issues += ["unknown_ref"]
 if requires_citation(claim_types) and not evidence_ids:
     if retrieval_state == empty: issues += ["missing_ref_on_empty_rag"]
+# compose_post 另加 collect_compose_issues：
+#   [[cta:N]] 下标校验；[[media:]] offered key；未知 https；增长话术；近重复 source
 if proposed_degrade not in {None} ∪ allowed_ops: ignore proposal
 
 if not issues: return pass
@@ -347,6 +352,8 @@ AUTO_RUNTIMES +=
 | T13 | http | 问数 `/v1/tasks` 回归仍 202 |
 | T14 | gw | auto offered 含 matrix，不含 codex |
 | T15 | gw | 附件 → agent，不进 matrix |
+| T16 | unit | `resolve_draft_cta` 展开后 text 不含 `[[cta:0]]` |
+| T17 | flow | 纯主题 compose 跳过 intel-react 但可有 material_cards 配图 |
 
 S4 真模型（不阻塞合入）：X 预热一题；回评贴评一题。看 `logs/<task_id>/run.json`，不用正则判正文质量。
 
@@ -396,7 +403,7 @@ S4 真模型（不阻塞合入）：X 预热一题；回评贴评一题。看 `l
 
 开放问题（请评审口头定）：
 
-1. `max_chars`：X 按字符还是按加权长度？P0 建议按 Python `len(text)`，文档标明。
+1. `max_chars`：写帖 compose 用 `effective_text_length`（剥 media、CTA 占位按 23）；回评仍可用 `len(text)`。文档与 Gate 以 [`constraints.py`](../integrated_agent/runtimes/matrix/host/constraints.py) 为准。
 2. 是否保留 `escalate` 枚举？否。不露出；若模型写出则 Gate 映射为 skip。全程无人工审批。
 3. 矩阵默认平台列表：仅 `x-twitter`，还是 P0 就加 `weibo` 空壳？建议只锁 X，第二平台 P1。
 

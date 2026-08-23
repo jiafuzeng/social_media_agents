@@ -147,7 +147,7 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                     "goal 写本条要达成的写作目标；talking_points 写 Hook/角度要点（2–3 条）。",
                     "claim_types 只能从 info.offered_claim_types 选取。",
                     "增长 CTA：每条稿结尾只规划一个行动——关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
-                    "若 info.offered_cta_urls 非空，可在 talking_points 注明可用 [[cta:0]]；否则只写关注/置顶类文字 CTA。",
+                    "talking_points 只规划文字 CTA（关注系列/点置顶/去官方渠道）；不要写 [[cta:0]] 或 https。",
                     "可借鉴 info.material_list 的事实点与结构，不要整段抄袭素材正文。",
                     "看不见 source_post；不要发明未签发的链接或 tweet_id。",
                 ]

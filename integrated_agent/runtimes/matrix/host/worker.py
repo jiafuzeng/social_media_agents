@@ -12,12 +12,19 @@ from .models import (
     MatrixTaskRequest,
     MatrixTaskResult,
     Scenario,
+    TaskStatus,
     coerce_media_links,
 )
-from .service import MatrixTaskFailed
 from .stores import InMemoryEventStore
 
 AnalyzeFn = Callable[[MatrixTaskRequest], Awaitable[dict[str, Any]]]
+
+
+def _rollup_task_status(raw: Any) -> TaskStatus:
+    status = str(raw or "").strip().lower()
+    if status in {"completed", "partial", "failed"}:
+        return cast(TaskStatus, status)
+    return "failed"
 
 
 @dataclass
@@ -100,8 +107,6 @@ async def _publish_package(
     request = _request(data)
     await _stage(data, "stage.started", stage)
     run = cast(dict[str, Any], data.get_state("matrix_analysis_run"))
-    if run.get("status") == "failed":
-        raise MatrixTaskFailed(str(run.get("summary") or "matrix task failed"))
     drafts = [
         GatedDraft.model_validate(item)
         for item in cast(list[dict[str, Any]], run.get("drafts") or [])
@@ -122,7 +127,7 @@ async def _publish_package(
         task_id=request.task_id,
         snapshot_id=str(run["snapshot_id"]),
         trace_ref=str(run["trace_ref"]),
-        status="partial" if run.get("status") == "partial" else "completed",
+        status=_rollup_task_status(run.get("status")),
         task_type=cast(Any, run["task_type"]),
         summary=str(run.get("summary") or ""),
         drafts=drafts,

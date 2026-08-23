@@ -174,6 +174,52 @@ async def _dispatch_compose_reply(
     context = info.get("context") if isinstance(info, dict) else info
     if name == "matrix-compose-route-intent":
         return await model.route_intent(text=input_data.get("text") or "", info=info)
+    if name == "matrix-compose-intel-react":
+        cleaned = info.get("已完成步骤") if isinstance(info, dict) else []
+        need_trends = bool((info or {}).get("need_trends")) if isinstance(info, dict) else False
+        has_trend = any(
+            isinstance(item, dict) and str(item.get("kind") or "").strip().lower() == "trend"
+            for item in (cleaned or [])
+        )
+        has_tweet = any(
+            isinstance(item, dict)
+            and str(item.get("kind") or "").strip().lower() == "tweet"
+            and str(item.get("tweet_id") or "").strip()
+            for item in (cleaned or [])
+        )
+        if need_trends and not has_trend:
+            return {
+                "type": "tool",
+                "reasoning": "前端开了趋势，先拉热搜。",
+                "tool_calls": [{"name": "fetch_trending", "args": {}}],
+                "answer": "",
+            }
+        if not has_tweet:
+            keyword = str(
+                (info or {}).get("user_instruction")
+                or input_data
+                or "创作"
+            ).strip()[:40]
+            return {
+                "type": "tool",
+                "reasoning": "需要搜索带配图的对标推文。",
+                "tool_calls": [
+                    {
+                        "name": "fetch_search_timeline",
+                        "args": {
+                            "keyword": keyword or "创作",
+                            "search_type": "Media",
+                        },
+                    }
+                ],
+                "answer": "",
+            }
+        return {
+            "type": "final",
+            "reasoning": "已有推文/趋势观察，可进 Brief。",
+            "tool_calls": [],
+            "answer": "已采集创作素材卡",
+        }
     if name == "matrix-compose-intel-plan":
         text = input_data if isinstance(input_data, str) else str(input_data or "")
         post_count = 1
@@ -283,20 +329,32 @@ async def _dispatch_compose_reply(
         }
     if name == "matrix-compose-brief":
         text = input_data.get("text") if isinstance(input_data, dict) else str(input_data or "")
-        return await model.compose_brief(
+        result = await model.compose_brief(
             text=text,
             info=info if isinstance(info, dict) else {},
         )
+        return result.model_dump(mode="json") if hasattr(result, "model_dump") else result
     if name == "matrix-compose-draft":
-        return await model.compose_draft(
-            work_item=input_data["work_item"],
-            info=context,
-            repair=input_data.get("repair") or None,
+        merged_info = dict(info) if isinstance(info, dict) else {}
+        payload = input_data if isinstance(input_data, dict) else {}
+        merged_info.update(
+            {
+                key: value
+                for key, value in payload.items()
+                if key not in {"work_item", "repair"}
+            }
         )
+        result = await model.compose_draft(
+            work_item=payload["work_item"],
+            info=merged_info,
+            repair=payload.get("repair") or None,
+        )
+        return result.model_dump(mode="json") if hasattr(result, "model_dump") else result
     if name == "matrix-compose-review":
-        return await model.compose_review(
+        result = await model.compose_review(
             package=input_data["package"], info=snapshot
         )
+        return result.model_dump(mode="json") if hasattr(result, "model_dump") else result
     if name == "matrix-reply-brief":
         return await model.reply_brief(text=input_data["text"], info=snapshot)
     if name == "matrix-reply-draft":
@@ -388,9 +446,26 @@ def install_compose_ask(monkeypatch, model) -> None:
                                 "media": [
                                     {
                                         "type": "photo",
-                                        "thumb": "https://pic.example.com/ref.jpg",
+                                        "thumb": "https://pbs.twimg.com/media/ref.jpg",
                                     }
                                 ],
+                            }
+                        ]
+                    },
+                },
+            }
+        if name == "fetch_trending":
+            return {
+                "tool": name,
+                "args": args or {},
+                "result": {
+                    "code": 200,
+                    "data": {
+                        "trends": [
+                            {
+                                "name": "秋季上新",
+                                "context": "China",
+                                "description": "测试热搜",
                             }
                         ]
                     },
@@ -409,14 +484,19 @@ def install_compose_ask(monkeypatch, model) -> None:
     fake_agent = _fake_create_agent(dispatch)
     for module in (
         "integrated_agent.runtimes.matrix.compose.brief",
+        "integrated_agent.runtimes.matrix.compose.draft_gate",
         "integrated_agent.runtimes.matrix.compose.intel",
-        "integrated_agent.runtimes.matrix.compose.originaltweet",
+        "integrated_agent.runtimes.matrix.compose.review",
         "integrated_agent.runtimes.matrix.compose.rewritetweet",
         "integrated_agent.runtimes.matrix.compose.source",
     ):
         monkeypatch.setattr(f"{module}.Agently.create_agent", fake_agent)
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.compose.source._run_one_tool",
+        fake_run_one_tool,
+    )
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.compose.intel._run_one_tool",
         fake_run_one_tool,
     )
 

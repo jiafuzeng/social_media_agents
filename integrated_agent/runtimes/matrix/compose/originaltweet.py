@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from agently import Agently, TriggerFlow, TriggerFlowRuntimeData
+from agently import TriggerFlow, TriggerFlowRuntimeData
 from agently.types.trigger_flow.trigger_flow import (
     TriggerFlowSubFlowCapture,
     TriggerFlowSubFlowWriteBack,
@@ -14,6 +14,8 @@ from integrated_agent.runtimes.matrix.compose.brief import (
     collect_compose_work_items,
     compose_brief,
 )
+from integrated_agent.runtimes.matrix.compose.draft_gate import gate_compose_draft
+from integrated_agent.runtimes.matrix.compose.review import compose_review
 from integrated_agent.runtimes.matrix.compose.material import (
     _align_material_cards,
     _collect_material_cards,
@@ -22,10 +24,8 @@ from integrated_agent.runtimes.matrix.compose.material import (
     _focus_hint_for_card,
     _resolve_post_count,
 )
-from integrated_agent.runtimes.matrix.compose.draft_media import (
-    resolve_draft_media,
-    to_draft_media_cards,
-)
+from integrated_agent.runtimes.matrix.host.drafting import rollup_status
+from integrated_agent.runtimes.matrix.host.models import GatedDraft
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
@@ -118,119 +118,40 @@ async def plan_compose_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, An
 
 
 async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """基于分配到的单张素材卡与人设，生成一条原创推文草稿。"""
+    """检索 + 写稿 + Gate，生成单条原创推文草稿。"""
     work = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    draft_key = str(work.get("draft_key") or "d1")
     draft_index = int(work.get("draft_index") or 1)
     total_count = int(work.get("total_count") or 1)
-    formal_work = work.get("work_item") if isinstance(work.get("work_item"), dict) else {}
-    goal = str(work.get("goal") or formal_work.get("goal") or "").strip()
+    draft_key = str(work.get("draft_key") or "d1")
     talking_points = [
         str(item).strip()
-        for item in _as_list(work.get("talking_points") or formal_work.get("talking_points"))
+        for item in _as_list(work.get("talking_points") or [])
         if str(item).strip()
     ]
     angle_hint = str(work.get("angle_hint") or _draft_angle_hint(draft_index))
     focus_hint = str(work.get("focus_hint") or angle_hint)
     if talking_points:
         focus_hint = "；".join(talking_points[:3])
-    material_card = cast(dict[str, Any], work.get("material_card") or {})
-    offered_media = [
-        item for item in _as_list(work.get("offered_media")) if isinstance(item, dict)
-    ]
-    media_catalog = [
-        item for item in _as_list(work.get("media_catalog")) if isinstance(item, dict)
-    ]
-    offered_cta_urls = [
-        str(item) for item in _as_list(work.get("offered_cta_urls")) if str(item).strip()
-    ]
-
-    ctx = _compose_context(data)
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    account = snapshot.account
-    user_instruction = str(ctx["user_instruction"])
-    material_cards = [material_card] if material_card else []
-
-    info: dict[str, Any] = {
-        "intent": "compose",
-        "work_item": formal_work or work,
-        "goal": goal,
-        "talking_points": talking_points,
-        "claim_types": list(work.get("claim_types") or formal_work.get("claim_types") or []),
-        "material_card": material_card,
-        "material_cards": material_cards,
-        "offered_media": offered_media,
-        "media_catalog": media_catalog,
-        "offered_cta_urls": offered_cta_urls,
-        "intel_result": ctx["intel_result"],
-        "plan_summary": ctx["plan_summary"],
-        "brief": data.get_state("brief"),
-        "platform": snapshot.platform.model_dump(mode="json"),
-        "max_chars": snapshot.platform.max_chars,
-        "draft_index": draft_index,
-        "total_count": total_count,
-        "angle_hint": angle_hint,
-        "focus_hint": focus_hint,
-    }
-    if account is not None:
-        info["account"] = account.model_dump(mode="json")
-
-    draft_text = ""
-    rationale = ""
-    draft_media: list[dict[str, Any]] = []
-    error = ""
-    try:
-        raw = await (
-            Agently.create_agent(name="matrix-compose-original-draft")
-            .input(user_instruction)
-            .info(info)
-            .instruct(
-                [
-                    f"本次共需生成 {total_count} 条推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
-                    f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
-                    "优先遵循 info.work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
-                    "只根据 info.material_card 这一张素材卡写一条原创推文，不要混用其他素材。",
-                    "只借鉴素材的结构与事实点，不要整段抄袭；不要写长文分析。",
-                    "遵守 info.account 的 voice、pillars、must_do、must_not。",
-                    f"正文不超过 info.max_chars 字。",
-                    "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
-                    "若 info.offered_cta_urls 非空，可用 [[cta:0]] 占位，不要手写 https。",
-                    "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
-                    "不要输出 hashtags 堆砌；不要编造素材卡中没有的事实。",
-                    "素材为空时仍可基于用户意图与人设创作，但语气要保守。",
-                ]
-            )
-            .output(
-                {
-                    "draft_text": (str, "推文正文", "not_null"),
-                    "rationale": (str, "写法说明", "not_null"),
-                },
-                format="json",
-            )
-            .async_start()
-        )
-        if isinstance(raw, dict):
-            draft_text = str(raw.get("draft_text") or "").strip()
-            rationale = str(raw.get("rationale") or "").strip()
-            draft_text, attached = resolve_draft_media(
-                draft_text,
-                media_catalog=media_catalog,
-                default_reuse=bool(media_catalog),
-            )
-            draft_media = to_draft_media_cards(attached)
-    except Exception as exc:
-        error = f"original_tweet_error:{draft_key}:{type(exc).__name__}"
-
-    return {
-        "draft_key": draft_key,
-        "draft_index": draft_index,
-        "draft_text": draft_text,
-        "rationale": rationale,
-        "media": draft_media,
-        "material_card": material_card,
-        "ok": bool(draft_text),
-        "error": error,
-    }
+    return await gate_compose_draft(
+        data,
+        work=work,
+        draft_agent_name="matrix-compose-draft",
+        instruct=[
+            f"本次共需生成 {total_count} 条推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
+            f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
+            "优先遵循 work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
+            "只根据 info.material_card 这一张素材卡写一条原创推文，不要混用其他素材。",
+            "只借鉴素材的结构与事实点，不要整段抄袭；不要写长文分析。",
+            "遵守 info.account 的 voice、pillars、must_do、must_not。",
+            "正文不超过 info.max_chars 字。",
+            "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
+            "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
+            "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
+            "证据只能引用 info.offered_refs 的 ref_id，正文写成 [[ref:e1]]；offered_refs 为空时 evidence_ids 必须是 []。",
+            "不要输出 hashtags 堆砌；不要编造素材卡中没有的事实。",
+            "素材为空时仍可基于用户意图与人设创作，但语气要保守。",
+        ],
+    )
 
 
 def _normalize_draft(
@@ -291,49 +212,54 @@ def _normalize_package(
 
 
 async def normalized_output_tweet(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """汇总 for_each 写稿结果，归一化为 package / drafts 结构。"""
+    """汇总 review 后的 Gate 草稿，归一化为 package / drafts 结构。"""
     ctx = _compose_context(data)
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     material_list = list(ctx["material_list"])
     request = cast(dict[str, Any], data.get_state("request") or {})
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    post_count = _resolve_post_count(request, snapshot)
-    platform_key = snapshot.platform.platform_key or TWITTER_PLATFORM_KEY
+    post_count = _resolve_post_count(request, cast(Snapshot, data.require_resource("snapshot")))
 
-    task_results = [
-        item for item in _as_list(data.input) if isinstance(item, dict)
-    ]
-    task_results.sort(key=lambda item: int(item.get("draft_index") or 0))
+    review_payload = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
+    drafts_raw = list(
+        cast(list[Any], data.get_state("drafts") or review_payload.get("drafts") or [])
+    )
+    summary = str(
+        review_payload.get("review_summary")
+        or data.get_state("review_summary")
+        or ""
+    ).strip()
 
     drafts: list[dict[str, Any]] = []
-    for result in task_results:
-        error = str(result.get("error") or "").strip()
-        if error and error not in limitations:
-            limitations.append(error)
-        if not result.get("ok", True) and not error:
-            code = f"original_tweet_failed:{result.get('draft_key') or 'unknown'}"
-            if code not in limitations:
-                limitations.append(code)
-
-        draft_text = str(result.get("draft_text") or "").strip()
-        draft_media = [
-            item for item in _as_list(result.get("media")) if isinstance(item, dict)
-        ]
-        draft = _normalize_draft(
-            draft_key=str(result.get("draft_key") or f"d{len(drafts) + 1}"),
-            draft_text=draft_text,
-            rationale=str(result.get("rationale") or "").strip(),
-            platform_key=platform_key,
-            media=draft_media,
-        )
+    for index, item in enumerate(drafts_raw, start=1):
+        if not isinstance(item, dict):
+            continue
+        gated = GatedDraft.model_validate(item)
+        draft = gated.model_dump(mode="json")
+        if not draft.get("draft_key"):
+            draft["draft_key"] = f"d{index}"
         drafts.append(draft)
 
-    package = _normalize_package(
-        drafts=drafts,
-        material_cards=material_list,
-        limitations=limitations,
-        post_count=post_count,
-    )
+    status = str(review_payload.get("rollup_status") or rollup_status(
+        [GatedDraft.model_validate(item) for item in drafts if isinstance(item, dict)]
+    ))
+    if not summary:
+        ready = sum(1 for item in drafts if str(item.get("text") or "").strip())
+        if ready == 0:
+            summary = "未生成推文草稿"
+        elif ready < post_count:
+            summary = f"已生成 {ready}/{post_count} 条原创推文草稿"
+        else:
+            summary = f"已生成 {ready} 条原创推文草稿"
+
+    package = {
+        "status": status,
+        "intent": "compose",
+        "task_type": "compose_post",
+        "summary": summary,
+        "material_cards": material_list,
+        "drafts": drafts,
+        "limitations": limitations,
+    }
 
     await data.async_set_state("drafts", drafts, emit=False)
     await data.async_set_state("package", package, emit=False)
@@ -373,6 +299,7 @@ def build_original_tweet_subflow() -> TriggerFlow:
         .for_each(concurrency=MAX_DRAFT_CONCURRENCY)
         .to(original_tweet_reason)
         .end_for_each()
+        .to(compose_review)
         .to(normalized_output_tweet)
     )
     return flow
@@ -401,6 +328,10 @@ ORIGINAL_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
         "trace": "resources.trace",
         "session_id": "resources.session_id",
         "snapshot": "resources.snapshot",
+        "data_root": "resources.data_root",
+        "knowledge": "resources.knowledge",
+        "kb_user_id": "resources.kb_user_id",
+        "kb_profile_id": "resources.kb_profile_id",
     },
 }
 
@@ -424,6 +355,7 @@ __all__ = [
     "build_original_tweet_subflow",
     "collect_compose_work_items",
     "compose_brief",
+    "compose_review",
     "normalized_output_tweet",
     "original_tweet_prelude",
     "original_tweet_reason",

@@ -1,0 +1,27 @@
+{
+  "platform_key": "x-twitter",
+  "cases": [
+    {
+      "ref_id": "e1",
+      "case_id": "e1",
+      "title": "可核验卖点",
+      "platform_keys": ["x-twitter"],
+      "claim_types": ["format", "efficacy"],
+      "ruling": "只写已对外公布的成分、用法与库存口径，不承诺疗效或收益。",
+      "allowed": "秋季上新已公布成分表与官方说明链接。",
+      "forbidden": "治愈、稳赚、翻倍、包治",
+      "quote": "详情见官方渠道，成分与用法以公示为准。"
+    },
+    {
+      "ref_id": "e2",
+      "case_id": "e2",
+      "title": "增长 CTA",
+      "platform_keys": ["x-twitter"],
+      "claim_types": ["format"],
+      "ruling": "结尾只给一个增长行动：关注系列、点置顶或去官方渠道。",
+      "allowed": "关注看系列更新；置顶有完整说明；官方渠道见链接。",
+      "forbidden": "求转、互关、你怎么看、来评论区聊聊",
+      "quote": "关注后续更新，置顶有完整说明。"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 _MEDIA_TOKEN_RE = re.compile(r"\[\[media:(m\d+)\]\]")
+_CTA_TOKEN_RE = re.compile(r"\[\[cta:(\d+)\]\]")
 
 
 def media_kind(raw_type: str) -> str:
@@ -15,6 +16,26 @@ def media_kind(raw_type: str) -> str:
     if lowered in {"gif", "animated_gif"}:
         return "gif"
     return "photo"
+
+
+def resolve_draft_cta(
+    draft_text: str,
+    *,
+    offered_cta_urls: list[str],
+) -> str:
+    """Gate 通过后把 [[cta:N]] 展开为已签发的官方 URL，推文字段不出现占位符。"""
+
+    def repl(match: re.Match[str]) -> str:
+        index = int(match.group(1))
+        if 0 <= index < len(offered_cta_urls):
+            return str(offered_cta_urls[index]).strip()
+        return ""
+
+    display_text = _CTA_TOKEN_RE.sub(repl, draft_text or "")
+    display_text = re.sub(r"\s{2,}", " ", display_text).strip()
+    if not display_text:
+        display_text = (draft_text or "").strip()
+    return display_text
 
 
 def resolve_draft_media(
@@ -71,4 +92,4 @@ def to_draft_media_cards(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return cards
 
 
-__all__ = ["media_kind", "resolve_draft_media", "to_draft_media_cards"]
+__all__ = ["media_kind", "resolve_draft_cta", "resolve_draft_media", "to_draft_media_cards"]

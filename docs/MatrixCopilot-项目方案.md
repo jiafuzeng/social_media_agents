@@ -8,7 +8,7 @@
 | Runtime | `matrix` |
 | 主路径 | 推文创作 `compose`、评论回复 `reply`（两套 Flow） |
 | 参照工程 | 本仓库问数 Runtime（TriggerFlow、有界队列、SSE、证据短 key） |
-| 文档日期 | 2026-08-21 |
+| 文档日期 | 2026-08-23 |
 | 写帖规格 | [推文创作技术方案](./MatrixCopilot-推文创作技术方案.md) **v1.0 定版** |
 | P0 终态 | 带评理与降级轨迹的草稿包，不发送。写帖图文契约见 v1.0 |
 
@@ -102,14 +102,17 @@ flowchart LR
 
 ### 3.1 推文创作 compose
 
-创作与改写共用 `POST /api/create` 与一张 `COMPOSE_FLOW`。分流、图文签发、TikHub 与模块契约以 [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md) 为准。改写图文是草稿包里的 jpg/封面。创作允许无图。TikHub 调用走 ReAct（思考 → 确认参数 → 执行 → 观察）；相同入参的成功响应进独立 RecordStore，TTL 按方法（列表 1h、详情/资料 24h），过期后原地覆盖。创作只喂 24h 保护期内的对标帖。
+创作与改写共用 `POST /api/create` 与一张 `COMPOSE_FLOW`。分流、图文签发、TikHub 与模块契约以 [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md) 为准。现网拓扑：`compose_init → compose_route → when(compose|rewrite|PACKAGE)`；创作支 `intel → originaltweet`（内嵌 brief / for_each draft+gate / review）；改写支 `source → rewritetweet`。TikHub 走有界 ReAct；纯主题可跳过 ReAct 并由 Search/Browse fallback 补配图。Gate 后 `resolve_draft_cta` / `resolve_draft_media` 出包。
 
 | 项 | 约定 |
 |---|---|
 | 入站 | 只 HTTP `/api/create`（写帖 P0 不考虑企业微信） |
 | 平台 | P0 固定 `x-twitter`。条数 = `post_count`（改写忽略，固定 1 条） |
-| 输入 | 主题或帖锚点、`account_key`、`need_trends`（前端传，默认 false）、可选 `force_intent` / `post_count` |
-| 分流 | 同一张 `COMPOSE_FLOW` 内 `when compose\|rewrite`，规则见写帖规格 §2.2 |
+| 输入 | 主题或帖锚点、`account_key`、`need_trends`（前端传，默认 false）、可选 `post_count` / `session_id` |
+| 会话 | 模型 `activate_session(session_id=…)`；`task_id` 只追踪本单与日志路径 |
+| 分流 | 同一张 `COMPOSE_FLOW` 内 `when compose\|rewrite\|PACKAGE`；每单走 `route_intent` + `normalize_route_intent`，见写帖规格 §2.2 |
+| Intel | `need_trends=false` 且无 URL/handle → 0 次 TikHub ReAct；宿主 `_ensure_material_media` 可采配图。`need_trends=true` → 离开 M3 前必有 trending |
+| CTA | Brief/Draft 优先文字 CTA；Gate 内可含 `[[cta:N]]`；出包前展开为 `offered_cta_urls[N]`，正文不出现占位符 |
 | 产出 | 图文草稿包 `completed \| partial \| failed`，不发送 |
 
 ### 3.2 评论回复 reply
@@ -134,9 +137,11 @@ flowchart LR
 写帖 `COMPOSE_FLOW` 的分流、TikHub ReAct、`when` 汇合以 [MatrixCopilot-推文创作技术方案.md](./MatrixCopilot-推文创作技术方案.md) 为准，**不要按下面旧线性图实现创作**。回评骨架仍如下。
 
 ```text
-COMPOSE_FLOW  → 见写帖规格：route emit compose|rewrite
-               → collect emit WRITE(list) → for_each Draft+Gate → Review → Package
-               → 失败 emit PACKAGE，跳过 for_each
+COMPOSE_FLOW  → compose_init → compose_route
+               → when compose: intel 子流 → originaltweet 子流（brief → for_each draft+gate → review → package）
+               → when rewrite: source 子流 → rewritetweet 子流
+               → when PACKAGE: 失败/早退 package
+               → 详见写帖规格 §2、§3
 
 REPLY_FLOW
     → 快照（硬规则 / 品牌 / 评论卡片）
@@ -189,7 +194,7 @@ P0 不拆独立 `run_matrix.py`。客户端不直连 TaskService。附件仍钉 
 | 节点 | 所有者 | 决策 | 拆开原因 |
 |---|---|---|---|
 | snapshot | 宿主 | 签发 brand / platform / policy / comment 短 key | 无快照不得开写 |
-| fetch_trends / TikHub | 宿主 Confirm + `fetch`；trending 看 `need_trends`；其余 method/params 由模型 Thought | 写帖见创作规格 §5.5。回评无此节点 | 新观察必须先成卡片 |
+| fetch_trends / TikHub / Intel | 宿主 Confirm + `fetch`；`matrix-compose-intel-react`；trending 看 `need_trends`；无 ReAct 时 Search/Browse 补配图 | 写帖见创作规格 §3.3、§5.5。回评无此节点 | 新观察必须先成卡片 |
 | compose_brief / reply_brief | ModelRequest | 按平台或按评论拆 work_items | 入口已绑定场景；Brief 不分类 |
 | retrieve_cases | Action + 宿主投影 | 检索案例，签发 offered refs | 各自 Brief 之后的新观察；空结果标 empty |
 | compose_draft[*] / reply_draft[*] | ModelRequest | 评理、正文、引用；回复另裁 decision | 项间可并行；skip ⇒ 空正文 |
@@ -227,7 +232,7 @@ Brief 不是入口表单，也不做场景分类。它是本套 Flow 里、快�
 
 | 产物 | 消费者 | 缺失或触线 |
 |---|---|---|
-| 趋势卡片 | compose Brief | 抓取失败则无爆款继续写，limitation 记一笔 |
+| 趋势/素材卡 | compose Brief | 抓取或 fallback 失败记 limitation，仍可写；纯主题可无 TikHub 但有 Search/Browse 配图 |
 | work_items[*] | RAG 查询与 draft fan-out | 无工作项 → 任务 failed |
 | offered refs | draft.info | empty 时该引则降级，禁止编法条 |
 | rationale / decision | Gate 与运营 | 无评理不得出正文 |
@@ -351,7 +356,7 @@ P0 使用设计夹具，例如 `data/matrix/cases/x-twitter.json`（12 条 Twitt
 | account_key / brand_key | 矩阵账号人设 |
 | need_trends | 仅 compose；前端传。true 才打 `fetch_trending`。reply 携带则忽略 |
 | post_count | 仅 compose；1–10。省略则模型在平台上限内决定。改写忽略 |
-| force_intent | 仅 compose 可选；纠错分流。不另开 scenario |
+| session_id | 宿主对话 id，与 Agently Session 相同；每单可新分配以隔离记忆 |
 | comments[] | 仅 reply；compose 请求携带则 422。省略则用 text 签发一条评论 |
 | requester / channel | 审计，不进模型身份 |
 
@@ -359,9 +364,9 @@ Gateway 纯文本落到 matrix 时绑定 `COMPOSE_FLOW`。回评走 HTTP `commen
 
 ### 8.2 TaskResult
 
-- `status`：`completed` \| `partial` \| **`failed`（写帖签发失败必须用 failed，见写帖规格 §7.6）**
+- `status`：`completed` \| `partial` \| **`failed`**（写帖签发失败、改写无原文等必须用 `failed`，见写帖规格 §7.6、§8）
 - `task_type`：`compose_post` \| `reply_comment`（由所跑 Flow 决定，禁止 `mixed`）
-- 写帖包另含 `intent`、`drafts[].media[]`（`preview_url`）。回评包不含媒体字段。其余字段以所跑 Flow 的契约为准。
+- 写帖包另含 `intent`、`drafts[].media[]`（`preview_url`）、`material_cards`。出包 `drafts[].text` 不含 `[[cta:…]]` / `[[media:…]]` 占位符。回评包不含媒体字段。其余字段以所跑 Flow 的契约为准。
 
 ### 8.3 HTTP 与 SSE
 
@@ -385,10 +390,10 @@ SSE：`task.submitted`、`stage.*`、`work_item.ready`、`draft.ready`、一次 
 
 | 请求 | input | info | 必填输出 | 宿主验收 |
 |---|---|---|---|---|
-| tikhub_react | 用户原文 | need_trends、候选、观察、allowlist | thought、next、method、params | Confirm 不过不 HTTP |
-| compose_brief | 用户原文、渠道 | offered 平台卡片、品牌摘要、约束卡片、可选趋势/对标卡 | normalized_brief、requirements、work_items | id 唯一；覆盖完整；`platform_key` ∈ offered |
-| compose_draft | 单条 work_item、平台上限 | 人设、政策、offered refs；改写另含 source_* | stance_assessment、draft_text、rationale、evidence_ids | 引用合法；不得输出 `reply_decision` |
-| compose_review | brief + 已校验草稿 | 同一 snapshot；改写另含 source_post | item_verdicts、package_summary、limitations | draft_key ∈ 已有；revise 再过 Gate |
+| tikhub_react | 用户原文 | need_trends、候选、观察、allowlist | thought、next、method、params | Confirm 不过不 HTTP；纯主题可跳过 ReAct |
+| compose_brief | 用户原文、渠道 | offered 平台卡片、品牌摘要、约束卡片、M3 素材/趋势卡 | normalized_brief、requirements、work_items | id 唯一；文字 CTA，不写 `[[cta:0]]` |
+| compose_draft | 单条 work_item、平台上限 | 人设、政策、offered refs、offered_media；改写另含 source_* | stance_assessment、draft_text、rationale、evidence_ids | Gate 后可含占位符；出包前 resolve |
+| compose_review | brief + 已校验草稿 | 同一 snapshot；改写另含 source_post | item_verdicts、package_summary、limitations | draft_key ∈ 已有；revise 再过 Gate + resolve |
 
 **REPLY_FLOW**
 
@@ -408,42 +413,28 @@ SSE：`task.submitted`、`stage.*`、`work_item.ready`、`draft.ready`、一次 
 
 ```text
 integrated_agent/runtimes/matrix/
-  __init__.py
   compose/                  # 写帖
-    flow.py
-    pipeline.py
-    client.py               # Gateway 只走写帖
-    worker.py               # 队列侧写帖入口
+    flow.py init.py route.py
+    intel.py source.py brief.py
+    originaltweet.py rewritetweet.py
+    draft_gate.py draft_media.py review.py
+    package.py material.py rewrite_plan.py
+    client.py worker.py
   reply/                    # 回评
-    flow.py
-    pipeline.py
-    worker.py               # 队列侧回评入口
+    flow.py pipeline.py worker.py
   kb_chat/                  # 召回聊天
-    flow.py
-    pipeline.py
+    flow.py pipeline.py
   rag/                      # 知识库 RecordStore 与文档门面
-    kb_store.py
-    knowledge.py
-  host/                     # 共用宿主：快照、硬门、案例、目录、身份、队列
-    models.py
-    snapshots.py
-    constraints.py
-    retrieval.py
-    drafting.py
-    catalog.py
-    trace_log.py
-    identity.py
-    service.py
-    stores.py
-    worker.py
+    kb_store.py knowledge.py
+  host/                     # 共用宿主
+    models.py snapshots.py constraints.py
+    retrieval.py drafting.py
+    service.py stores.py worker.py trace_log.py
     db/
 integrated_agent/transports/http/matrix_api.py
 integrated_agent/bootstrap/matrix_service.py
 data/matrix/
-  accounts.yaml
-  platforms.yaml
-  policy_terms.yaml
-  templates.yaml
+  accounts.yaml platforms.yaml policy_terms.yaml templates.yaml
   cases/x-twitter.json
 ```
 

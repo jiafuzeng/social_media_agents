@@ -16,6 +16,7 @@ async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     request = MatrixTaskRequest.model_validate(payload["request"])
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     await data.async_set_state("request", request.model_dump(mode="json"), emit=False)
+    await data.async_set_state("need_trends", bool(request.need_trends), emit=False)
     await data.async_set_state("limitations", [], emit=False)
     await data.async_set_state("drafts", [], emit=False)
     await data.async_set_state("evidence_cards", [], emit=False)

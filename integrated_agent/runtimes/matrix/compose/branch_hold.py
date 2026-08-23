@@ -347,8 +347,15 @@ async def compose_branch_hold(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                 "limitations": limitations,
             },
         )
-    print(package)
     return package
 
 
-__all__ = ["compose_branch_hold"]
+# compose_branch_hold 未接入 COMPOSE_FLOW；helpers 仍供 intel / rewrite / tests 使用。
+__all__ = [
+    "_append_evidence",
+    "_collect_upstream",
+    "_media_links_from_raw",
+    "_normalize_branch_context",
+    "_normalize_compose_cards",
+    "compose_branch_hold",
+]

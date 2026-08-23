@@ -34,7 +34,8 @@ class InMemoryTaskStore:
         return await self._replace(task_id, status="running")
 
     async def complete(self, task_id: str, result: MatrixTaskResult) -> TaskSnapshot:
-        return await self._replace(task_id, status="completed", result=result)
+        snap_status = "failed" if result.status == "failed" else "completed"
+        return await self._replace(task_id, status=snap_status, result=result)
 
     async def fail(self, task_id: str, error: str) -> TaskSnapshot:
         return await self._replace(task_id, status="failed", error=error)

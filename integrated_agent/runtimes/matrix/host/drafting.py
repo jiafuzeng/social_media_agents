@@ -34,6 +34,10 @@ async def retrieve_and_gate_draft(
     knowledge: Any | None = None,
     user_id: str | None = None,
     embedding_profile_id: str | None = None,
+    extra_info: dict[str, Any] | None = None,
+    offered_cta_urls: list[str] | None = None,
+    offered_media_keys: list[str] | None = None,
+    source_text: str = "",
 ) -> tuple[GatedDraft, list[dict[str, Any]], list[str]]:
     query = RetrieveQuery(
         work_item_id=work_item.work_item_id,
@@ -123,6 +127,8 @@ async def retrieve_and_gate_draft(
         info["account"] = snapshot.account.model_dump(mode="json")
     if snapshot.interaction is not None:
         info["interaction"] = snapshot.interaction.model_dump(mode="json")
+    if extra_info:
+        info.update(extra_info)
     draft = await draft_once(
         work_item=work_item.model_dump(mode="json"),
         info=info,
@@ -174,6 +180,9 @@ async def retrieve_and_gate_draft(
         retrieval_state=retrieved.state,
         templates=[item.model_dump(mode="json") for item in snapshot.templates],
         rewrite_once=rewrite_once,
+        offered_cta_urls=offered_cta_urls or [],
+        offered_media_keys=offered_media_keys or [],
+        source_text=source_text,
     )
     cited = [
         token

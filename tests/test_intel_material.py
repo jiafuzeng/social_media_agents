@@ -1,23 +1,73 @@
+from __future__ import annotations
+
 from integrated_agent.runtimes.matrix.compose.intel import (
+    _has_url_or_handle_candidate,
     _normalize_material_card,
-    _pad_plan_tasks,
-    _tasks_from_plan,
+    _normalize_trending_country,
     _tweet_cards_from_materials,
+    confirm_intel_tool,
 )
 
 
-def test_tasks_from_plan_respects_post_count() -> None:
-    raw = [{"task_id": f"m{i}", "goal": f"主题{i}"} for i in range(1, 6)]
-    tasks = _tasks_from_plan(raw, max_tasks=3)
-    assert len(tasks) == 3
-    assert tasks[0]["goal"] == "主题1"
+def test_gate_skips_pure_theme_without_trends() -> None:
+    assert not _has_url_or_handle_candidate(
+        source_kind="none",
+        source_anchor="",
+        text="为秋季上新写预热稿",
+    )
 
 
-def test_pad_plan_tasks_fills_to_post_count() -> None:
-    tasks = _pad_plan_tasks([{"task_id": "m1", "goal": "已有任务"}], post_count=3, user_instruction="秋季上新")
-    assert len(tasks) == 3
-    assert tasks[0]["goal"] == "已有任务"
-    assert "角度 3" in tasks[2]["goal"]
+def test_gate_opens_on_handle_or_url() -> None:
+    assert _has_url_or_handle_candidate(
+        source_kind="handle",
+        source_anchor="demo",
+        text="",
+    )
+    assert _has_url_or_handle_candidate(
+        source_kind="none",
+        source_anchor="",
+        text="参考 https://x.com/demo/status/1234567890123456789 自己写",
+    )
+    assert _has_url_or_handle_candidate(
+        source_kind="none",
+        source_anchor="",
+        text="看看 @matrix_demo 的风格",
+    )
+
+
+def test_confirm_rejects_trending_when_disabled() -> None:
+    args, err = confirm_intel_tool(
+        "fetch_trending",
+        {},
+        need_trends=False,
+        allowlist={"fetch_trending", "fetch_search_timeline"},
+    )
+    assert args is None
+    assert "trending_disabled" in err
+
+
+def test_confirm_defaults_trending_country() -> None:
+    args, err = confirm_intel_tool(
+        "fetch_trending",
+        {},
+        need_trends=True,
+        allowlist={"fetch_trending"},
+    )
+    assert err == ""
+    assert args == {"country": "China"}
+    assert _normalize_trending_country("china") == "China"
+
+
+def test_confirm_search_defaults_latest() -> None:
+    args, err = confirm_intel_tool(
+        "fetch_search_timeline",
+        {"keyword": "秋季上新"},
+        need_trends=False,
+        allowlist={"fetch_search_timeline"},
+    )
+    assert err == ""
+    assert args is not None
+    assert args["search_type"] == "Latest"
 
 
 def test_normalize_material_card_preserves_media_links() -> None:

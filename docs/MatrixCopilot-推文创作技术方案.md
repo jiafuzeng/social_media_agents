@@ -8,20 +8,20 @@
 | Runtime | `matrix` |
 | 写帖入口 | `POST /api/create` → `scenario=compose` → 一张 [`COMPOSE_FLOW`](../integrated_agent/runtimes/matrix/compose/flow.py) |
 | 回评入口 | `POST /api/reply` → `REPLY_FLOW`（本文不展开） |
-| 文档日期 | 2026-08-21 |
-| 版本 | **v1.0 定版** |
+| 文档日期 | 2026-08-21（M2 分流对齐现网：2026-08-23） |
+| 版本 | **v1.0 定版**（M2 以 §2.2 现网实现为准） |
 | 归档状态 | **P0 写帖规格已冻结**。创作/改写落地以本文为准。回评仍以 [MatrixCopilot-项目方案.md](./MatrixCopilot-项目方案.md) 为准 |
 | P0 终态 | 过硬门的草稿包。改写带可展示媒体（TikHub `media_url_https`）；创作允许无图。不发送 |
 | P0 入站 | **只 HTTP** `/api/create`。本文不考虑企业微信 |
 
-现网骨架：[`compose/flow.py`](../integrated_agent/runtimes/matrix/compose/flow.py) 为 `prelude → brief → for_each(retrieve_and_compose_draft) → review`。落地是把下列模块接到这些工位，并在图上增加一层 `when("compose"|"rewrite")`，不是另起执行链。
+现网骨架：[`compose/flow.py`](../integrated_agent/runtimes/matrix/compose/flow.py) 为 `compose_init → compose_route → when("compose"|"rewrite")` 分叉；创作支 `intel → originaltweet`，改写支 `source → rewritetweet`，失败支 `PACKAGE`。
 
 ### 0. 拍板清单（归档）
 
 | 题 | 拍板 |
 |---|---|
 | 入口 | 创作与改写共用 `POST /api/create` + 一张 `COMPOSE_FLOW`。不新开 `/api/rewrite` |
-| 分流 | 宿主规则为主；仅「一条帖链接 + 主题指令」才 `route_intent`。`force_intent` 纠错 |
+| 分流 | **每次请求**走模型 `matrix-compose-route-intent`（[`compose/route.py`](../integrated_agent/runtimes/matrix/compose/route.py)）；宿主仅 `normalize_route_intent` 后处理（[`retrieval.py`](../integrated_agent/runtimes/matrix/compose/retrieval.py)）。**不用**候选机判短路、**不用** `force_intent` |
 | 趋势 | **`need_trends` 前端传参**（默认 false）。true 才打 trending；离开 M3 前宿主可补 1 次 |
 | 填参 | search keyword / 对标 handle 归模型 Thought。Confirm 机器校验，无 HITL |
 | 改写 | 硬条件只有原文 `source_post`。作者卡、时间线可空 |
@@ -30,10 +30,10 @@
 | 图文 | 改写图在 `package.drafts[].media[].preview_url`。创作允许 `media=[]` |
 | CTA | 唯一增长行动。渠道 URL ∈ `offered_cta_urls`。P0 不做 SearchWeb |
 | 汇合 | `emit("WRITE", work_items)` 进 `for_each`；失败 `emit("PACKAGE")`。改写 `rw1` 同形状 |
-| 会话 | 模型 session = `task_id`。P0 不查历史稿、不发送、不考虑企业微信 |
+| 会话 | 模型 session = `session_id`（HTTP 入参 → `activate_session`）。`task_id` 只追踪本单。P0 不查历史稿、不发送、不考虑企业微信 |
 | ReAct | 宿主有界 while；一跳一个 call。创作 ≤8 次 Thought；改写 ≤3 次 HTTP |
 
-P1（明确不做，不算本文遗漏）：工作台「刷新素材」独立入参、跨任务日预算、SearchWeb、按 `source_draft_key` 查库、发送、出图、企业微信 `force_intent`。
+P1（明确不做，不算本文遗漏）：工作台「刷新素材」独立入参、跨任务日预算、SearchWeb、按 `source_draft_key` 查库、发送、出图、企业微信、`force_intent` 纠错入参。
 
 ---
 
@@ -80,43 +80,59 @@ Transport 现网仍把 `/api/create` 写死为 `scenario=compose`（[`task_api.p
 
 两条获客路径共用一个写帖入口、一张写帖 TriggerFlow。回评仍是现网 `/api/reply` + `REPLY_FLOW`，与写帖分流无关。
 
-分流是图上的边：M2 之后 `when("compose"|"rewrite")` 进入不同的 M3/M4，再汇合到同结构的 M5–M7。**M4 Brief 仍然不分类。** 有 URL 不等于改写。能用宿主规则确定时跳过意图模型。分叉必须 `flow.when(...).to(...)`。
+分流是图上的边：M2 之后 `when("compose"|"rewrite")` 进入不同的 M3/M4，再汇合到同结构的 M5–M7。**M4 Brief 仍然不分类。** 现网 M2 **总是**调用意图模型，不做链接/候选抽取前的机判短路。分叉必须 `flow.when(...).to(...)`。
 
 ```text
-M1 Snapshot → M2 Route
+M1 Snapshot → M2 Route（compose_route）
   when compose → M3 Intel → M4 Plan(brief) → M5 Write → M6 Review → M7 Package
   when rewrite → M3 Source → M4 Plan(host卡) → M5 Write → M6 Review → M7 Package
+  when PACKAGE → M7 Package（路由 Agent 异常等）
 ```
 
-### 2.1 `route_intent` 输出
+### 2.1 `route_intent` 模型出参
 
-禁止无消费者字段。字段仅此：
+Agent `matrix-compose-route-intent` 结构化输出，经 `RouteIntentOut` 校验后再过宿主 `normalize_route_intent`：
 
-| 字段 | 取值 |
+| 字段 | 取值 / 说明 |
 |---|---|
+| `reason` | 判定理由，须引用原文线索 |
 | `intent` | `compose` \| `rewrite` |
 | `source_kind` | `paste` \| `url` \| `tweet_id` \| `handle` \| `prior_draft` \| `none` |
-| `source_anchor` | id / url / handle / 正文起止，或空 |
-| `user_instruction` | 去掉原文后剩下的指令，可空 |
-| `confidence` | `high` \| `low` |
+| `source_anchor` | `tweet_id` 或 handle；没有则空 |
+| `user_instruction` | 去掉原文/链接后的任务说明 |
+| `source_text` | 粘贴原文；非 paste 留空 |
+| `search_query` | 检索实体/主题（如「特朗普」）；不含「改口吻」等任务说明 |
+| `confidence` | `high` \| `low`（现网**不**因 `low` 整单 failed） |
 
-不得发明未出现的 `tweet_id`。存在 `force_intent` 时本节点不跑。
+instruct 要求不得发明原文未出现的 `tweet_id` / handle。典型分工：纯主题 → `compose`；改帖/粘贴/「先查最新动态再写」→ `rewrite`；「对标结构自己写」→ `compose`。
 
-### 2.2 宿主规则（路由主人）
+### 2.2 现网 M2 实现（[`compose/route.py`](../integrated_agent/runtimes/matrix/compose/route.py)）
 
-可机判。候选 = 帖链接/id、handle。**主题指令** = 去掉链接/id/handle 后剩下的非空文本。不靠「像不像推文」的长度或句号猜测。
+**Do**
 
-1. `force_intent` 最高优先。
-2. 无候选 → `compose`，不打意图模型。
-3. 无帖链接/id → **默认创作**（整段主题也是创作）。只有 `force_intent=rewrite` 才把无 id 文本当原文（`source_unresolved`，无图）。
-4. 恰好一条 `/status/{id}` 或显式 `tweet_id`，且没有主题指令 → `rewrite`，不打意图模型。
-5. 恰好一条帖链接/id，且还有主题指令 → 才跑 `route_intent`（对标自己写 vs 改口吻）。锚点必须来自候选，不得发明 id。`confidence=low` → 整单 `failed`，请带 `force_intent`。
-6. 多条帖链接/id → `failed`，请指定一条。
-7. 只给 handle、没有正文或帖链接 → `failed`。不自动钉赞最高/置顶。
-8. `intent=rewrite` 且签发成功才进改写支。抽得出 `tweet_id` 则走适配器（详情缓存 24h）。抽不出 id 的改写只改文案。
-9. 签发失败 → 同一形状 package、`status=failed`，不滑回创作。
-10. 「改这一条」：`force_intent=rewrite` + **本次请求里的稿正文**。P0 不按 `source_draft_key` 查历史。
-11. SSE 尽早带上本次 `intent`。P0 HTTP `ComposeHttpIn`：`text`、`account_key`、`need_trends`（默认 `false`）、可选 `post_count` / `force_intent` / `session_id` / `embedding_profile_id`。**是否打趋势由前端传参决定**。`source_kind=prior_draft` 枚举保留，P0 路由不按它查库。不考虑企业微信。工作台「刷新素材」**P1**，P0 无 `force_refresh` 入参。
+1. 读 `request.text`，调用 `matrix-compose-route-intent`（session = 工作台 `session_id`）。
+2. `RouteIntentOut.model_validate` → `normalize_route_intent(..., request_text=text)`（[`retrieval.py`](../integrated_agent/runtimes/matrix/compose/retrieval.py)）：
+   - 用 `extract_search_query` 从 `search_query` / `user_instruction` / 原文补检索词。
+   - 模型判 `compose` 但原文含「最新动态/查找/搜索…」类 hint 且已有 `search_query` → **升为** `rewrite`。
+   - 短 handle（≤8 字符）且已有 `search_query` → `source_kind=none`、清空 `source_anchor`（避免 `trump` 撞号，改按主题搜）。
+   - 模型判 `rewrite`、需检索但缺 `search_query` → 再从原文抽一次。
+3. 写入 state：`intent`、`source_kind`、`source_anchor`、`user_instruction`、`source_text`、`search_query`。
+4. `emit(intent)` → 图分叉 `when("compose")` / `when("rewrite")`。
+
+**失败**
+
+- Agent 抛错 → `package.status=failed`、`limitations` 含 `route_intent_error:*`、`emit("PACKAGE")`。不滑回创作。
+
+**现网不做（旧规格 §2.2 宿主机判，未落地）**
+
+- 不做候选抽取（url/tweet_id/handle 列表）与「无候选必 compose / 纯链接必 rewrite」短路。
+- 不因多条链接、仅 handle、低置信而 **failed**；这些情形交给模型 + 下游 M3 Source 处理。
+- `MatrixTaskRequest.force_intent` 字段存在，**route 未读取**；HTTP `ComposeHttpIn` 亦未暴露。
+- 无「改这一条」专用路由；工作台应把稿正文写进 `text`，由模型判 `paste` / `rewrite`。
+
+**HTTP 入站（写帖）**
+
+`text`、`account_key`、`need_trends`（默认 `false`）、可选 `post_count` / `session_id` / `embedding_profile_id`。是否打趋势由前端传参决定。P0 无 `force_refresh`。
 
 ### 2.3 禁止
 
@@ -129,19 +145,17 @@ M1 Snapshot → M2 Route
 - P0 把 `rewrite_safe` / reflect 画成独立 `when` 却仍塞在一个 chunk 里
 - 把回评并进这张图
 
-### 2.4 对照
+### 2.4 对照（期望行为；实际支路由模型 + normalize 决定）
 
-| 用户输入 | 支路 |
+| 用户输入 | 期望支路 / 说明 |
 |---|---|
-| 「下周发布，写 3 条获客帖」 | 创作 |
-| 「对标这条的结构自己写 https://x.com/...」 | 创作（链接进 `tweet_card`） |
-| 「把下面改成我们口吻：…」或只贴一条带 `/status/{id}` 的推文 | 改写 |
-| 「下周发布写 3 条」且没有帖链接 | 创作（即使很长） |
-| 「改成我们的口吻 https://x.com/i/status/…」 | 改写（先拉详情） |
-| 「把 @foo 置顶改成我们的」但没贴帖 | `failed`（请给链接或正文） |
-| 「看看 @foo 最近怎么写，给我们出一组」 | 创作（handle 进候选；模型 Thought 决定是否拉 profile/时间线） |
-| 走错支后带 `force_intent` 再提交 | 按明示走 |
-| 「改这一条」 | `force_intent=rewrite` + 本次贴回的稿正文 |
+| 「为秋季上新写预热稿」 | 创作（纯主题） |
+| 「对标这条的结构自己写 https://x.com/...」 | 创作（instruct 偏 compose；链接供 Intel 参考） |
+| 「改成我们口吻 https://x.com/.../status/…」 | 改写（`source_kind=url`，M3 Source 拉详情） |
+| 「查找特朗普最新动态，创作推文」 | 改写（normalize 常把 compose 升为 rewrite，`search_query=特朗普`） |
+| 只贴一条带 `/status/{id}` 的推文 | 通常改写（取决于模型） |
+| 把稿正文贴回 `text` 要求改写 | 改写（`source_kind=paste`，`source_text` 填正文） |
+| 仅 `@handle`、无帖链接 | **不**在 M2 failed；模型可能判 compose/rewrite，改写支 Source 仍可能 limitation |
 
 ### 2.5 改写硬边界
 
@@ -184,17 +198,16 @@ state 只在模块 commit 时写入完整对象。下一模块只读已提交 ke
 | `text` | 是 | 主题、帖链接、或改写指令+正文 |
 | `account_key` | 是 | 人设 |
 | `need_trends` | 否，默认 false | 前端传。true 才打 trending |
-| `session_id` | 是 | 工作台会话；模型 session 用 `task_id` |
+| `session_id` | 是 | 工作台会话；各 ModelRequest 用同一值 `activate_session(session_id=...)` |
 | `post_count` | 否 | 1–10；省略由 Brief 在 `max_posts` 内决定。改写忽略 |
-| `force_intent` | 否 | `compose` \| `rewrite` |
 | `embedding_profile_id` | 否 | 仅手册检索 |
 
 | 模块 | 所有者 | 读（入参） | 写（出参 / emit） |
 |---|---|---|---|
 | **M1 Snapshot** | 宿主 | `account_key` | `runtime_resources.snapshot`（人设/护栏/平台/词表/`offered_cta_urls`）。未知人设 → 本单 failed |
-| **M2 Route** | 宿主；必要时模型 `route_intent` | `text`、`force_intent`、snapshot | state `intent`、`candidates`（url/tweet_id/handle）。成功 `emit("compose"\|"rewrite")`；只 handle / 多锚点 / 低置信 → `package.status=failed` 并 `emit("PACKAGE")` |
-| **M3 Intel** 创作 | 模型 `tikhub_react` + 宿主 Confirm/fetch | `text`、`need_trends`、`candidates`、预算 | `tweet_cards[]`、`trend_cards[]`、`limitations[]`（均可空）。不写正文 |
-| **M3 Source** 改写 | 同上 | `text`、`candidates.tweet_id`（宿主解析） | **必有** `source_post`；`source_media[]`、`author_card`、`related_tweet_cards[]` 可空；`limitations[]`。无原文且无粘贴 → failed + `emit("PACKAGE")` |
+| **M2 Route** | 模型 `route_intent` + 宿主 `normalize_route_intent` | `text`、snapshot | state `intent`、`source_kind`、`source_anchor`、`user_instruction`、`source_text`、`search_query`。成功 `emit("compose"\|"rewrite")`；Agent 异常 → `emit("PACKAGE")` |
+| **M3 Intel** 创作 | 模型 `matrix-compose-intel-react` + 宿主 Confirm/fetch；无 ReAct 时 Search/Browse fallback | `text`、`need_trends`、`user_instruction`、路由 anchor | `material_list[]`（可含配图）、`tweet_cards[]`、`trend_cards[]`、`limitations[]`。不写正文 |
+| **M3 Source** 改写 | 同上 | `text`、路由写回的 `source_kind` / anchor / `source_text` / `search_query` | **必有** `source_post`；`source_media[]`、`author_card`、`related_tweet_cards[]` 可空；`limitations[]`。无原文且无粘贴 → failed + `emit("PACKAGE")` |
 | **M4 Brief** 创作 | 模型 `compose_brief` | `text`、snapshot、M3 卡、`post_count` | `brief`：`normalized_brief`、`requirements[]`、`work_items[]`（`WorkItem` 形状）。看不见 `source_post` |
 | **M4 HostPlan** 改写 | 宿主，无模型 | `source_post`、`source_media`、`offered_cta_urls`、指令 | `rewrite_plan_card`（`media_choice`、`cta_url`、`source_issues`）+ `work_items=[rw1]`（与创作同形状） |
 | **collect** | 宿主 | `work_items[]` | 合法列表 → `emit("WRITE", work_items)`；空/失败 → `emit("PACKAGE")` |
@@ -202,9 +215,9 @@ state 只在模块 commit 时写入完整对象。下一模块只读已提交 ke
 | **M6 Review** | 模型 `compose_review` | 创作：brief+全部 GatedDraft；改写：另加 `source_post`/`source_media`/`author_card` | 一次替换完整 `drafts[]`；`package_summary`；`limitations[]`。不得回抬 skip/template |
 | **M7 Package** | 宿主 | `intent`、`drafts[]`、`limitations[]`、`source_media`（改写） | `package`：`status`、`intent`、`summary`、`limitations`、`drafts[]`（含 `media[]`）。P0 不发送 |
 
-**`route_intent` 出参（仅 M2 在规则不能确定时）**
+**`route_intent` 出参（M2 模型 + normalize 后写入 state）**
 
-`intent`、`source_kind`、`source_anchor`、`user_instruction`、`confidence`
+`reason`、`intent`、`source_kind`、`source_anchor`、`user_instruction`、`source_text`、`search_query`、`confidence`
 
 **`tikhub_react` 每跳（M3 内部）**
 
@@ -258,19 +271,19 @@ when("PACKAGE").to(package)          # 不再 for_each
 - 反思：未知人设 fail-closed。
 - 原子提交：runtime_resource `snapshot` 一次绑定，本单只读。
 
-### 3.2 M2 Route（宿主规则 + 偶尔模型）
+### 3.2 M2 Route（模型 + normalize）
 
-- Plan：抽出候选；决定要不要打意图模型。
-- Do：见 §2.2。
-- 反思：校验枚举、锚点必须来自候选。
-- 原子提交：`intent` 卡一次写入并 `emit`；SSE 报支路。可 `force_intent` 整单重跑纠错。
+- Plan：无独立 plan；整段 `text` 交给 `matrix-compose-route-intent`。
+- Do：见 §2.2。每次请求都打意图模型。
+- 反思：`normalize_route_intent` 修正检索型 compose、歧义 handle。
+- 原子提交：一次写入路由 state 并 `emit`；SSE 报支路。Agent 异常 → `emit("PACKAGE")`。
 
 ### 3.3 M3 Intel / Source（写稿前材料，不写正文）
 
 **创作 = Intel**：**打不打趋势由请求体 `need_trends` 决定（前端传参）。** 方法怎么调、search 的 keyword 仍由模型 Thought 填（§5.5），机器 Confirm，无 HITL。**P0 不做 SearchWeb**。
 
-- `need_trends=false` 且候选无 URL/handle → 不进外挂循环，空卡进 M4。
-- `need_trends=false` 但候选有 URL/handle → 进循环，allowlist **不含** `fetch_trending`。
+- `need_trends=false` 且候选无 URL/handle → **跳过 TikHub ReAct**（0 次 TikHub HTTP）。离开 M3 前宿主 `_ensure_material_media`：先宿主侧 `fetch_search_timeline(search_type=Media)`，仍无 `media_links` 则调 `matrix-compose-intel-task` + Search/Browse fallback（**不是** SearchWeb / `web_card`）。可得到带配图的 `material_list`，Brief 不必空卡。
+- `need_trends=false` 但候选有 URL/handle → 进 ReAct 循环，allowlist **不含** `fetch_trending`；finalize 时若推文无配图，同样走 `_ensure_material_media`。
 - `need_trends=true` → 进循环，allowlist 含 trending。离开 M3 前若还没打过 trending，宿主补 1 次 `fetch_trending(country=china)`（前端要了热搜，不能被模型 `stop` 掉）。
 - 改写 **不看** `need_trends`。
 
@@ -312,8 +325,9 @@ when("PACKAGE").to(package)          # 不再 for_each
 
 ```text
 when("compose") prelude
-  仅当 need_trends 或候选含 URL/handle
-  逐跳自动 ReAct；need_trends=true 则离开前必有 1 次 trending
+  仅当 need_trends 或候选含 URL/handle → TikHub ReAct
+  纯主题且 need_trends=false → 跳过 ReAct；宿主补采配图（Media 搜索 + Search/Browse）
+  need_trends=true → 离开前必有 1 次 trending
 when("rewrite") issue_source_post
   解析 tweet_id 失败 / t.co → 文本 source_post，不进 ReAct
   否则自动 ReAct：第一跳必须拿到原文 detail；之后模型可 stop
@@ -328,8 +342,14 @@ when("rewrite") issue_source_post
 
 **一条稿最多一个正文 URL**（媒体不占这个名额）
 
-- 创作：P0 无 `web_card`。正文若有链接，只能是快照 `offered_cta_urls` 里已签发的那一个（宿主渲染，模型写 `[[cta:0]]` 或直接不写链接、只写关注/置顶）。不要用网页预览冒充配图。
-- 改写：`[[media:m1]]` 表示包内带上这张图/视频，**不展开成正文 URL**。正文若还要一个链接，只能来自 `offered_cta_urls`。不能整段抄原文。
+**渠道链接（CTA）**（现网 [`draft_media.py`](../integrated_agent/runtimes/matrix/compose/draft_media.py) + [`draft_gate.py`](../integrated_agent/runtimes/matrix/compose/draft_gate.py)）：
+
+- 正文 URL 只认人设 `offered_cta_urls`（P0 无 `web_card`）。
+- Brief / Draft instruct：结尾只用**文字 CTA**（关注系列 / 点置顶 / 去官方渠道），**不要求**模型写 `[[cta:0]]` 或手写 https。
+- Gate 内：模型若仍输出 `[[cta:N]]`，校验下标 ∈ offered，字数按 23 计；未签发 https → 硬伤。
+- **出包前** `resolve_draft_cta` 把 `[[cta:N]]` **展开**为 `offered_cta_urls[N]`。`package.drafts[].text` 不得仍含 `[[cta:…]]`。
+- 媒体：`[[media:m*]]` 由 `resolve_draft_media` 剥掉，写入 `draft.media[]`。不要用网页预览冒充配图。
+- 改写：`[[media:m1]]` 表示包内媒体，**不**展开成正文 URL；正文若还要链接，仍只认 `offered_cta_urls`。
 
 **改写 P0**：宿主拼 `rewrite_plan_card`（state 里），**再收成一条与创作同形状的 `WorkItem`**，供 `for_each` 使用。不单开 rewrite_plan 模型，**不改 WorkItem 字段表**。
 
@@ -363,17 +383,18 @@ M5 仍吃 `WorkItem`；改写额外读 `state.intent` + `rewrite_plan_card` + `s
 - Plan：吃本条 work_item / 改写计划卡。
 - ReAct：检索案例+手册（观察）→ Draft（行动）→ Gate（观察）→ 至多一次 `rewrite_safe`。写稿不调 TikHub，不发明未签发 https，不把 CDN 写进正文。
 - DAG：`for_each` 多条并行（现网 concurrency=10，与 `max_posts=10` 对齐）。
-- 反思：Gate 扫禁词、增长话术（求转/你怎么看/互关 → 硬伤）、标签 `#` 至多 1 个、字数（已签发正文 URL 按 X=23 计，禁止对展开后的 CDN/`len(url)`；先剥掉 `[[media:]]`）、未知引用、未知 https、`claim_types` ⊆ 计划、正文最多一个 URL 且必须 ∈ `offered_cta_urls`（或改写少见的已签发 `pic_tco`）。改写近重复：去掉 URL/空白后，与 `source_post` 连续重叠 ≥40 字则硬伤。`related_tweet_cards` **不喂全文**，只喂结构标签。
-- 原子提交：Gate 结束后才 append 完整 `GatedDraft`。skip/模板项不带媒体、不带外链。
-- 模型只写已签发短 key：创作可选 `[[cta:0]]`（∈ offered_cta_urls）；改写另允许 `[[media:m1]]`。宿主把 `[[media:]]` 从展示正文剥掉，写入 package 媒体字段。禁止手写任意 https，禁止把 jpg/mp4 展开进 280 字，禁止把创作支 tweet_card 的 `media_url_https` 当配图。
+- 反思：Gate 扫禁词、增长话术（求转/你怎么看/互关 → 硬伤）、标签 `#` 至多 1 个、字数（Gate 内 `[[cta:]]` 按 23 计、剥 `[[media:]]` 后计；禁止对展开后的 CDN/`len(url)` 裸计）、未知引用、未知 https、`claim_types` ⊆ 计划、正文最多一个 URL 且必须 ∈ `offered_cta_urls`（或改写少见的已签发 `pic_tco`）。改写近重复：去掉 URL/空白后，与 `source_post` 连续重叠 ≥40 字则硬伤。`related_tweet_cards` **不喂全文**，只喂结构标签。
+- 原子提交：Gate 通过后 `resolve_draft_cta` / `resolve_draft_media`，再 append 完整 `GatedDraft`。skip/模板项不带媒体、不带外链。
+- Gate 内可含 `[[cta:N]]` / `[[media:m*]]` 占位；出包 `text` 不含 `[[cta:…]]`，媒体进 `media[]`。禁止手写任意 https，禁止把 jpg/mp4 展开进 280 字，禁止把创作支 tweet_card 的 `media_url_https` 当配图。
 
 顺序已经在 [`drafting.py`](../integrated_agent/runtimes/matrix/host/drafting.py)，P0 **保持这一条 chunk**：
 
 1. RetrieveCases：query = platform + claim_types + goal → `hits|empty|failed`
 2. RetrieveKb：query = goal + talking_points；失败不 skip
-3. compose_draft：输出正文。创作只引用 `[[cta:0]]`（若有签发）。改写另允许一张 `[[media:]]`。不写 `image_prompt`，不把 `preview_url` 写进正文
-4. ConstraintGate：AC + 增长话术 + 标签数 + 字数（剥掉 media token 后计；已签发 URL 按 23）+ 引用；正文 URL 必须已签发；`claim_types` 超出计划则拒收；未知 `[[media:]]` fail-closed；改写近重复原文则拒收；`rewrite_safe` 一次（宿主计数）；硬伤 template 或 skip
-5. 收尾原子提交：仅此时 `append_state` 完整 `GatedDraft`；中间正文不进 state
+3. compose_draft：输出正文；优先文字 CTA。Gate 内可含 `[[cta:N]]` / `[[media:]]`，不写 `preview_url`
+4. ConstraintGate：AC + 增长话术 + 标签数 + 字数（Gate 内剥 media、CTA 按 23）+ 引用；正文 URL 必须已签发；`claim_types` 超出计划则拒收；未知 `[[media:]]` fail-closed；改写近重复原文则拒收；`rewrite_safe` 一次（宿主计数）；硬伤 template 或 skip
+5. resolve_draft_cta + resolve_draft_media：Gate 通过后展开 CTA、签发媒体（[`draft_media.py`](../integrated_agent/runtimes/matrix/compose/draft_media.py)）
+6. 收尾原子提交：仅此时 `append_state` 完整 `GatedDraft`；中间正文不进 state
 
 P1 若加 `draft_reflect`，放在步骤 3 与 4 之间，仍在本模块 commit 之前。案例 `failed` → 该项 skip。手册失败 → 继续写。空案例且主张需要引用 → 降级，禁止编 `e1`。
 
@@ -389,7 +410,7 @@ P1 若加 `draft_reflect`，放在步骤 3 与 4 之间，仍在本模块 commit
 
 - 看见：`source_post` + `source_media`（可空）+ `author_card`（可空）+ 已 Gate 草稿
 - 文案须相对原文明显改写（近重复阈值同 M5：连续 ≥40 字则硬伤，走一次 revise）
-- 媒体只许本单已签发 `[[media:]]`；官方渠道只许 `offered_cta_urls` 已签发下标。二者可同时出现（图在包里、渠道在正文）。不得引用 `related_tweet_cards` 的媒体
+- 媒体只许本单已签发 `[[media:]]`；官方渠道只许 `offered_cta_urls`。revise 后 `re_gate` 同样走 `resolve_draft_cta`。二者可同时出现（图在包里、渠道在正文）。不得引用 `related_tweet_cards` 的媒体
 - 不得回抬 skip / `template_fallback`
 
 原子提交：一次替换完整 `drafts`。验收包内媒体字段能否展示，不把网页预览当图。
@@ -465,7 +486,7 @@ CTA 与正文 URL：
 
 ## 5. 联网与 TikHub
 
-「从网上搜需要的元素」和「对接第三方拉推文」都是 **新观察**，必须先校验成短卡，再进 Brief/Draft。不复用通用 Agent 的 Search/Browse 工具环（那是 `agent` runtime）。TikHub **不是**活的 ExecutionResource：每一跳 Act 自己建客户端、用完 `close()`。
+「从网上搜需要的元素」和「对接第三方拉推文」都是 **新观察**，必须先校验成短卡，再进 Brief/Draft。TikHub ReAct **不**把通用 Search/Browse 挂进模型 Action 列表（那是 `agent` runtime）。**例外**：创作 Intel 在 TikHub 无配图时，宿主 deterministic 调 `matrix-compose-intel-task` + Search/Browse 补 `media_links`（仍不签发 `web_card`）。TikHub **不是**活的 ExecutionResource：每一跳 Act 自己建客户端、用完 `close()`。
 
 ### 5.1 两套能力、两套卡片
 
@@ -636,7 +657,7 @@ TTL 按方法（读时比较 `fetched_at`）：
 
 列表命中 1h 缓存后，投影仍要再滤保护期（缓存里可能混进已过期帖）。
 
-这是宿主确定性工作，不把 `twitter_web.*` 注册成模型可调 Action，不走通用 Search/Browse。调用形态是 §5.5 ReAct：模型或剧本只提出 method+params，宿主确认后才 `fetch`。
+这是宿主确定性工作，不把 `twitter_web.*` 注册成模型可调 Action。TikHub 调用形态是 §5.5 ReAct：模型或剧本只提出 method+params，宿主 Confirm 后才 `fetch`。Search/Browse 仅作 Intel 配图 fallback，不走 ReAct allowlist。
 
 **Agently owner**
 
@@ -703,7 +724,7 @@ fetch(method, params):
 - 抽不出 id 的纯文本改写 **不调** Twitter-Web
 - 只给 handle 的改写不打时间线自动钉帖
 
-创作 prelude **仅当** `need_trends=true`，或候选已有 URL / handle。纯主题且前端未开趋势 → 空卡进 Brief，0 次 HTTP。不另开 `use_live_intel`。工作台「刷新素材」是 **P1**（独立入参 + 10 分钟冷却），不是 `need_trends`。`need_trends=true` 时离开 M3 前宿主保证 1 次 trending（模型没点则补打，`country=china`）。
+创作 prelude：**ReAct 仅当** `need_trends=true`，或候选已有 URL / handle。纯主题且 `need_trends=false` → **跳过 ReAct**（0 次 TikHub HTTP），宿主 `_ensure_material_media` 补采配图。不另开 `use_live_intel`。工作台「刷新素材」是 **P1**（独立入参 + 10 分钟冷却），不是 `need_trends`。`need_trends=true` 时离开 M3 前宿主保证 1 次 trending（模型没点则补打，`country=china`）。
 
 **强制刷新（P1）**：工作台「刷新素材」可绕过该方法 TTL，同一键 ≥10 分钟冷却。P0 无此入参。
 
@@ -728,10 +749,10 @@ rewrite source pack  — 原文够用即可 stop
 
 ```text
 prelude  — 趋势门闩=前端 need_trends；keyword 仍模型填
-  if not (need_trends or candidates_url_or_handle) → 空卡
-  loop (预算内):
+  if not (need_trends or candidates_url_or_handle) → 跳过 ReAct；宿主补采配图
+  else loop (预算内):
     模型 thought + {method, params} 或 stop
-    stop / 预算尽 → 若 need_trends 且本单还没 trending → 宿主补打 1 次 → 退出
+    stop / 预算尽 → _ensure_material_media → 若 need_trends 且本单还没 trending → 宿主补打 1 次 → 退出
     Confirm 失败 → 观察说明原因，模型自动再想（每跳最多 1 次重提）
     Confirm 通过 → fetch → observe → 下一跳
   → Brief（有卡用卡，无卡照写）
@@ -847,14 +868,14 @@ flowchart LR
 
 ### 7.1 `route_intent`
 
-仅当宿主规则不能确定时才跑。input 是 `text`；info 是候选。不得发明未出现的 tweet_id。`force_intent` 存在则本节点不跑。输出见 §2.1。
+**每次写帖请求都跑。** 实现：[`compose/route.py`](../integrated_agent/runtimes/matrix/compose/route.py) 内 Agent `matrix-compose-route-intent`；input 为 `request.text`；成功后经 [`normalize_route_intent`](../integrated_agent/runtimes/matrix/compose/retrieval.py) 再写 state。不得发明未出现的 tweet_id（instruct + 校验）。输出字段见 §2.1。
 
 ### 7.2 `compose_brief`
 
 - input：用户主题 `text`
 - info：人设（voice / pillars / must_* / audience / goals）、forbidden_topics 并集、平台卡（字数与 max_posts）、`offered_claim_types`、`offered_cta_urls`、tweet_cards、trend_cards 或 limitation。P0 **无** web_cards
 - 输出：`normalized_brief`、`requirements`、`work_items`
-- talking_points 对齐 pillars；可点名 `[[cta:0]]`；对标只借鉴形态，不抄句
+- talking_points 对齐 pillars；规划文字 CTA，不写 `[[cta:0]]` 或 https；对标只借鉴形态，不抄句
 - **看不见** `source_post`
 - 今日拆项：平台只有 `x-twitter`，条数由 `post_count`（省略则 1…max_posts）在该平台上限内扇出；`platform_key` 必须是快照里那一张
 - 以后目录出现多平台：work_item 覆盖 offered 平台集合；不在这一站发明互动或评论 key
@@ -864,7 +885,7 @@ flowchart LR
 
 输出 `stance_assessment`、`draft_text`、`rationale`、`evidence_ids`、可选 `proposed_degrade`。
 
-- 正文最多一个渠道链接。P0 无 `[[web:]]`；有 `offered_cta_urls` 时宿主可签发 `[[cta:0]]`（仅下标 0）。改写另可带一张 `[[media:]]`。
+- 正文最多一个渠道链接。P0 无 `[[web:]]`。Draft 优先文字 CTA；Gate 内可含 `[[cta:N]]`，出包前 `resolve_draft_cta` 展开为 `offered_cta_urls[N]`。改写另可带一张 `[[media:]]`（出包进 `media[]`）。
 - 改写 info 含 `source_post`（必有）、`source_media`（可空；模型只见 key/kind/尺寸）、`author_card` / `related_tweet_cards`（可空）。有相关帖才借鉴形态，不得写成第二原文，不得引用其媒体 key。
 - 功效类须案例 `[[ref:]]`。
 - 不得把 tweet_card 互动数写进正文；不得把 `preview_url` / 对标 `media_url_https` 写进正文。
@@ -913,8 +934,8 @@ package.drafts[]:
 
 | 角色 | 负责 |
 |---|---|
-| 宿主 | snapshot、候选抽取、路由规则、TikHub **机器** Confirm/Act/Observe、RecordStore、Retrieve*、文本 Gate、SSE、`when` emit。**不等人批参数** |
-| 模型 | `route_intent`（必要时）/ 每跳 `tikhub_react`（method+params）/ Brief / Draft / Review |
+| 宿主 | snapshot、TikHub **机器** Confirm/Act/Observe、RecordStore、Retrieve*、文本 Gate、`normalize_route_intent`、SSE、`when` emit。**不等人批参数** |
+| 模型 | `route_intent`（每单）/ 每跳 `tikhub_react`（method+params）/ Brief / Draft / Review |
 
 禁止：模型持有供应商 key；TikHub JSON 当案例 RAG；创作支把 tweet_card 媒体当本号配图；改写支引用未签发媒体、把 `preview_url` 写进正文、或整段抄原文；互动数当收益承诺；DIY 爬虫；Brief 做分类；`run_compose` 里另绑 Flow；流水线出图服务；用网页链接预览冒充配图。
 
@@ -923,7 +944,7 @@ package.drafts[]:
 | 情况 | 处理 |
 |---|---|
 | SearchWeb | P0 不做；不挡创作 |
-| need_trends=false 且无 URL/handle | 空卡进 Brief，0 次 HTTP |
+| need_trends=false 且无 URL/handle | 跳过 TikHub ReAct；宿主 Search/Browse fallback 可采配图；0 次 TikHub HTTP |
 | need_trends=true 但 trending 失败 | limitation，继续写 |
 | 改写有合法 `tweet_id` 但详情 `code!=200`、且没有可改的粘贴正文 | 同一形状 package、`status=failed` |
 | `TikHubPermissionError` | 创作：limitation 继续写。改写：有粘贴则纯文本；无正文则 `failed` |
@@ -946,9 +967,9 @@ package.drafts[]:
 
 同会话可连续新主题；每一单新 snapshot、新 package；下一单 Brief 的 input 只有新主题。
 
-**模型 session = `task_id`**。现网 `activate_session(session_id)` 必须改成 `task_id`，否则上一包会进下一单记忆。写帖 P0 不考虑企业微信。
+**模型 session = `session_id`**（与 HTTP 入参一致）。Route / Brief / Intel / Review / Source 等 ModelRequest 均 `activate_session(session_id=str(runtime_resources["session_id"]))`。`task_id` 仅用于本单追踪、TraceLog、`logs/<task_id>/` 产物路径，**不**作为模型记忆键。工作台若希望每单隔离记忆，应为每单分配新的 `session_id`；若复用同一会话 id，模型可能保留跨任务上下文。写帖 P0 不考虑企业微信。
 
-「改这一条」：**P0 不查历史任务。** 工作台把该稿正文再 POST 回来，带 `force_intent=rewrite`（可选再带原 `tweet_id` 链接）。只给 `source_draft_key`、不带正文 → `failed`，请贴回正文。不把上一包塞进模型 Session。
+「改这一条」：**P0 不查历史任务。** 工作台把该稿正文写进 `text` 再 POST（可附带原帖链接）；由 `route_intent` 判 `paste`/`rewrite`。只给 `source_draft_key`、不带正文 → 下游 Source 可能 `failed`。不把上一包塞进模型 Session。
 
 写帖与改写共用写帖会话、`/api/create` 和同一张 `COMPOSE_FLOW`。互动规则、评论卡片不进这张图。`source_post` 只出现在 rewrite 支；创作 prelude 的 tweet_card 不是原文。回评仍用独立 `/api/reply` + `REPLY_FLOW`。
 
@@ -968,7 +989,7 @@ package.drafts[]:
 |---|---|
 | 模型站过多 | 策略下沉到模块内部；P0 不给每模块再加反思模型。M5 修复留在 chunk 内计数 |
 | 图与 `for_each` 单 chunk 打架 | 修复留在 `drafting.py` 计数；图上只保留 compose/rewrite 这一层 `when` |
-| 误分流难纠 | `force_intent` + SSE 报支路；取消 handle 自动钉帖 |
+| 误分流难纠 | 依赖模型 instruct + 用户改写 `text` 重提；SSE 报支路。无 `force_intent` 入参 |
 | 契约未钉 | 宿主检查 `claim_types` ⊆ 计划；功效路径补案例夹具 |
 | 出图无服务 | 改写图文走 TikHub `preview_url` 进包；创作允许无图。不引入生成服务、不用网页预览冒充配图 |
 | 模型连打计费接口 | M3 内有界 ReAct；Confirm 不过不 HTTP；单任务预算封顶；不把 twitter_web 挂进 Action 列表 |
@@ -981,29 +1002,27 @@ package.drafts[]:
 
 不挡本文作为 P0 规格生效。实现时按下列对照改现网：
 
-- FetchTweets 默认 TikHub：`tikhub` 尚未进 requirements；套餐须含 Twitter-Web。
-- **按方法 TTL 的计费缓存必须落地**：独立 RecordStore（`workspace/tikhub/`）；列表 1h、详情/资料 24h；`search(filters)` 精确键；过期后 HTTP 成功则原地覆盖。多 worker 共用同一根。
-- 创作热侧滤 24h 保护期；搜索产品缺省 `Latest`。改写过期原文不 failed。
+### 已对齐（2026-08-23，勿再当缺口）
+
+- [`data/matrix/cases/x-twitter.json`](../data/matrix/cases/x-twitter.json) 案例夹具已补。
+- M5 Gate：`effective_text_length`（剥 `[[media:]]` + Gate 内 `[[cta:]]` 按 23）+ compose 硬伤；Gate 后 `resolve_draft_cta` / `resolve_draft_media`；M6 `compose_review` 已接线（revise 同样展开 CTA）。
+- 模型 session 按 `session_id` 隔离（`activate_session`）；`task_id` 只追踪本单。
+- `TaskStatus` 含 `failed`；HTTP/`MatrixTaskResult` 透传，不再把业务失败一律映射成 `partial`。
+- M3 Intel：TikHub ReAct + `need_trends` 门闩；finalize 时 `_ensure_material_media`（宿主 Media 搜索 + Search/Browse fallback，非公网 SearchWeb）。纯主题且 `need_trends=false` → 0 次 ReAct HTTP、可非空配图卡；`need_trends=true` 离开前宿主补 1 次 `fetch_trending(country=China)`。
+- 人设 `default.offered_cta_urls` 已有；Brief/Draft instruct 不要求写 `[[cta:0]]`；其余人设缺省 `[]` 仍可写。
+
+### 仍未跟
+
+- FetchTweets 默认 TikHub：`tikhub` 尚未进 `requirements.txt`；套餐须含 Twitter-Web。
+- **按方法 TTL 的计费缓存**（可选/后置）：独立 RecordStore（`workspace/tikhub/`）；列表 1h、详情/资料 24h。P0 可直连每跳 new+close，不挡写帖。
+- 创作热侧滤 24h 保护期；改写过期原文记 limitation 不 failed。
 - [`tests/tikhub/api-test.py`](../tests/tikhub/api-test.py) 不得保留明文 api_key。
-- 出图服务：不做。改写媒体 = 本单 `source_media`（包内 jpg/封面）。创作允许无图。
-- 创作把 tweet_card `media_url_https` 当本号配图：禁止。改写引用未签发媒体：禁止。把 `preview_url` 展开进正文：禁止。
-- **P0 必须补** [`data/matrix/cases/x-twitter.json`](../data/matrix/cases/x-twitter.json) 案例夹具（当前仓库缺失）。
-- 不把通用 Agent Search/Browse 焊进 `COMPOSE_FLOW`。
-- 改写有 `tweet_id` 时走 §5.5：第一跳必须拿到原文；之后可 stop。禁止跳过 Confirm、禁止把未观察到的调用一批打。
-- 创作/改写 M3：逐跳 `tikhub_react`，模型自主 method+params；Confirm 无人；禁止 pause 等人。
-- `emit("WRITE", work_items)` 汇入 `for_each`；失败 `emit("PACKAGE")` 不进 for_each。
-- 改写收成一条同形状 WorkItem；media_choice 留在 rewrite_plan_card。
+- 出图服务：不做。改写媒体 = 本单 `source_media`；创作允许无图。禁止创作引用对标 `media_url_https` 当本号配图。
+- 改写 Source Confirm 与 §5.5 细项（第一跳必须 detail、XOR 等）继续收紧。
+- `emit("WRITE", work_items)` 汇合形态与现网子流内 `for_each` 不等价但功能可接受；失败支 `emit("PACKAGE")` 已有。
 - P0 不做 SearchWeb、不做跨任务日预算、不查历史 `source_draft_key`。
-- `route_intent` 夹具：对标结构 vs 改写口吻、纯主题、纯粘贴（含可抽出 id / 抽不出 id）、仅 handle、`force_intent`。
-- P0 不把 reflect/`rewrite_safe` 提成独立 when。
-- 模型 session 按 `task_id` 隔离。
-- HTTP 补可选 `force_intent`；**保留产品入参 `need_trends`**（前端传，默认 `false`）。人设补 `offered_cta_urls`（缺省 `[]`）。写帖 P0 不考虑企业微信。
-- TikHub：**每跳** new + `close()`，禁止活连接挂进 ExecutionResource。
-- Gate 现网 `len(text)` 必须改成：剥 `[[media:]]` + 已签发 URL 按 23。
-- 趋势 `country` 产品默认 `china`，禁止 OpenAPI `UnitedStates`。
-- TikHub RecordStore：`LocalRecordStore` 构造；search 去重；锁覆盖 miss→写完。
-- 现网 `TaskStatus` 补 `failed`，不要把签发失败映射成 `partial`。
-- 现网 `activate_session` 改用 `task_id`。
+- 趋势 `country` 产品默认 `china`（Confirm 规范化为 OpenAPI `China`）。
+- `compose_branch_hold` 未接入 `COMPOSE_FLOW`（helpers 仍用）；不强制接线。
 
 **不算缺口、允许出现：** 创作 `media=[]`；改写包内是他人原文媒体（无版权/授权门）；TikHub 原始 JSON 不进仓库（字段写在本文，不要提交 Downloads 里的计费响应）。
 
@@ -1016,14 +1035,14 @@ package.drafts[]:
 - 创作加载了 `interaction_key` / 评论
 - Brief 输出里出现 compose|rewrite 分类字段
 - `run_compose` 里按意图再 create 另一张 Flow
-- 「对标这条结构自己写」+ URL 被当成改写
-- 无 `/status/{id}` 的长段粘贴被当成改写原文
-- 恰好一条帖链接、没有主题指令，却走了创作
-- 有主题指令+帖链接却不跑 `route_intent`、也不失败请 `force_intent`
+- 「对标这条结构自己写」+ URL 被模型稳定判成改写（instruct 期望 compose）
+- 纯主题请求却未调用 `matrix-compose-route-intent`
+- `normalize_route_intent` 未对「查找…最新动态」类输入做 compose→rewrite 升格
+- `route_intent` Agent 异常却未 `emit("PACKAGE")`
 - `science-writer` 稿里出现医疗词表字面（AC 应拦住，即使 RAG 没命中）
 - 手册命中就放行「治愈」类主张
 - Review 把 `template_fallback` 改回可发长文
-- 仅 handle、无帖链接被自动改写成一条赞最高帖
+- M3 Source 用 handle 自动钉赞最高/置顶当原文（应 limitation 或 failed，不静默选帖）
 - 改写已有 `x.com/.../status/{id}` 却不走适配器 `fetch`（缓存命中也必须走适配器，只是 http=0）
 - 该方法 TTL 内对同一规范化入参打了第二次真实 HTTP
 - 省略 `search_type` 与显式 `Latest` 各计费一次
@@ -1048,6 +1067,7 @@ package.drafts[]:
 - `need_trends=false` 仍打了 `fetch_trending`
 - `need_trends=true` 结束 M3 时一次 trending 都没有（模型 stop 后宿主也没补）
 - 正文里出现未签发的 https
+- `package.drafts[].text` 仍含 `[[cta:…]]` 或 `[[media:…]]`（Gate 后未 resolve）
 - 创作稿引用 tweet_card / 对标帖 `media_url_https` 当配图
 - 因创作无图而 `failed` 或拒绝出包
 - 因「他人媒体版权」去掉已签发的 `source_media`
