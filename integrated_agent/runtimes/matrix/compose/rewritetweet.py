@@ -16,6 +16,11 @@ from integrated_agent.runtimes.matrix.compose.branch_hold import (
     _collect_upstream,
     _normalize_branch_context,
 )
+from integrated_agent.runtimes.matrix.compose.draft_media import (
+    media_kind as _media_kind,
+    resolve_draft_media as _resolve_draft_media,
+    to_draft_media_cards as _to_draft_media_cards,
+)
 from integrated_agent.runtimes.matrix.compose.source import (
     _materialize_source_package,
     _source_media_entries,
@@ -30,11 +35,12 @@ from integrated_agent.runtimes.matrix.compose.originaltweet import (
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
-_MEDIA_TOKEN_RE = re.compile(r"\[\[media:(m\d+)\]\]")
-
 
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？!?；;])\s*")
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -121,15 +127,6 @@ def _rewrite_has_source_card(rewrite_ctx: dict[str, Any]) -> bool:
     return False
 
 
-def _media_kind(raw_type: str) -> str:
-    lowered = str(raw_type or "photo").strip().lower()
-    if lowered == "video":
-        return "video"
-    if lowered in {"gif", "animated_gif"}:
-        return "gif"
-    return "photo"
-
-
 def _account_rewrite_hint(account: Any) -> dict[str, Any]:
     if account is None:
         return {}
@@ -139,9 +136,6 @@ def _account_rewrite_hint(account: Any) -> dict[str, Any]:
         "must_do": list(getattr(account, "must_do", []) or []),
         "must_not": list(getattr(account, "must_not", []) or []),
     }
-
-
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？!?；;])\s*")
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -380,60 +374,6 @@ def _build_rewrite_media_catalog(
         limitations.append("source_media_unavailable")
 
     return offered, catalog, limitations
-
-
-def _resolve_draft_media(
-    draft_text: str,
-    *,
-    media_catalog: list[dict[str, Any]],
-    default_reuse: bool,
-) -> tuple[str, list[dict[str, Any]]]:
-    """解析 [[media:m*]] 占位，默认保留原文首张配图。"""
-    keys = _MEDIA_TOKEN_RE.findall(draft_text)
-    if not keys and default_reuse and media_catalog:
-        keys = [str(media_catalog[0]["media_key"])]
-
-    by_key = {
-        str(item.get("media_key") or ""): item
-        for item in media_catalog
-        if str(item.get("media_key") or "")
-    }
-    attached = [dict(by_key[key]) for key in keys if key in by_key]
-
-    display_text = _MEDIA_TOKEN_RE.sub("", draft_text)
-    display_text = re.sub(r"\s{2,}", " ", display_text).strip()
-    if not display_text:
-        display_text = draft_text.strip()
-    return display_text, attached
-
-
-def _to_draft_media_cards(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    cards: list[dict[str, Any]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        media_key = str(item.get("media_key") or "").strip()
-        if not media_key:
-            continue
-        card: dict[str, Any] = {
-            "media_key": media_key,
-            "kind": _media_kind(str(item.get("kind") or item.get("type") or "photo")),
-            "preview_url": str(
-                item.get("preview_url")
-                or item.get("thumb")
-                or item.get("media_url_https")
-                or ""
-            ).strip(),
-        }
-        if item.get("width") is not None:
-            card["width"] = item["width"]
-        if item.get("height") is not None:
-            card["height"] = item["height"]
-        file_url = str(item.get("file_url") or item.get("video_url") or "").strip()
-        if file_url:
-            card["file_url"] = file_url
-        cards.append(card)
-    return cards
 
 
 def _normalize_rewrite_draft(

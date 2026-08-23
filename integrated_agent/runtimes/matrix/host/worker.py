@@ -8,11 +8,11 @@ from agently import TriggerFlow, TriggerFlowRuntimeData
 
 from .models import (
     EvidenceCard,
-    EvidenceMediaLink,
     GatedDraft,
     MatrixTaskRequest,
     MatrixTaskResult,
     Scenario,
+    coerce_media_links,
 )
 from .service import MatrixTaskFailed
 from .stores import InMemoryEventStore
@@ -113,11 +113,7 @@ async def _publish_package(
             ruling=str(item.get("ruling") or item.get("text") or ""),
             kind=str(item.get("kind") or ""),
             link=str(item.get("link") or ""),
-            media_links=[
-                EvidenceMediaLink.model_validate(link_item)
-                for link_item in cast(list[dict[str, Any]], item.get("media_links") or [])
-                if isinstance(link_item, dict)
-            ],
+            media_links=coerce_media_links(item.get("media_links")),
         )
         for item in cast(list[dict[str, Any]], run.get("evidence") or [])
         if item.get("ref_id")

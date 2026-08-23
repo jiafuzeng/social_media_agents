@@ -131,6 +131,14 @@ class _ScriptedAgent:
         del schema, format
         return self
 
+    def use_actions(self, actions):
+        del actions
+        return self
+
+    def set_action_loop(self, **kwargs):
+        del kwargs
+        return self
+
     def activate_session(self, *, session_id: str | None = None):
         self.session_id = session_id
         return self
@@ -168,23 +176,51 @@ async def _dispatch_compose_reply(
         return await model.route_intent(text=input_data.get("text") or "", info=info)
     if name == "matrix-compose-intel-plan":
         text = input_data if isinstance(input_data, str) else str(input_data or "")
+        post_count = 1
+        if isinstance(info, dict):
+            try:
+                post_count = max(1, int(info.get("post_count") or 1))
+            except (TypeError, ValueError):
+                post_count = 1
+        tasks = [
+            {
+                "task_id": f"m{index}",
+                "goal": f"{text or '创作素材'}（角度 {index}）",
+            }
+            for index in range(1, post_count + 1)
+        ]
         return {
             "plan_summary": "测试素材计划",
-            "tasks": [{"task_id": "m1", "goal": text or "创作素材"}],
+            "tasks": tasks,
         }
     if name == "matrix-compose-intel-task":
         goal = ""
         if isinstance(input_data, dict):
             goal = str(input_data.get("goal") or "")
+        tweet_id = str(abs(hash(goal or "x")) % 10**15)
         return {
-            "answer": "已采集测试素材",
+            "answer": "已采集测试推文素材",
             "material_list": [
                 {
-                    "kind": "article",
-                    "title": goal or "测试素材",
-                    "text": "测试素材正文",
-                    "link": "",
-                    "media_links": [],
+                    "kind": "tweet",
+                    "title": "test_user",
+                    "text": goal or "测试推文正文",
+                    "link": f"https://x.com/test_user/status/{tweet_id}",
+                    "tweet_id": tweet_id,
+                    "screen_name": "test_user",
+                    "media_links": [
+                        {
+                            "type": "photo",
+                            "thumb": "https://pbs.twimg.com/media/test.jpg",
+                            "preview_url": "https://pbs.twimg.com/media/test.jpg",
+                        }
+                    ],
+                    "media": [
+                        {
+                            "type": "photo",
+                            "thumb": "https://pbs.twimg.com/media/test.jpg",
+                        }
+                    ],
                 }
             ],
         }
@@ -192,8 +228,10 @@ async def _dispatch_compose_reply(
         work = info.get("work_item") if isinstance(info, dict) else {}
         draft_key = str((work or {}).get("draft_key") or "d1")
         draft_index = str((work or {}).get("draft_index") or draft_key.lstrip("d") or "1")
+        offered = info.get("offered_media") if isinstance(info, dict) else []
+        media_token = " [[media:m1]]" if offered else ""
         return {
-            "draft_text": f"秋季上新草稿{draft_index}，详情见官方说明。",
+            "draft_text": f"秋季上新草稿{draft_index}，详情见官方说明。{media_token}".strip(),
             "rationale": f"测试草稿 {draft_key}。",
         }
     if name == "matrix-compose-rewrite-draft":

@@ -7,6 +7,7 @@ from typing import Any, cast
 from agently import TriggerFlowRuntimeData
 
 from integrated_agent.runtimes.matrix.compose.source import _source_media_entries
+from integrated_agent.runtimes.matrix.host.models import media_links_as_dicts
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 
@@ -120,7 +121,9 @@ def _normalize_compose_cards(
 
     for item in material_list:
         ref_index += 1
-        media = item.get("media_links")
+        media = media_links_as_dicts(item.get("media_links"))
+        if not media:
+            media = media_links_as_dicts(_media_links_from_raw(item.get("media")))
         _append_evidence(
             evidence,
             ref_id=f"e{ref_index}",
@@ -129,7 +132,7 @@ def _normalize_compose_cards(
             text=str(item.get("text") or ""),
             link=str(item.get("link") or ""),
             branch="compose",
-            media_links=media if isinstance(media, list) else [],
+            media_links=media,
             meta={
                 k: item[k]
                 for k in ("source_task_id", "source_goal")

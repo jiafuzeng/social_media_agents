@@ -66,6 +66,33 @@ async def test_compose_post_count_fans_out_drafts(tmp_path, monkeypatch) -> None
     assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-original-draft") == 3
 
 
+@pytest.mark.asyncio
+async def test_compose_intel_collects_media_and_evidence(tmp_path, monkeypatch) -> None:
+    model = ScriptedMatrixModel()
+    install_compose_ask(monkeypatch, model)
+
+    async def _skip_host_fetch(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.compose.intel._host_fetch_tweet_material",
+        _skip_host_fetch,
+    )
+    run = await run_compose(
+        _request("m2-intel-media", "写两条推文", post_count=2),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "m2-intel-media",
+    )
+    assert run["status"] == "completed"
+    material_cards = [item for item in run.get("material_cards") or [] if isinstance(item, dict)]
+    assert material_cards
+    assert any(item.get("media_links") for item in material_cards)
+    evidence = [item for item in run.get("evidence") or [] if isinstance(item, dict)]
+    assert any(item.get("media_links") for item in evidence)
+    assert len(material_cards) == 2
+    assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-intel-task") == 2
+
+
 def test_rewrite_plan_splits_long_source_across_drafts() -> None:
     from integrated_agent.runtimes.matrix.compose.rewritetweet import (
         _plan_rewrite_work_items,

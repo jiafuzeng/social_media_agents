@@ -2213,6 +2213,10 @@ function normalizeMediaKind(item) {
 }
 
 function primaryMediaUrl(item) {
+  if (typeof item === "string") {
+    const url = item.trim();
+    return url.startsWith("http://") || url.startsWith("https://") ? url : "";
+  }
   if (!item || typeof item !== "object") return "";
   const kind = normalizeMediaKind(item);
   const candidates =
@@ -2229,7 +2233,7 @@ function primaryMediaUrl(item) {
 }
 
 function mediaLinkLabel(item, url) {
-  const kind = normalizeMediaKind(item);
+  const kind = typeof item === "string" ? "photo" : normalizeMediaKind(item);
   const prefix = mediaKindLabels[kind] || "媒体";
   return `${prefix}：${truncateUrl(url)}`;
 }

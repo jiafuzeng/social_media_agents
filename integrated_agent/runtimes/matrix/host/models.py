@@ -235,6 +235,50 @@ class EvidenceMediaLink(DomainModel):
     file_url: str | None = None
 
 
+def coerce_media_link(item: Any) -> EvidenceMediaLink | None:
+    """把字符串 URL 或松散 dict 规范为 EvidenceMediaLink。"""
+    if isinstance(item, str):
+        url = item.strip()
+        if url.startswith(("http://", "https://")):
+            return EvidenceMediaLink(type="photo", thumb=url, preview_url=url)
+        return None
+    if not isinstance(item, dict):
+        return None
+    media_type = str(item.get("type") or item.get("kind") or "photo").strip() or "photo"
+    thumb = str(
+        item.get("thumb")
+        or item.get("preview_url")
+        or item.get("media_url_https")
+        or item.get("url")
+        or ""
+    ).strip()
+    preview = str(item.get("preview_url") or thumb or "").strip()
+    if not thumb and not preview:
+        return None
+    return EvidenceMediaLink(
+        type=media_type,
+        thumb=thumb,
+        preview_url=preview,
+        video_url=str(item["video_url"]).strip() if item.get("video_url") else None,
+        file_url=str(item["file_url"]).strip() if item.get("file_url") else None,
+    )
+
+
+def coerce_media_links(items: Any) -> list[EvidenceMediaLink]:
+    out: list[EvidenceMediaLink] = []
+    if not isinstance(items, list):
+        return out
+    for item in items:
+        link = coerce_media_link(item)
+        if link is not None:
+            out.append(link)
+    return out
+
+
+def media_links_as_dicts(items: Any) -> list[dict[str, Any]]:
+    return [item.model_dump(mode="json") for item in coerce_media_links(items)]
+
+
 class EvidenceCard(DomainModel):
     ref_id: str
     title: str
