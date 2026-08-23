@@ -425,5 +425,7 @@ class RouteIntentOut(DomainModel):
     source_kind: SourceKind = Field(description="paste、url、tweet_id、handle、prior_draft 或 none")
     source_anchor: str = Field(default="", description="tweet_id 或 handle，没有则空")
     user_instruction: str = Field(default="", description="去掉原文后的任务说明")
+    source_text: str = Field(default="", description="粘贴原文；非 paste 留空")
+    search_query: str = Field(default="", description="检索实体/主题，不含改口吻等任务说明")
     confidence: RouteConfidence = Field(default="high", description="high 或 low")
 

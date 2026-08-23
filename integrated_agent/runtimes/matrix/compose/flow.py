@@ -165,6 +165,8 @@ async def run_compose(
         "source_kind": state.get("source_kind"),
         "source_anchor": state.get("source_anchor"),
         "user_instruction": state.get("user_instruction"),
+        "source_text": state.get("source_text"),
+        "search_query": state.get("search_query"),
         "candidates": state.get("candidates"),
         "limitations": package.get("limitations") or state.get("limitations") or [],
         "material_cards": package.get("material_cards") or state.get("material_list") or [],

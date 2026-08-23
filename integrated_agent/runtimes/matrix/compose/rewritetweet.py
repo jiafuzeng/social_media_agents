@@ -76,18 +76,22 @@ def _extract_source_text(
     if source_result:
         return source_result
 
-    for candidate in (user_instruction, request_text):
-        text = str(candidate or "").strip()
-        if text:
-            return text
-    return ""
+    pasted = str(rewrite_ctx.get("source_text") or "").strip()
+    if pasted:
+        return pasted
+
+    return str(request_text or "").strip()
 
 
 def _hydrate_rewrite_upstream(upstream: dict[str, Any]) -> dict[str, Any]:
     """若 Source 只写回 tool_result_cleaned，从推文卡补全 source_post 等字段。"""
     hydrated = dict(upstream)
+    search_query = str(upstream.get("search_query") or "").strip()
     if not isinstance(hydrated.get("source_post"), dict):
-        package = _materialize_source_package(_as_list(upstream.get("tool_result_cleaned")))
+        package = _materialize_source_package(
+            _as_list(upstream.get("tool_result_cleaned")),
+            search_query=search_query,
+        )
         if not package["source_post"]:
             return upstream
         hydrated["source_post"] = package["source_post"]
@@ -656,6 +660,8 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                         f"本次共需生成 {total_count} 条改写推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
                         f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
                         "你是改写支写稿模型：只改写 input.source_text 这一段，并结合 input.user_instruction。",
+                        "input.source_text 是检索到的原文事实；input.user_instruction 只是口吻/写法要求，不得当正文主题。",
+                        "推文主题、人物、事件必须与 input.source_text 一致，不要引入原文没有的新话题。",
                         "只输出一个 JSON 对象，不要 markdown 代码块，不要额外说明。",
                         "必须原创表述，禁止整段照抄原文；可保留事实点，但句式与结构要改写。",
                         "遵守 info.account 的 voice_summary、content_pillars、must_do、must_not。",
@@ -663,7 +669,7 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                         "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位（仅写已签发的 media_key），不要把图片/视频链接写进正文。",
                         "info.reference_tweet.offered_media 展示参考推文配图信息，可决定是否沿用同样配图策略。",
                         "无 offered_media 时不要编造 [[media:]]；不要输出 hashtags 堆砌；不要编造原文中没有的事实。",
-                        "info.reference_tweet 只作结构参考，不要写成第二篇原文。",
+                        "info.reference_tweet 只作结构参考，不得把参考推文的话题混入正文。",
                         "rationale 用一句话说明写法，不要复述原文。",
                     ]
                 )
@@ -826,6 +832,8 @@ REWRITE_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
         "source_kind": "runtime_data.source_kind",
         "source_anchor": "runtime_data.source_anchor",
         "user_instruction": "runtime_data.user_instruction",
+        "source_text": "runtime_data.source_text",
+        "search_query": "runtime_data.search_query",
         "limitations": "runtime_data.limitations",
         "tool_logs": "runtime_data.tool_logs",
         "tool_result_cleaned": "runtime_data.tool_result_cleaned",

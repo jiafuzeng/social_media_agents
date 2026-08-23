@@ -7,6 +7,7 @@ from typing import Any, cast
 from agently import TriggerFlowRuntimeData
 
 from integrated_agent.runtimes.matrix.compose.source import _source_media_entries
+from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -27,6 +28,8 @@ def _collect_upstream(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         "tool_result_cleaned",
         "source_post",
         "source_media",
+        "source_text",
+        "search_query",
         "author_card",
         "related_tweet_cards",
         "source_result",
@@ -243,6 +246,8 @@ def _normalize_rewrite_cards(
     return {
         "source_post": source_post_dict,
         "source_media": source_media,
+        "source_text": str(upstream.get("source_text") or "").strip(),
+        "search_query": str(upstream.get("search_query") or "").strip(),
         "author_card": author_dict,
         "related_tweet_cards": related,
         "source_result": str(upstream.get("source_result") or ""),

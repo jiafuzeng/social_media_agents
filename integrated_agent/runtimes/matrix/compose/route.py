@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from agently import Agently, TriggerFlowRuntimeData
 
+from integrated_agent.runtimes.matrix.compose.retrieval import normalize_route_intent
 from integrated_agent.runtimes.matrix.host.models import RouteIntentOut
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
@@ -34,8 +35,12 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                     "忽略表面用词：即使用户说「创作推文」「写一条」，只要任务是「先查最新动态再写」或「按某条改写」，一律 rewrite。例：「查找特朗普最新动态，创作推文」→ rewrite。",
                     "「对标这条的结构自己写、不要内容」才偏 compose；有链接或「参考这条写」偏 rewrite。",
                     "reason 用一两句话指出原文线索；intent 只填 compose 或 rewrite。",
-                    "rewrite 且原文是帖：source_kind 为 url 或 tweet_id，source_anchor 填原文里的 tweet_id。paste 时 source_anchor 留空。只有人名/主题、无链接无 handle：source_kind 多为 none，source_anchor 留空。compose：source_kind 多为 none。",
+                    "rewrite 且原文是帖：source_kind 为 url 或 tweet_id，source_anchor 填原文里的 tweet_id。paste 时 source_anchor 留空，source_text 填完整粘贴正文。",
+                    "要查某人/事最新动态且无明确 @handle：source_kind=none，source_anchor 留空，search_query 填检索实体（如 特朗普）。",
+                    "只有用户明确给出 @handle 且要该账号发帖时，才用 source_kind=handle；不要把 trump 这类短词当 handle。",
                     "不得发明原文没有的 tweet_id 或 handle。user_instruction 填去掉原文或链接后的任务说明。",
+                    "search_query 单独填写检索实体/主题，不要填「改成我们口吻」「创作推文」等任务说明。",
+                    "例：「查找特朗普最新动态，创作推文」→ intent=rewrite, search_query=特朗普, user_instruction=创作推文。",
                 ]
             )
             .output(
@@ -45,13 +50,18 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                     "source_kind": (str, "paste、url、tweet_id、handle 或 none", "not_null"),
                     "source_anchor": (str, "tweet_id 或 handle，没有则空"),
                     "user_instruction": (str, "去掉原文后的任务说明"),
+                    "source_text": (str, "粘贴原文；非 paste 留空"),
+                    "search_query": (str, "检索关键词；无需检索留空"),
                     "confidence": (str, "high 或 low", "not_null"),
                 },
                 format="json",
             )
             .async_start()
         )
-        routed = RouteIntentOut.model_validate(result)
+        routed = normalize_route_intent(
+            RouteIntentOut.model_validate(result),
+            request_text=text,
+        )
     except Exception as exc:
         package = {
             "status": "failed",
@@ -74,10 +84,14 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         return package
 
     instruction = str(routed.user_instruction or "").strip() or text.strip()
+    source_text = str(routed.source_text or "").strip()
+    search_query = str(routed.search_query or "").strip()
     await data.async_set_state("intent", routed.intent, emit=False)
     await data.async_set_state("source_kind", routed.source_kind, emit=False)
     await data.async_set_state("source_anchor", str(routed.source_anchor or "").strip(), emit=False)
     await data.async_set_state("user_instruction", instruction, emit=False)
+    await data.async_set_state("source_text", source_text, emit=False)
+    await data.async_set_state("search_query", search_query, emit=False)
     trace.log(
         layer="business",
         event_type="business.matrix.routed",
@@ -88,6 +102,7 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             "reason": routed.reason,
             "source_kind": routed.source_kind,
             "source_anchor": routed.source_anchor,
+            "search_query": search_query,
         },
     )
     await data.async_emit(str(routed.intent), {"intent": routed.intent})
@@ -97,6 +112,8 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         "source_kind": routed.source_kind,
         "source_anchor": str(routed.source_anchor or "").strip(),
         "user_instruction": instruction,
+        "source_text": source_text,
+        "search_query": search_query,
     }
 
 

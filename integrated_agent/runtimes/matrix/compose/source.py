@@ -20,6 +20,11 @@ from agently.types.trigger_flow.trigger_flow import (
 )
 
 from integrated_agent.runtimes.matrix.compose.materialize import materialize_tool_batch
+from integrated_agent.runtimes.matrix.compose.retrieval import (
+    extract_search_query,
+    pick_primary_tweet,
+    prefer_search_over_handle,
+)
 from integrated_agent.runtimes.matrix.host.tikhubtools import source_tools_list
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
@@ -27,6 +32,7 @@ MAX_STEPS = 3
 # Reason：放大 session 窗口与输出额度，容纳累计 tool_result_cleaned
 _REACT_SESSION_MAX_LENGTH = 64_000
 _REACT_MAX_TOKENS = 8_192
+_PASTED_TWEET_ID = "pasted-local"
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -190,7 +196,21 @@ def _related_card_from_tweet(card: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _materialize_source_package(tool_result_cleaned: list[Any]) -> dict[str, Any]:
+def _pasted_tweet_card(source_text: str) -> dict[str, Any]:
+    return {
+        "kind": "tweet",
+        "tweet_id": _PASTED_TWEET_ID,
+        "screen_name": "",
+        "text": str(source_text or "").strip(),
+        "media": [],
+    }
+
+
+def _materialize_source_package(
+    tool_result_cleaned: list[Any],
+    *,
+    search_query: str = "",
+) -> dict[str, Any]:
     tweets = _tweet_cards_from_cleaned(tool_result_cleaned)
     if not tweets:
         return {
@@ -199,21 +219,33 @@ def _materialize_source_package(tool_result_cleaned: list[Any]) -> dict[str, Any
             "related_tweet_cards": [],
             "tweet_cards": [],
         }
-    primary = tweets[0]
+    primary, relevance_score = pick_primary_tweet(
+        tweets,
+        search_query=search_query,
+    )
+    if primary is None:
+        primary = tweets[0]
+        relevance_score = 0
+    related = [item for item in tweets if item is not primary]
     media_raw = primary.get("media")
     media = media_raw if isinstance(media_raw, list) else []
     return {
         "source_post": _source_post_from_card(primary),
         "source_media": _source_media_entries(media),
-        "related_tweet_cards": [_related_card_from_tweet(item) for item in tweets[1:]],
+        "related_tweet_cards": [_related_card_from_tweet(item) for item in related],
         "tweet_cards": tweets,
+        "retrieval_relevance_score": relevance_score,
+        "retrieval_query": str(search_query or "").strip(),
     }
 
 
 def _host_fallback_tools(
-    source_anchor: str,
-    question: str,
     *,
+    source_kind: str,
+    source_anchor: str,
+    search_query: str,
+    user_instruction: str,
+    request_text: str,
     tool_result_cleaned: list[Any] | None = None,
 ) -> list[dict[str, Any]]:
     tried_tools = {
@@ -221,15 +253,38 @@ def _host_fallback_tools(
         for item in (tool_result_cleaned or [])
         if isinstance(item, dict) and str(item.get("tool") or "").strip()
     }
-    anchor = str(source_anchor or "").strip()
+    anchor = str(source_anchor or "").strip().lstrip("@")
+    kind = str(source_kind or "none").strip().lower()
+    resolved_query = extract_search_query(
+        search_query=search_query,
+        user_instruction=user_instruction,
+        request_text=request_text,
+    )
+
     if anchor.isdigit() and "fetch_tweet_detail" not in tried_tools:
         return [{"name": "fetch_tweet_detail", "args": {"tweet_id": anchor}}]
-    keyword = str(question or "").strip()
-    if keyword and "fetch_search_timeline" not in tried_tools:
+
+    use_search = prefer_search_over_handle(
+        source_kind=kind,
+        source_anchor=anchor,
+        search_query=resolved_query,
+    )
+    if use_search and resolved_query and "fetch_search_timeline" not in tried_tools:
         return [
             {
                 "name": "fetch_search_timeline",
-                "args": {"keyword": keyword, "search_type": "Latest"},
+                "args": {"keyword": resolved_query, "search_type": "Latest"},
+            }
+        ]
+
+    if kind == "handle" and anchor and "fetch_user_post_tweet" not in tried_tools:
+        return [{"name": "fetch_user_post_tweet", "args": {"screen_name": anchor}}]
+
+    if resolved_query and "fetch_search_timeline" not in tried_tools:
+        return [
+            {
+                "name": "fetch_search_timeline",
+                "args": {"keyword": resolved_query, "search_type": "Latest"},
             }
         ]
     return []
@@ -253,39 +308,75 @@ async def source_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     payload = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
     request = cast(dict[str, Any], data.get_state("request") or {})
     intent = str(data.get_state("intent") or payload.get("intent") or "rewrite")
+    source_kind = str(data.get_state("source_kind") or "none")
     source_anchor = str(data.get_state("source_anchor") or "").strip()
     user_instruction = str(
         data.get_state("user_instruction") or request.get("text") or ""
     )
+    source_text = str(data.get_state("source_text") or "").strip()
+    search_query = str(data.get_state("search_query") or "").strip()
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     task_id = str(request.get("task_id") or "")
     text = str(request.get("text") or "")
 
+    resolved_query = extract_search_query(
+        search_query=search_query,
+        user_instruction=user_instruction,
+        request_text=text,
+    )
+
     await data.async_set_state("task_id", task_id, emit=False)
     await data.async_set_state("intent", intent, emit=False)
+    await data.async_set_state("source_kind", source_kind, emit=False)
     await data.async_set_state("source_anchor", source_anchor, emit=False)
     await data.async_set_state("user_instruction", user_instruction, emit=False)
+    await data.async_set_state("source_text", source_text, emit=False)
+    await data.async_set_state("search_query", resolved_query, emit=False)
     await data.async_set_state("limitations", limitations, emit=False)
     await data.async_set_state("tool_result_cleaned", [], emit=False)
 
-    base = {
-        "intent": intent,
-        "source_anchor": source_anchor,
-        "user_instruction": user_instruction,
-        "task_id": task_id,
-    }
+    if source_kind == "paste" and source_text:
+        await _finalize_source(
+            data,
+            tool_result=[_pasted_tweet_card(source_text)],
+            answer="已使用用户粘贴原文作为改写素材",
+            limitations=limitations,
+            task_id=task_id,
+            step=0,
+            search_query="",
+        )
+        return {
+            "intent": intent,
+            "source_kind": source_kind,
+            "source_anchor": source_anchor,
+            "user_instruction": user_instruction,
+            "source_text": source_text,
+            "search_query": resolved_query,
+            "task_id": task_id,
+        }
 
     data.emit_nowait(
         "Reason",
         {
             "question": user_instruction or text,
+            "search_query": resolved_query,
+            "source_kind": source_kind,
+            "user_instruction": user_instruction,
             "tool_result_cleaned": [],
             "step": 0,
             "source_anchor": source_anchor,
             "task_id": task_id,
         },
     )
-    return base
+    return {
+        "intent": intent,
+        "source_kind": source_kind,
+        "source_anchor": source_anchor,
+        "user_instruction": user_instruction,
+        "source_text": source_text,
+        "search_query": resolved_query,
+        "task_id": task_id,
+    }
 
 
 async def source_reason(data: TriggerFlowRuntimeData) -> None:
@@ -308,7 +399,23 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
         "tool_result_cleaned": tool_result_cleaned,
     }
     source_anchor = str(state.get("source_anchor") or "")
+    source_kind = str(
+        state.get("source_kind") or data.get_state("source_kind") or "none"
+    )
     question = str(state.get("question") or "")
+    search_query = str(
+        state.get("search_query") or data.get_state("search_query") or ""
+    ).strip()
+    user_instruction = str(
+        state.get("user_instruction") or data.get_state("user_instruction") or ""
+    )
+    request = cast(dict[str, Any], data.get_state("request") or {})
+    request_text = str(request.get("text") or "")
+    resolved_query = extract_search_query(
+        search_query=search_query,
+        user_instruction=user_instruction,
+        request_text=request_text,
+    )
 
     if has_tweet_cards:
         await _finalize_source(
@@ -318,6 +425,7 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
             limitations=limitations,
             task_id=str(state.get("task_id") or ""),
             step=step,
+            search_query=resolved_query,
         )
         return
 
@@ -331,11 +439,19 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
             limitations=limitations,
             task_id=str(state.get("task_id") or ""),
             step=step,
+            search_query=resolved_query,
         )
         return
 
     host_tools = _filter_new_tools(
-        _host_fallback_tools(source_anchor, question),
+        _host_fallback_tools(
+            source_kind=source_kind,
+            source_anchor=source_anchor,
+            search_query=resolved_query,
+            user_instruction=user_instruction,
+            request_text=request_text,
+            tool_result_cleaned=tool_result_cleaned,
+        ),
         tool_result_cleaned,
     )
     if host_tools:
@@ -350,11 +466,11 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
         ]
     else:
         extra = [
-            "可从 source_anchor / 用户指令中自行识别 tweet_id 或搜索关键字；"
-            "有 status id 则优先 fetch_tweet_detail；否则可用 fetch_search_timeline。"
+            "检索关键字必须用 info.search_query（实体/主题），不要把 user_instruction 里的改口吻、创作推文等任务说明当 keyword。",
+            "有 tweet_id 则优先 fetch_tweet_detail；source_kind=handle 时用 fetch_user_post_tweet；否则 fetch_search_timeline(keyword=search_query)。",
             "禁止 fetch_user_media / fetch_trending。",
             "必须至少拿到一条推文素材卡（kind=tweet，含 tweet_id 与正文）后才能 type=final；"
-            "用户粘贴文字不能代替工具拉取的推文卡。",
+            "用户粘贴文字不能代替工具拉取的推文卡（source_kind=paste 已在 prelude 处理）。",
         ]
 
     try:
@@ -367,6 +483,9 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
                     "job": "为改写组装原文包；必须拿到推文素材卡后才能 final。不要写改写正文。",
                     "branch": "source",
                     "source_anchor": source_anchor,
+                    "source_kind": source_kind,
+                    "user_instruction": user_instruction,
+                    "search_query": resolved_query,
                     "tools": tools_schema,
                     "已完成步骤": _summarize_cleaned_for_reason(tool_result_cleaned),
                     "budget": {
@@ -419,6 +538,7 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
             limitations=limitations,
             task_id=str(state.get("task_id") or ""),
             step=step,
+            search_query=resolved_query,
         )
         return
 
@@ -444,6 +564,7 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
         limitations=limitations,
         task_id=str(state.get("task_id") or ""),
         step=step,
+        search_query=resolved_query,
     )
 
 
@@ -494,22 +615,31 @@ async def _finalize_source(
     limitations: list[str],
     task_id: str,
     step: int,
+    search_query: str = "",
 ) -> None:
     cleaned = list(tool_result)
-    package = _materialize_source_package(cleaned)
+    resolved_query = str(
+        search_query or data.get_state("search_query") or ""
+    ).strip()
+    package = _materialize_source_package(cleaned, search_query=resolved_query)
     tweet_cards = package["tweet_cards"]
     if not tweet_cards and "source_no_tweet_cards" not in limitations:
         limitations.append("source_no_tweet_cards")
+    relevance = int(package.get("retrieval_relevance_score") or 0)
+    if resolved_query and tweet_cards and relevance <= 0:
+        if "source_low_relevance" not in limitations:
+            limitations.append("source_low_relevance")
 
     used = {
         str(item.get("tool") or "").strip()
         for item in cleaned
         if isinstance(item, dict) and str(item.get("tool") or "").strip()
     }
+    source_post = package["source_post"]
     await data.async_set_state("tool_logs", cleaned, emit=False)
     await data.async_set_state("tool_result_cleaned", cleaned, emit=False)
     await data.async_set_state("source_result", answer, emit=False)
-    await data.async_set_state("source_post", package["source_post"], emit=False)
+    await data.async_set_state("source_post", source_post, emit=False)
     await data.async_set_state("source_media", package["source_media"], emit=False)
     await data.async_set_state("author_card", None, emit=False)
     await data.async_set_state(
@@ -528,6 +658,16 @@ async def _finalize_source(
             "tool_names": sorted(used),
             "react_steps": step,
             "limitations": limitations,
+            "search_query": resolved_query,
+            "selected_tweet_id": (
+                str(source_post.get("tweet_id") or "") if isinstance(source_post, dict) else ""
+            ),
+            "selected_screen_name": (
+                str(source_post.get("screen_name") or "")
+                if isinstance(source_post, dict)
+                else ""
+            ),
+            "retrieval_relevance_score": relevance,
         },
     )
 
@@ -545,8 +685,11 @@ SOURCE_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
     "runtime_data": {
         "request": "runtime_data.request",
         "intent": "runtime_data.intent",
+        "source_kind": "runtime_data.source_kind",
         "source_anchor": "runtime_data.source_anchor",
         "user_instruction": "runtime_data.user_instruction",
+        "source_text": "runtime_data.source_text",
+        "search_query": "runtime_data.search_query",
         "limitations": "runtime_data.limitations",
     },
     "resources": {
