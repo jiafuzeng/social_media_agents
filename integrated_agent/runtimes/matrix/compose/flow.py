@@ -160,6 +160,7 @@ async def run_compose(
         "pipeline_version": PIPELINE_VERSION,
         "brief": state.get("brief"),
         "work_items": state.get("work_items") or [],
+        "rewrite_plan_card": state.get("rewrite_plan_card"),
         "drafts": package.get("drafts") or [],
         "summary": package.get("summary") or "",
         "source_kind": state.get("source_kind"),

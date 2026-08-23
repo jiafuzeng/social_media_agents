@@ -47,8 +47,11 @@ async def test_m2_theme_uses_route_intent(tmp_path, monkeypatch) -> None:
     assert run["status"] == "completed"
     assert run["intent"] == "compose"
     assert run["source_kind"] == "none"
+    assert run.get("brief") is not None
+    assert len(run["brief"]["work_items"]) == 1
     assert len(run["drafts"]) == 1
     assert any(name == "matrix-compose-route-intent" for name, _ in model.agent_sessions)
+    assert any(name == "matrix-compose-brief" for name, _ in model.agent_sessions)
 
 
 @pytest.mark.asyncio
@@ -63,7 +66,9 @@ async def test_compose_post_count_fans_out_drafts(tmp_path, monkeypatch) -> None
     assert run["status"] == "completed"
     assert len(run["drafts"]) == 3
     assert {item["draft_key"] for item in run["drafts"]} == {"d1", "d2", "d3"}
+    assert len(run["brief"]["work_items"]) == 3
     assert sum(1 for name, _ in model.agent_sessions if name == "matrix-compose-original-draft") == 3
+    assert any(name == "matrix-compose-brief" for name, _ in model.agent_sessions)
 
 
 @pytest.mark.asyncio

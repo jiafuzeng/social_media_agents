@@ -18,7 +18,7 @@ from integrated_agent.runtimes.matrix.compose.branch_hold import (
     _normalize_compose_cards,
 )
 from integrated_agent.runtimes.matrix.compose.materialize import materialize_tool_batch
-from integrated_agent.runtimes.matrix.compose.originaltweet import _resolve_post_count
+from integrated_agent.runtimes.matrix.compose.material import _resolve_post_count
 from integrated_agent.runtimes.matrix.compose.web_media import (
     fetch_public_media_from_page,
     is_public_page_url,

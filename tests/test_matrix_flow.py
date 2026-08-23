@@ -27,8 +27,11 @@ async def test_t07_compose_routes_theme(tmp_path, monkeypatch) -> None:
     )
     assert run["status"] == "completed"
     assert run["intent"] == "compose"
-    assert run["drafts"] == []
     assert run["task_type"] == "compose_post"
+    assert run.get("brief") is not None
+    assert run["brief"]["work_items"]
+    assert run["drafts"]
+    assert all(item.get("text") for item in run["drafts"])
 
 
 @pytest.mark.asyncio

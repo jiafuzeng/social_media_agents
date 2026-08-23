@@ -10,33 +10,26 @@ from agently.types.trigger_flow.trigger_flow import (
     TriggerFlowSubFlowWriteBack,
 )
 
-from integrated_agent.runtimes.matrix.compose.branch_hold import _media_links_from_raw
+from integrated_agent.runtimes.matrix.compose.brief import (
+    collect_compose_work_items,
+    compose_brief,
+)
+from integrated_agent.runtimes.matrix.compose.material import (
+    _align_material_cards,
+    _collect_material_cards,
+    _compose_media_bundle,
+    _draft_angle_hint,
+    _focus_hint_for_card,
+    _resolve_post_count,
+)
 from integrated_agent.runtimes.matrix.compose.draft_media import (
     resolve_draft_media,
     to_draft_media_cards,
-)
-from integrated_agent.runtimes.matrix.host.models import (
-    MAX_COMPOSE_POSTS,
-    MIN_COMPOSE_POSTS,
-    media_links_as_dicts,
 )
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 MAX_DRAFT_CONCURRENCY = 3
-
-_DRAFT_ANGLE_HINTS = (
-    "直入主题，信息密度高",
-    "轻度提问或互动口吻",
-    "故事化或场景化开头",
-    "对比或清单式表达",
-    "引用素材中的具体事实点",
-    "简短有力的行动号召",
-    "温和科普口吻",
-    "情绪共鸣但不夸张",
-    "突出差异化卖点",
-    "收尾留一句开放式互动",
-)
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -65,137 +58,6 @@ def _compose_context(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         "plan_summary": str(data.get_state("plan_summary") or payload.get("plan_summary") or ""),
         "task_id": str(payload.get("task_id") or data.get_state("task_id") or request.get("task_id") or ""),
     }
-
-
-def _resolve_post_count(request: dict[str, Any], snapshot: Snapshot) -> int:
-    platform_cap = max(
-        MIN_COMPOSE_POSTS,
-        min(int(snapshot.platform.max_posts), MAX_COMPOSE_POSTS),
-    )
-    raw = request.get("post_count")
-    if raw is None:
-        return MIN_COMPOSE_POSTS
-    try:
-        count = int(raw)
-    except (TypeError, ValueError):
-        return MIN_COMPOSE_POSTS
-    return max(MIN_COMPOSE_POSTS, min(count, platform_cap))
-
-
-def _draft_angle_hint(index: int) -> str:
-    return _DRAFT_ANGLE_HINTS[(index - 1) % len(_DRAFT_ANGLE_HINTS)]
-
-
-def _material_card_key(card: dict[str, Any]) -> str:
-    return str(
-        card.get("tweet_id")
-        or card.get("link")
-        or card.get("title")
-        or card.get("text")
-        or ""
-    ).strip()
-
-
-def _tweet_card_as_material(card: dict[str, Any]) -> dict[str, Any]:
-    tweet_id = str(card.get("tweet_id") or "").strip()
-    screen_name = str(card.get("screen_name") or "").lstrip("@").strip()
-    link = ""
-    if tweet_id and screen_name:
-        link = f"https://x.com/{screen_name}/status/{tweet_id}"
-    elif tweet_id:
-        link = f"https://x.com/i/web/status/{tweet_id}"
-    media = card.get("media") if isinstance(card.get("media"), list) else []
-    media_links = media_links_as_dicts(card.get("media_links"))
-    if not media_links:
-        media_links = media_links_as_dicts(_media_links_from_raw(media))
-    return {
-        "kind": "tweet",
-        "title": screen_name or tweet_id or str(card.get("title") or ""),
-        "text": str(card.get("text") or ""),
-        "link": link,
-        "tweet_id": tweet_id,
-        "screen_name": screen_name,
-        "media": media,
-        "media_links": media_links,
-    }
-
-
-def _collect_material_cards(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
-    """合并 Intel 写回的 material_list 与 tweet_cards，去重后返回素材卡列表。"""
-    material_list = [
-        item for item in _as_list(data.get_state("material_list")) if isinstance(item, dict)
-    ]
-    tweet_cards = [
-        item for item in _as_list(data.get_state("tweet_cards")) if isinstance(item, dict)
-    ]
-    seen = {_material_card_key(card) for card in material_list if _material_card_key(card)}
-    merged = list(material_list)
-    for card in tweet_cards:
-        normalized = _tweet_card_as_material(card)
-        key = _material_card_key(normalized)
-        if key and key in seen:
-            continue
-        if key:
-            seen.add(key)
-        merged.append(normalized)
-    return merged
-
-
-def _align_material_cards(
-    cards: list[dict[str, Any]],
-    post_count: int,
-) -> tuple[list[dict[str, Any]], str]:
-    """按 post_count 对齐素材卡：多则截断，少则循环补齐。"""
-    if post_count <= 0:
-        return [], "empty"
-    if not cards:
-        return [{} for _ in range(post_count)], "no_cards"
-    if len(cards) > post_count:
-        return cards[:post_count], "trimmed"
-    if len(cards) == post_count:
-        return list(cards), "one_to_one"
-    aligned = list(cards)
-    while len(aligned) < post_count:
-        aligned.append(dict(cards[len(aligned) % len(cards)]))
-    return aligned, "padded"
-
-
-def _compose_media_bundle(
-    card: dict[str, Any],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """从单张素材卡签发 offered_media / media_catalog（最多 1 张配图）。"""
-    if not card:
-        return [], []
-    media_links = media_links_as_dicts(card.get("media_links"))
-    if not media_links:
-        media_links = media_links_as_dicts(_media_links_from_raw(card.get("media")))
-    if not media_links:
-        return [], []
-    item = media_links[0]
-    media_key = "m1"
-    kind = str(item.get("type") or "photo")
-    preview_url = str(item.get("preview_url") or item.get("thumb") or "").strip()
-    catalog_item: dict[str, Any] = {
-        "media_key": media_key,
-        "kind": kind,
-        "preview_url": preview_url,
-    }
-    file_url = str(item.get("file_url") or item.get("video_url") or "").strip()
-    if file_url:
-        catalog_item["file_url"] = file_url
-    return [{"media_key": media_key}], [catalog_item]
-
-
-def _focus_hint_for_card(card: dict[str, Any], angle_hint: str) -> str:
-    if not card:
-        return angle_hint
-    kind = str(card.get("kind") or "").strip().lower()
-    title = str(card.get("title") or card.get("screen_name") or "").strip()
-    if kind == "tweet" and title:
-        return f"{angle_hint}；主要参考 @{title.lstrip('@')} 这条推文素材"
-    if title:
-        return f"{angle_hint}；主要参考素材《{title}》"
-    return f"{angle_hint}；主要参考当前分配到的素材卡"
 
 
 async def original_tweet_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -261,14 +123,26 @@ async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     draft_key = str(work.get("draft_key") or "d1")
     draft_index = int(work.get("draft_index") or 1)
     total_count = int(work.get("total_count") or 1)
+    formal_work = work.get("work_item") if isinstance(work.get("work_item"), dict) else {}
+    goal = str(work.get("goal") or formal_work.get("goal") or "").strip()
+    talking_points = [
+        str(item).strip()
+        for item in _as_list(work.get("talking_points") or formal_work.get("talking_points"))
+        if str(item).strip()
+    ]
     angle_hint = str(work.get("angle_hint") or _draft_angle_hint(draft_index))
     focus_hint = str(work.get("focus_hint") or angle_hint)
+    if talking_points:
+        focus_hint = "；".join(talking_points[:3])
     material_card = cast(dict[str, Any], work.get("material_card") or {})
     offered_media = [
         item for item in _as_list(work.get("offered_media")) if isinstance(item, dict)
     ]
     media_catalog = [
         item for item in _as_list(work.get("media_catalog")) if isinstance(item, dict)
+    ]
+    offered_cta_urls = [
+        str(item) for item in _as_list(work.get("offered_cta_urls")) if str(item).strip()
     ]
 
     ctx = _compose_context(data)
@@ -279,13 +153,18 @@ async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
 
     info: dict[str, Any] = {
         "intent": "compose",
-        "work_item": work,
+        "work_item": formal_work or work,
+        "goal": goal,
+        "talking_points": talking_points,
+        "claim_types": list(work.get("claim_types") or formal_work.get("claim_types") or []),
         "material_card": material_card,
         "material_cards": material_cards,
         "offered_media": offered_media,
         "media_catalog": media_catalog,
+        "offered_cta_urls": offered_cta_urls,
         "intel_result": ctx["intel_result"],
         "plan_summary": ctx["plan_summary"],
+        "brief": data.get_state("brief"),
         "platform": snapshot.platform.model_dump(mode="json"),
         "max_chars": snapshot.platform.max_chars,
         "draft_index": draft_index,
@@ -309,10 +188,13 @@ async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                 [
                     f"本次共需生成 {total_count} 条推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
                     f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
+                    "优先遵循 info.work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
                     "只根据 info.material_card 这一张素材卡写一条原创推文，不要混用其他素材。",
                     "只借鉴素材的结构与事实点，不要整段抄袭；不要写长文分析。",
                     "遵守 info.account 的 voice、pillars、must_do、must_not。",
                     f"正文不超过 info.max_chars 字。",
+                    "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
+                    "若 info.offered_cta_urls 非空，可用 [[cta:0]] 占位，不要手写 https。",
                     "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
                     "不要输出 hashtags 堆砌；不要编造素材卡中没有的事实。",
                     "素材为空时仍可基于用户意图与人设创作，但语气要保守。",
@@ -477,6 +359,8 @@ async def normalized_output_tweet(data: TriggerFlowRuntimeData) -> dict[str, Any
         "drafts": drafts,
         "limitations": limitations,
         "material_cards": material_list,
+        "brief": data.get_state("brief"),
+        "work_items": data.get_state("work_items") or [],
     }
 
 
@@ -484,7 +368,8 @@ def build_original_tweet_subflow() -> TriggerFlow:
     flow = TriggerFlow(name="matrix-compose-original-tweet-v1")
     (
         flow.to(original_tweet_prelude)
-        .to(plan_compose_drafts)
+        .to(compose_brief)
+        .to(collect_compose_work_items)
         .for_each(concurrency=MAX_DRAFT_CONCURRENCY)
         .to(original_tweet_reason)
         .end_for_each()
@@ -506,6 +391,8 @@ ORIGINAL_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
         "intel_result": "runtime_data.intel_result",
         "plan_summary": "runtime_data.plan_summary",
         "material_plan": "runtime_data.material_plan",
+        "brief": "runtime_data.brief",
+        "work_items": "runtime_data.work_items",
         "tweet_cards": "runtime_data.tweet_cards",
         "trend_cards": "runtime_data.trend_cards",
         "tool_logs": "runtime_data.tool_logs",
@@ -523,6 +410,8 @@ ORIGINAL_TWEET_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
         "drafts": "result.drafts",
         "limitations": "result.limitations",
         "material_list": "result.material_list",
+        "brief": "result.brief",
+        "work_items": "result.work_items",
     },
 }
 
@@ -533,6 +422,8 @@ __all__ = [
     "_align_material_cards",
     "_collect_material_cards",
     "build_original_tweet_subflow",
+    "collect_compose_work_items",
+    "compose_brief",
     "normalized_output_tweet",
     "original_tweet_prelude",
     "original_tweet_reason",

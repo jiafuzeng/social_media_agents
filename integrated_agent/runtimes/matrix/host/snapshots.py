@@ -61,6 +61,7 @@ class AccountCard(DomainModel):
     content_pillars: list[str] = Field(default_factory=list)
     must_do: list[str] = Field(default_factory=list)
     must_not: list[str] = Field(default_factory=list)
+    offered_cta_urls: list[str] = Field(default_factory=list)
     guardrail_keys: list[str] = Field(min_length=1)
     term_list_keys: list[str] = Field(min_length=1)
 
@@ -260,6 +261,7 @@ def parse_account_card(raw: dict[str, Any]) -> AccountCard:
         content_pillars=_str_list(raw.get("content_pillars")),
         must_do=_str_list(raw.get("must_do")),
         must_not=_str_list(raw.get("must_not")),
+        offered_cta_urls=_unique_str(_str_list(raw.get("offered_cta_urls"))),
         guardrail_keys=_unique_str(_str_list(raw.get("guardrail_keys"))),
         term_list_keys=_unique_str(_str_list(raw.get("term_list_keys"))),
     )

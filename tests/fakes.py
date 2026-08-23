@@ -282,7 +282,11 @@ async def _dispatch_compose_reply(
             "answer": "",
         }
     if name == "matrix-compose-brief":
-        return await model.compose_brief(text=input_data["text"], info=snapshot)
+        text = input_data.get("text") if isinstance(input_data, dict) else str(input_data or "")
+        return await model.compose_brief(
+            text=text,
+            info=info if isinstance(info, dict) else {},
+        )
     if name == "matrix-compose-draft":
         return await model.compose_draft(
             work_item=input_data["work_item"],
@@ -402,6 +406,15 @@ def install_compose_ask(monkeypatch, model) -> None:
         "integrated_agent.runtimes.matrix.compose.route.Agently.create_agent",
         _fake_create_agent(dispatch),
     )
+    fake_agent = _fake_create_agent(dispatch)
+    for module in (
+        "integrated_agent.runtimes.matrix.compose.brief",
+        "integrated_agent.runtimes.matrix.compose.intel",
+        "integrated_agent.runtimes.matrix.compose.originaltweet",
+        "integrated_agent.runtimes.matrix.compose.rewritetweet",
+        "integrated_agent.runtimes.matrix.compose.source",
+    ):
+        monkeypatch.setattr(f"{module}.Agently.create_agent", fake_agent)
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.compose.source._run_one_tool",
         fake_run_one_tool,

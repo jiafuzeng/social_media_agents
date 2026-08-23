@@ -27,6 +27,8 @@ accounts:
     - 承诺稳赚、保本、治愈或保证涨粉数字
     - 虚构排队、售罄或未授权最高级
     - 冒充监管、平台或公权力
+    offered_cta_urls:
+    - https://matrix.demo/official
     guardrail_keys:
     - default
     term_list_keys:

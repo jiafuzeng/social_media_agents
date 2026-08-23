@@ -32,6 +32,11 @@ from integrated_agent.runtimes.matrix.compose.originaltweet import (
     _normalize_draft,
     _resolve_post_count,
 )
+from integrated_agent.runtimes.matrix.compose.rewrite_plan import (
+    build_rewrite_plan_card,
+    build_rewrite_work_item,
+)
+from integrated_agent.runtimes.matrix.host.models import WorkItem
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
@@ -484,6 +489,95 @@ async def rewrite_tweet_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     }
 
 
+def _offered_cta_urls(snapshot: Snapshot) -> list[str]:
+    account = snapshot.account
+    if account is None:
+        return []
+    return list(account.offered_cta_urls or [])
+
+
+async def host_rewrite_plan(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """M4：宿主拼 rewrite_plan_card + 正式 WorkItem，并签发改写媒体。"""
+    snapshot = cast(Snapshot, data.require_resource("snapshot"))
+    trace = cast(TraceLog, data.require_resource("trace"))
+    request = cast(dict[str, Any], data.get_state("request") or {})
+    task_id = str(request.get("task_id") or "")
+    limitations = list(cast(list[str], data.get_state("limitations") or []))
+    branch_context = _as_dict(data.get_state("branch_context"))
+    rewrite_ctx = _as_dict(branch_context.get("rewrite"))
+    user_instruction = str(data.get_state("user_instruction") or request.get("text") or "").strip()
+    request_text = str(request.get("text") or "")
+    source_text = str(data.get_state("source_text") or "").strip()
+    if not source_text:
+        source_text = _extract_source_text(
+            rewrite_ctx=rewrite_ctx,
+            user_instruction=user_instruction,
+            request_text=request_text,
+        )
+
+    if not _rewrite_has_source_card(rewrite_ctx):
+        if "rewrite_missing_source_card" not in limitations:
+            limitations.append("rewrite_missing_source_card")
+        await data.async_set_state("limitations", limitations, emit=False)
+        await data.async_set_state("rewrite_plan_card", None, emit=False)
+        await data.async_set_state("work_items", [], emit=False)
+        return {"rewrite_plan_card": None, "work_items": []}
+
+    source_post = rewrite_ctx.get("source_post")
+    source_post_dict = source_post if isinstance(source_post, dict) else None
+    source_media = [
+        item for item in _as_list(data.get_state("source_media")) if isinstance(item, dict)
+    ]
+    offered_cta_urls = _offered_cta_urls(snapshot)
+    offered_media, media_catalog, media_limits = _build_rewrite_media_catalog(
+        source_media,
+        source_post_dict,
+    )
+    for note in media_limits:
+        if note not in limitations:
+            limitations.append(note)
+
+    plan_card = build_rewrite_plan_card(
+        source_media=source_media,
+        source_post=source_post_dict,
+        offered_cta_urls=offered_cta_urls,
+        user_instruction=user_instruction,
+        limitations=limitations,
+    )
+    if plan_card["media_choice"] == "none":
+        offered_media = []
+        media_catalog = []
+
+    platform_key = snapshot.platform.platform_key or TWITTER_PLATFORM_KEY
+    work_item = build_rewrite_work_item(
+        user_instruction=user_instruction,
+        source_text=source_text,
+        platform_key=platform_key,
+        source_issues=list(plan_card.get("source_issues") or []),
+    )
+
+    await data.async_set_state("source_text", source_text, emit=False)
+    await data.async_set_state("rewrite_plan_card", plan_card, emit=False)
+    await data.async_set_state("work_items", [work_item.model_dump(mode="json")], emit=False)
+    await data.async_set_state("offered_media", offered_media, emit=False)
+    await data.async_set_state("rewrite_media_catalog", media_catalog, emit=False)
+    await data.async_set_state("limitations", limitations, emit=False)
+    trace.log(
+        layer="business",
+        event_type="business.matrix.rewrite_planned",
+        status="completed",
+        subject_id=task_id,
+        facts={
+            "media_choice": plan_card.get("media_choice"),
+            "has_cta_url": bool(plan_card.get("cta_url")),
+        },
+    )
+    return {
+        "rewrite_plan_card": plan_card,
+        "work_items": [work_item.model_dump(mode="json")],
+    }
+
+
 async def plan_rewrite_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     """计划阶段拆解原文并分配到每条并行写稿任务（多退少补）。"""
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
@@ -516,14 +610,35 @@ async def plan_rewrite_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, An
 
     post_count = _resolve_post_count(request, snapshot)
     source_post = _as_dict(rewrite_ctx.get("source_post"))
+    plan_card = _as_dict(data.get_state("rewrite_plan_card"))
+    formal_items = [
+        WorkItem.model_validate(item)
+        for item in _as_list(data.get_state("work_items"))
+        if isinstance(item, dict)
+    ]
+    formal_item = formal_items[0] if formal_items else None
+    offered_cta_urls = _offered_cta_urls(snapshot)
+    cta_url = str(plan_card.get("cta_url") or "").strip()
+    reuse_media = plan_card.get("media_choice") == "reuse_source_media"
+
     work_items = _plan_rewrite_work_items(
         post_count=post_count,
         source_text=source_text,
         source_post=source_post,
         related_tweet_cards=related_tweet_cards,
-        offered_media=offered_media,
-        media_catalog=media_catalog,
+        offered_media=offered_media if reuse_media else [],
+        media_catalog=media_catalog if reuse_media else [],
     )
+    for item in work_items:
+        if formal_item is not None:
+            item["work_item"] = formal_item.model_dump(mode="json")
+            item["work_item_id"] = formal_item.work_item_id
+            item["goal"] = formal_item.goal
+            item["talking_points"] = list(formal_item.talking_points)
+        item["rewrite_plan_card"] = plan_card
+        item["offered_cta_urls"] = offered_cta_urls
+        item["cta_url"] = cta_url
+        item["reuse_media"] = reuse_media and bool(item.get("media_catalog"))
     await data.async_set_state("post_count", post_count, emit=False)
     await data.async_set_state("rewrite_draft_plan", work_items, emit=False)
     return work_items
@@ -562,6 +677,13 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             if isinstance(item, dict)
         ]
 
+    offered_cta_urls = [
+        str(item) for item in _as_list(work.get("offered_cta_urls")) if str(item).strip()
+    ]
+    cta_url = str(work.get("cta_url") or "").strip()
+    formal_work = work.get("work_item") if isinstance(work.get("work_item"), dict) else {}
+    plan_card = work.get("rewrite_plan_card") if isinstance(work.get("rewrite_plan_card"), dict) else {}
+
     model_input = {
         "user_instruction": user_instruction,
         "source_text": allocated_source_text,
@@ -581,6 +703,10 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         "total_count": total_count,
         "draft_key": draft_key,
         "account": _account_rewrite_hint(account),
+        "rewrite_plan_card": plan_card,
+        "work_item": formal_work,
+        "offered_cta_urls": offered_cta_urls,
+        "cta_url": cta_url,
     }
 
     draft_text = ""
@@ -599,6 +725,7 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                     [
                         f"本次共需生成 {total_count} 条改写推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
                         f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
+                        "优先遵循 info.work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
                         "你是改写支写稿模型：只改写 input.source_text 这一段，并结合 input.user_instruction。",
                         "input.source_text 是检索到的原文事实；input.user_instruction 只是口吻/写法要求，不得当正文主题。",
                         "推文主题、人物、事件必须与 input.source_text 一致，不要引入原文没有的新话题。",
@@ -606,7 +733,10 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
                         "必须原创表述，禁止整段照抄原文；可保留事实点，但句式与结构要改写。",
                         "遵守 info.account 的 voice_summary、content_pillars、must_do、must_not。",
                         f"draft_text 不超过 info.max_chars 字。",
-                        "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位（仅写已签发的 media_key），不要把图片/视频链接写进正文。",
+                        "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
+                        "若 info.cta_url 非空，正文用 [[cta:0]] 占位，不要手写 https。",
+                        "若 info.rewrite_plan_card.media_choice=reuse_source_media 且 info.offered_media 非空，"
+                        "draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
                         "info.reference_tweet.offered_media 展示参考推文配图信息，可决定是否沿用同样配图策略。",
                         "无 offered_media 时不要编造 [[media:]]；不要输出 hashtags 堆砌；不要编造原文中没有的事实。",
                         "info.reference_tweet 只作结构参考，不得把参考推文的话题混入正文。",
@@ -748,6 +878,8 @@ async def normalized_output_rewrite(data: TriggerFlowRuntimeData) -> dict[str, A
         "material_list": evidence_cards,
         "evidence_cards": evidence_cards,
         "branch_context": branch_context,
+        "rewrite_plan_card": data.get_state("rewrite_plan_card"),
+        "work_items": data.get_state("work_items") or [],
     }
 
 
@@ -755,6 +887,7 @@ def build_rewrite_tweet_subflow() -> TriggerFlow:
     flow = TriggerFlow(name="matrix-compose-rewrite-tweet-v1")
     (
         flow.to(rewrite_tweet_prelude)
+        .to(host_rewrite_plan)
         .to(plan_rewrite_drafts)
         .for_each(concurrency=MAX_DRAFT_CONCURRENCY)
         .to(rewrite_tweet_reason)
@@ -798,6 +931,8 @@ REWRITE_TWEET_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
         "material_list": "result.material_list",
         "evidence_cards": "result.evidence_cards",
         "branch_context": "result.branch_context",
+        "rewrite_plan_card": "result.rewrite_plan_card",
+        "work_items": "result.work_items",
     },
 }
 
@@ -806,6 +941,7 @@ __all__ = [
     "REWRITE_TWEET_SUBFLOW_CAPTURE",
     "REWRITE_TWEET_SUBFLOW_WRITE_BACK",
     "build_rewrite_tweet_subflow",
+    "host_rewrite_plan",
     "normalized_output_rewrite",
     "plan_rewrite_drafts",
     "rewrite_tweet_prelude",

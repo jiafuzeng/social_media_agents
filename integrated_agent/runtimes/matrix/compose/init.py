@@ -35,6 +35,8 @@ async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("author_card", None, emit=False)
     await data.async_set_state("related_tweet_cards", [], emit=False)
     await data.async_set_state("work_items", [], emit=False)
+    await data.async_set_state("brief", None, emit=False)
+    await data.async_set_state("rewrite_plan_card", None, emit=False)
     trace = cast(TraceLog, data.require_resource("trace"))
     trace.log(
         layer="business",

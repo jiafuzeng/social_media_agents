@@ -44,9 +44,11 @@ class ScriptedComposeModel:
         }
 
     async def compose_brief(self, *, text: str, info: dict) -> BriefOut:
-        del info
         req_id = "r-compose"
-        count = max(1, self.compose_work_item_count)
+        try:
+            count = max(1, int(info.get("post_count") or self.compose_work_item_count))
+        except (TypeError, ValueError):
+            count = max(1, self.compose_work_item_count)
         return BriefOut(
             normalized_brief=text.strip(),
             requirements=[Requirement(requirement_id=req_id, description=text)],
