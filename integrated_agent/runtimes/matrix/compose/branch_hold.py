@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from agently import TriggerFlowRuntimeData
 
-from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.compose.source import _source_media_entries
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -43,6 +43,32 @@ def _collect_upstream(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     return out
 
 
+def _media_links_from_raw(media: Any) -> list[dict[str, Any]]:
+    if not isinstance(media, list):
+        return []
+    links: list[dict[str, Any]] = []
+    for item in media:
+        if not isinstance(item, dict):
+            continue
+        thumb = str(
+            item.get("thumb")
+            or item.get("preview_url")
+            or item.get("media_url_https")
+            or ""
+        ).strip()
+        entry: dict[str, Any] = {
+            "type": str(item.get("type") or item.get("kind") or "photo"),
+            "thumb": thumb,
+            "preview_url": thumb,
+        }
+        if item.get("video_url"):
+            entry["video_url"] = str(item["video_url"])
+        if item.get("file_url"):
+            entry["file_url"] = str(item["file_url"])
+        links.append(entry)
+    return links
+
+
 def _append_evidence(
     cards: list[dict[str, Any]],
     *,
@@ -63,6 +89,7 @@ def _append_evidence(
         "kind": kind,
         "title": title,
         "text": text,
+        "ruling": body,
         "link": link,
         "branch": branch,
         "media_links": media_links or [],
@@ -109,24 +136,7 @@ def _normalize_compose_cards(
 
     for item in tweet_cards:
         ref_index += 1
-        media = item.get("media")
-        media_links = (
-            [
-                {
-                    "type": str(m.get("type") or "photo"),
-                    "thumb": str(m.get("thumb") or ""),
-                    **(
-                        {"video_url": str(m["video_url"])}
-                        if m.get("video_url")
-                        else {}
-                    ),
-                }
-                for m in media
-                if isinstance(m, dict)
-            ]
-            if isinstance(media, list)
-            else []
-        )
+        media_links = _media_links_from_raw(item.get("media"))
         screen = str(item.get("screen_name") or "").lstrip("@")
         tid = str(item.get("tweet_id") or "")
         link = (
@@ -188,6 +198,10 @@ def _normalize_rewrite_cards(
     source_media = [
         item for item in _as_list(upstream.get("source_media")) if isinstance(item, dict)
     ]
+    if not source_media and source_post_dict:
+        post_media = source_post_dict.get("media")
+        if isinstance(post_media, list) and post_media:
+            source_media = _source_media_entries(post_media)
     author_card = upstream.get("author_card")
     author_dict = _as_dict(author_card) if author_card is not None else None
     related = [
@@ -198,24 +212,7 @@ def _normalize_rewrite_cards(
 
     if source_post_dict:
         ref_index += 1
-        media = source_post_dict.get("media")
-        media_links = (
-            [
-                {
-                    "type": str(m.get("type") or "photo"),
-                    "thumb": str(m.get("thumb") or ""),
-                    **(
-                        {"video_url": str(m["video_url"])}
-                        if m.get("video_url")
-                        else {}
-                    ),
-                }
-                for m in media
-                if isinstance(m, dict)
-            ]
-            if isinstance(media, list)
-            else []
-        )
+        media_links = _media_links_from_raw(source_post_dict.get("media"))
         _append_evidence(
             evidence,
             ref_id=f"e{ref_index}",
@@ -230,6 +227,7 @@ def _normalize_rewrite_cards(
 
     for item in related:
         ref_index += 1
+        media_links = _media_links_from_raw(item.get("media"))
         _append_evidence(
             evidence,
             ref_id=f"e{ref_index}",
@@ -238,6 +236,8 @@ def _normalize_rewrite_cards(
             text=str(item.get("text") or ""),
             link=str(item.get("url") or ""),
             branch="rewrite",
+            media_links=media_links,
+            meta={"tweet_id": item.get("tweet_id")},
         )
 
     return {

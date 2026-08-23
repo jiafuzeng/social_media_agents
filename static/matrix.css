@@ -528,6 +528,24 @@ html:has(.matrix-app),
   line-height: 1.65;
   color: #14532d;
 }
+.draft-media,
+.evidence-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.evidence-link,
+.media-link {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.evidence-link {
+  margin-left: 8px;
+  display: inline-block;
+}
 .tweet-pick input {
   margin-top: 3px;
 }

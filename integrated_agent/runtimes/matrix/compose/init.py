@@ -30,6 +30,8 @@ async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("source_result", "", emit=False)
     await data.async_set_state("source_post", None, emit=False)
     await data.async_set_state("source_media", [], emit=False)
+    await data.async_set_state("offered_media", [], emit=False)
+    await data.async_set_state("rewrite_media_catalog", [], emit=False)
     await data.async_set_state("author_card", None, emit=False)
     await data.async_set_state("related_tweet_cards", [], emit=False)
     await data.async_set_state("work_items", [], emit=False)

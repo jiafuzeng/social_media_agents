@@ -661,13 +661,7 @@ function showSourcePanel(item) {
   if (rationale) rationale.textContent = item.rationale || "这条没有单独的出处说明。";
   if (evidence) {
     evidence.replaceChildren(
-      ...listItems(
-        (item.evidence || []).map(card => ({
-          title: card.title || card.ref_id,
-          body: card.ruling
-        })),
-        "这条没有绑定案例证据。"
-      )
+      ...renderEvidenceItems(item.evidence || [], "这条没有绑定案例证据。")
     );
   }
   if (gate) {
@@ -1296,7 +1290,11 @@ function buildArchiveMarkdown(items, withSource, folderName) {
       const evidence = item.evidence || [];
       if (evidence.length) {
         evidence.forEach(card => {
-          lines.push(`- 证据：${card.title || card.ref_id} — ${card.ruling || ""}`);
+          const body = evidenceBody(card);
+          const link = String(card.link || "").trim();
+          lines.push(
+            `- 证据：${card.title || card.ref_id} — ${body}${link ? ` (${link})` : ""}`
+          );
         });
       } else {
         lines.push("- 证据：这条没有绑定案例证据。");
@@ -1587,6 +1585,7 @@ function renderTweetPick(result, row) {
   text.className = "draft-text";
   text.textContent = row.draft.text || "（正文已清空）";
   body.append(title, text);
+  appendMediaLinks(body, row.draft.media);
   card.append(box, body);
   return card;
 }
@@ -1727,13 +1726,7 @@ function fillResultSection(root, result, seconds) {
     ...result.drafts.map((draft, index) => renderDraft(draft, index))
   );
   root.querySelector("[data-role=evidence]").replaceChildren(
-    ...listItems(
-      (result.evidence || []).map(item => ({
-        title: item.title || item.ref_id,
-        body: item.ruling
-      })),
-      "本次没有召回案例卡片。"
-    )
+    ...renderEvidenceItems(result.evidence || [], "本次没有召回案例卡片。")
   );
   root.querySelector("[data-role=limitations]").replaceChildren(
     ...listItems(result.limitations || [], "没有额外限制说明。")
@@ -2201,6 +2194,101 @@ function chip(text, kind) {
   return node;
 }
 
+function evidenceBody(card) {
+  return card.ruling || card.text || "";
+}
+
+const mediaKindLabels = {
+  photo: "图片",
+  video: "视频",
+  gif: "GIF",
+  animated_gif: "GIF"
+};
+
+function normalizeMediaKind(item) {
+  const kind = String(item?.kind || item?.type || "photo").trim().toLowerCase();
+  if (kind === "video") return "video";
+  if (kind === "gif" || kind === "animated_gif") return "gif";
+  return "photo";
+}
+
+function primaryMediaUrl(item) {
+  if (!item || typeof item !== "object") return "";
+  const kind = normalizeMediaKind(item);
+  const candidates =
+    kind === "video"
+      ? [item.file_url, item.video_url, item.preview_url, item.thumb, item.media_url_https]
+      : kind === "gif"
+        ? [item.file_url, item.preview_url, item.thumb, item.media_url_https]
+        : [item.preview_url, item.thumb, item.media_url_https, item.file_url];
+  for (const raw of candidates) {
+    const url = String(raw || "").trim();
+    if (url) return url;
+  }
+  return "";
+}
+
+function mediaLinkLabel(item, url) {
+  const kind = normalizeMediaKind(item);
+  const prefix = mediaKindLabels[kind] || "媒体";
+  return `${prefix}：${truncateUrl(url)}`;
+}
+
+function truncateUrl(url, max = 72) {
+  const text = String(url || "").trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+}
+
+function appendMediaLinks(parent, mediaItems, className = "draft-media") {
+  const items = (mediaItems || []).filter(item => primaryMediaUrl(item));
+  if (!items.length) return;
+  const wrap = document.createElement("div");
+  wrap.className = className;
+  items.forEach(item => {
+    const url = primaryMediaUrl(item);
+    const link = document.createElement("a");
+    link.className = "media-link";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.title = url;
+    link.textContent = mediaLinkLabel(item, url);
+    wrap.append(link);
+  });
+  parent.append(wrap);
+}
+
+function renderEvidenceItems(evidence, emptyText) {
+  if (!(evidence || []).length) {
+    return listItems([], emptyText);
+  }
+  return evidence.map(card => {
+    const row = document.createElement("li");
+    const body = evidenceBody(card);
+    if (card.title || card.ref_id) {
+      const title = document.createElement("strong");
+      title.textContent = card.title || card.ref_id;
+      row.append(title);
+      if (body) row.append(document.createTextNode(` — ${body}`));
+    } else if (body) {
+      row.textContent = body;
+    }
+    const link = String(card.link || "").trim();
+    if (link) {
+      const anchor = document.createElement("a");
+      anchor.className = "evidence-link";
+      anchor.href = link;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.textContent = "原文链接";
+      row.append(anchor);
+    }
+    appendMediaLinks(row, card.media_links, "evidence-media");
+    return row;
+  });
+}
+
 function renderDraft(draft, index) {
   const item = document.createElement("li");
   item.className = `result-step status-${draft.status}`;
@@ -2214,6 +2302,7 @@ function renderDraft(draft, index) {
   text.className = "draft-text";
   text.textContent = draft.text || "（正文已清空）";
   item.append(head, text);
+  appendMediaLinks(item, draft.media);
   if (draft.rationale) {
     const rationale = document.createElement("p");
     rationale.className = "rationale";

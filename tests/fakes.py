@@ -200,16 +200,48 @@ async def _dispatch_compose_reply(
         work = info.get("work_item") if isinstance(info, dict) else {}
         draft_key = str((work or {}).get("draft_key") or "d1")
         draft_index = str((work or {}).get("draft_index") or draft_key.lstrip("d") or "1")
+        offered = info.get("offered_media") if isinstance(info, dict) else []
+        media_token = " [[media:m1]]" if offered else ""
         return {
-            "draft_text": f"改写草稿{draft_index}，已按我们口吻调整。",
+            "draft_text": f"改写草稿{draft_index}，已按我们口吻调整。{media_token}".strip(),
             "rationale": f"测试改写草稿 {draft_key}。",
         }
     if name == "matrix-compose-source-react":
+        cleaned = info.get("已完成步骤") if isinstance(info, dict) else []
+        has_tweet_cards = any(
+            isinstance(item, dict)
+            and str(item.get("kind") or "").strip().lower() == "tweet"
+            and str(item.get("tweet_id") or "").strip()
+            for item in (cleaned or [])
+        )
+        if has_tweet_cards:
+            return {
+                "type": "final",
+                "reasoning": "已完成步骤中已有推文素材卡。",
+                "tool_calls": [],
+                "answer": "已拿到推文原文包。",
+            }
+        anchor = str((info or {}).get("source_anchor") or "").strip()
+        if anchor.isdigit():
+            return {
+                "type": "tool",
+                "reasoning": "需拉取推文详情以生成素材卡。",
+                "tool_calls": [
+                    {"name": "fetch_tweet_detail", "args": {"tweet_id": anchor}}
+                ],
+                "answer": "",
+            }
+        question = str(input_data or "").strip()
         return {
-            "type": "final",
-            "reasoning": "测试环境跳过工具调用。",
-            "tool_calls": [],
-            "answer": "已拿到粘贴原文。",
+            "type": "tool",
+            "reasoning": "需搜索推文以生成素材卡。",
+            "tool_calls": [
+                {
+                    "name": "fetch_search_timeline",
+                    "args": {"keyword": question or "改写", "search_type": "Latest"},
+                }
+            ],
+            "answer": "",
         }
     if name == "matrix-compose-brief":
         return await model.compose_brief(text=input_data["text"], info=snapshot)
@@ -275,9 +307,66 @@ def install_compose_ask(monkeypatch, model) -> None:
             model, name, input_data, info, session_id
         )
 
+    async def fake_run_one_tool(name, args, tools):
+        del tools
+        tweet_id = str((args or {}).get("tweet_id") or "1234567890123456789")
+        if name == "fetch_tweet_detail":
+            return {
+                "tool": name,
+                "args": args or {},
+                "result": {
+                    "code": 200,
+                    "data": {
+                        "tweet_id": tweet_id,
+                        "text": "原帖正文供改写使用",
+                        "screen_name": "demo",
+                        "media": [
+                            {
+                                "type": "photo",
+                                "thumb": "https://pic.example.com/source.jpg",
+                                "width": 1200,
+                                "height": 675,
+                            }
+                        ],
+                    },
+                },
+            }
+        if name == "fetch_search_timeline":
+            return {
+                "tool": name,
+                "args": args or {},
+                "result": {
+                    "code": 200,
+                    "data": {
+                        "timeline": [
+                            {
+                                "tweet_id": "9876543210987654321",
+                                "text": "搜索到的参考推文",
+                                "screen_name": "search_demo",
+                                "media": [
+                                    {
+                                        "type": "photo",
+                                        "thumb": "https://pic.example.com/ref.jpg",
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                },
+            }
+        return {
+            "tool": name,
+            "args": args or {},
+            "result": {"error": f"unexpected tool in test: {name}"},
+        }
+
     monkeypatch.setattr(
         "integrated_agent.runtimes.matrix.compose.route.Agently.create_agent",
         _fake_create_agent(dispatch),
+    )
+    monkeypatch.setattr(
+        "integrated_agent.runtimes.matrix.compose.source._run_one_tool",
+        fake_run_one_tool,
     )
 
 

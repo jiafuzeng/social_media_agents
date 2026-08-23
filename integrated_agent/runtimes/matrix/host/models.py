@@ -200,6 +200,15 @@ class DegradeStep(DomainModel):
     attempt: int = 1
 
 
+class DraftMediaCard(DomainModel):
+    media_key: str
+    kind: str
+    preview_url: str = ""
+    width: int | None = None
+    height: int | None = None
+    file_url: str | None = None
+
+
 class GatedDraft(DomainModel):
     draft_key: str
     kind: WorkItemKind
@@ -215,12 +224,24 @@ class GatedDraft(DomainModel):
     risk_flags: list[str] = Field(default_factory=list)
     status: DraftStatus
     issues: list[str] = Field(default_factory=list)
+    media: list[DraftMediaCard] = Field(default_factory=list)
+
+
+class EvidenceMediaLink(DomainModel):
+    type: str = "photo"
+    thumb: str = ""
+    preview_url: str = ""
+    video_url: str | None = None
+    file_url: str | None = None
 
 
 class EvidenceCard(DomainModel):
     ref_id: str
     title: str
     ruling: str
+    kind: str = ""
+    link: str = ""
+    media_links: list[EvidenceMediaLink] = Field(default_factory=list)
 
 
 class MatrixTaskResult(DomainModel):

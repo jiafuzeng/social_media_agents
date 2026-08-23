@@ -8,6 +8,7 @@ from agently import TriggerFlow, TriggerFlowRuntimeData
 
 from .models import (
     EvidenceCard,
+    EvidenceMediaLink,
     GatedDraft,
     MatrixTaskRequest,
     MatrixTaskResult,
@@ -109,7 +110,14 @@ async def _publish_package(
         EvidenceCard(
             ref_id=str(item.get("ref_id") or ""),
             title=str(item.get("title") or ""),
-            ruling=str(item.get("ruling") or ""),
+            ruling=str(item.get("ruling") or item.get("text") or ""),
+            kind=str(item.get("kind") or ""),
+            link=str(item.get("link") or ""),
+            media_links=[
+                EvidenceMediaLink.model_validate(link_item)
+                for link_item in cast(list[dict[str, Any]], item.get("media_links") or [])
+                if isinstance(link_item, dict)
+            ],
         )
         for item in cast(list[dict[str, Any]], run.get("evidence") or [])
         if item.get("ref_id")

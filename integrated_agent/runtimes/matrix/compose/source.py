@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any, cast
 
 from agently import Agently, TriggerFlow, TriggerFlowRuntimeData
@@ -27,6 +28,211 @@ MAX_STEPS = 3
 _REACT_SESSION_MAX_LENGTH = 64_000
 _REACT_MAX_TOKENS = 8_192
 
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _tool_call_signature(name: str, args: dict[str, Any]) -> tuple[str, str]:
+    return name, json.dumps(args, sort_keys=True, ensure_ascii=False)
+
+
+def _attempted_tool_signatures(cleaned: list[Any]) -> set[tuple[str, str]]:
+    signatures: set[tuple[str, str]] = set()
+    for item in cleaned:
+        if not isinstance(item, dict):
+            continue
+        tool = str(item.get("tool") or "").strip()
+        if not tool:
+            continue
+        signatures.add(_tool_call_signature(tool, _as_dict(item.get("args"))))
+    return signatures
+
+
+def _filter_new_tools(
+    pending: list[dict[str, Any]], cleaned: list[Any]
+) -> list[dict[str, Any]]:
+    attempted = _attempted_tool_signatures(cleaned)
+    fresh: list[dict[str, Any]] = []
+    for item in pending:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        args = _as_dict(item.get("args"))
+        if _tool_call_signature(name, args) in attempted:
+            continue
+        fresh.append({"name": name, "args": args})
+    return fresh
+
+
+def _parse_pending_tools(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    pending: list[dict[str, Any]] = []
+    candidates = raw.get("tool_calls")
+    if candidates is None:
+        candidates = raw.get("tools")
+    for item in candidates or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        args = _as_dict(item.get("args"))
+        if not name:
+            continue
+        pending.append({"name": name, "args": args})
+    return pending
+
+
+def _summarize_cleaned_for_reason(cleaned: list[Any]) -> list[dict[str, Any]]:
+    summary: list[dict[str, Any]] = []
+    for item in cleaned:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind") or "").strip().lower()
+        if kind == "tweet":
+            summary.append(
+                {
+                    "kind": "tweet",
+                    "tweet_id": item.get("tweet_id"),
+                    "screen_name": item.get("screen_name"),
+                    "text": str(item.get("text") or "")[:240],
+                }
+            )
+            continue
+        if kind == "error":
+            summary.append(
+                {
+                    "kind": "error",
+                    "tool": item.get("tool"),
+                    "error": item.get("error"),
+                }
+            )
+            continue
+        summary.append({"kind": kind or "unknown", "tool": item.get("tool")})
+    return summary
+
+
+def _is_tweet_card(item: dict[str, Any]) -> bool:
+    if item.get("ok") is False:
+        return False
+    kind = str(item.get("kind") or "").strip().lower()
+    if kind == "tweet":
+        return bool(str(item.get("tweet_id") or "").strip())
+    tid = str(item.get("tweet_id") or "").strip()
+    text = str(item.get("text") or "").strip()
+    return bool(tid and text)
+
+
+def _tweet_cards_from_cleaned(items: list[Any]) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in items
+        if isinstance(item, dict) and _is_tweet_card(item)
+    ]
+
+
+def _tweet_status_url(screen_name: str, tweet_id: str) -> str:
+    screen = str(screen_name or "").lstrip("@").strip()
+    tid = str(tweet_id or "").strip()
+    if screen and tid:
+        return f"https://x.com/{screen}/status/{tid}"
+    return ""
+
+
+def _source_media_entries(media: list[Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for raw in media:
+        if not isinstance(raw, dict):
+            continue
+        kind = str(raw.get("type") or raw.get("kind") or "photo").lower()
+        entry: dict[str, Any] = {
+            "kind": kind if kind in {"video", "gif"} else "photo",
+            "preview_url": str(
+                raw.get("thumb") or raw.get("preview_url") or ""
+            ).strip(),
+        }
+        thumb = str(raw.get("thumb") or "").strip()
+        if thumb:
+            entry["thumb"] = thumb
+        if raw.get("video_url"):
+            entry["video_url"] = str(raw["video_url"])
+        if raw.get("width") is not None:
+            entry["width"] = raw["width"]
+        if raw.get("height") is not None:
+            entry["height"] = raw["height"]
+        out.append(entry)
+    return out
+
+
+def _source_post_from_card(card: dict[str, Any]) -> dict[str, Any]:
+    screen = str(card.get("screen_name") or "").lstrip("@")
+    tid = str(card.get("tweet_id") or "")
+    media_raw = card.get("media")
+    media = media_raw if isinstance(media_raw, list) else []
+    return {
+        "tweet_id": tid,
+        "text": str(card.get("text") or ""),
+        "screen_name": screen,
+        "url": _tweet_status_url(screen, tid),
+        "media": media,
+    }
+
+
+def _related_card_from_tweet(card: dict[str, Any]) -> dict[str, Any]:
+    screen = str(card.get("screen_name") or "").lstrip("@")
+    tid = str(card.get("tweet_id") or "")
+    media_raw = card.get("media")
+    media = media_raw if isinstance(media_raw, list) else []
+    return {
+        "tweet_id": tid,
+        "text": str(card.get("text") or ""),
+        "screen_name": screen,
+        "url": _tweet_status_url(screen, tid),
+        "media": media,
+    }
+
+
+def _materialize_source_package(tool_result_cleaned: list[Any]) -> dict[str, Any]:
+    tweets = _tweet_cards_from_cleaned(tool_result_cleaned)
+    if not tweets:
+        return {
+            "source_post": None,
+            "source_media": [],
+            "related_tweet_cards": [],
+            "tweet_cards": [],
+        }
+    primary = tweets[0]
+    media_raw = primary.get("media")
+    media = media_raw if isinstance(media_raw, list) else []
+    return {
+        "source_post": _source_post_from_card(primary),
+        "source_media": _source_media_entries(media),
+        "related_tweet_cards": [_related_card_from_tweet(item) for item in tweets[1:]],
+        "tweet_cards": tweets,
+    }
+
+
+def _host_fallback_tools(
+    source_anchor: str,
+    question: str,
+    *,
+    tool_result_cleaned: list[Any] | None = None,
+) -> list[dict[str, Any]]:
+    tried_tools = {
+        str(item.get("tool") or "").strip()
+        for item in (tool_result_cleaned or [])
+        if isinstance(item, dict) and str(item.get("tool") or "").strip()
+    }
+    anchor = str(source_anchor or "").strip()
+    if anchor.isdigit() and "fetch_tweet_detail" not in tried_tools:
+        return [{"name": "fetch_tweet_detail", "args": {"tweet_id": anchor}}]
+    keyword = str(question or "").strip()
+    if keyword and "fetch_search_timeline" not in tried_tools:
+        return [
+            {
+                "name": "fetch_search_timeline",
+                "args": {"keyword": keyword, "search_type": "Latest"},
+            }
+        ]
+    return []
 
 
 async def _run_one_tool(
@@ -94,30 +300,75 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
     session_id = str(data.require_resource("session_id"))
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     tool_result_cleaned = list(cast(list[Any], data.get_state("tool_result_cleaned") or []))
+    tweet_cards = _tweet_cards_from_cleaned(tool_result_cleaned)
+    has_tweet_cards = bool(tweet_cards)
+    new_state = {
+        **state,
+        "step": step,
+        "tool_result_cleaned": tool_result_cleaned,
+    }
+    source_anchor = str(state.get("source_anchor") or "")
+    question = str(state.get("question") or "")
+
+    if has_tweet_cards:
+        await _finalize_source(
+            data,
+            tool_result=tool_result_cleaned,
+            answer="已拿到推文素材卡",
+            limitations=limitations,
+            task_id=str(state.get("task_id") or ""),
+            step=step,
+        )
+        return
+
+    if budget_left <= 0:
+        if "source_no_tweet_cards" not in limitations:
+            limitations.append("source_no_tweet_cards")
+        await _finalize_source(
+            data,
+            tool_result=tool_result_cleaned,
+            answer="已达到最大步骤数，仍未拿到推文素材卡",
+            limitations=limitations,
+            task_id=str(state.get("task_id") or ""),
+            step=step,
+        )
+        return
+
+    host_tools = _filter_new_tools(
+        _host_fallback_tools(source_anchor, question),
+        tool_result_cleaned,
+    )
+    if host_tools:
+        data.emit_nowait("Act", {**new_state, "pending_tools": host_tools})
+        return
 
     if budget_left <= 1:
         extra = [
-            f"步骤预算只剩 {budget_left} 步，请直接基于现有观察给出结论（type=final），不要再声明工具"
+            f"步骤预算只剩 {budget_left} 步；"
+            "仅当「已完成步骤」里已有推文素材卡（kind=tweet）时才能 type=final，"
+            "否则继续用 tool_calls 拉取推文。"
         ]
     else:
         extra = [
             "可从 source_anchor / 用户指令中自行识别 tweet_id 或搜索关键字；"
             "有 status id 则优先 fetch_tweet_detail；否则可用 fetch_search_timeline。"
-            "禁止 fetch_user_media / fetch_trending。"
+            "禁止 fetch_user_media / fetch_trending。",
+            "必须至少拿到一条推文素材卡（kind=tweet，含 tweet_id 与正文）后才能 type=final；"
+            "用户粘贴文字不能代替工具拉取的推文卡。",
         ]
 
     try:
         raw = await (
-            Agently.create_agent(name="matrix-compose-source-react").
-            activate_session(session_id=session_id)
-            .input(state.get("question") or "")
+            Agently.create_agent(name="matrix-compose-source-react")
+            .activate_session(session_id=session_id)
+            .input(question)
             .info(
                 {
-                    "job": "为改写组装原文包；够用就 final。不要写改写正文。",
+                    "job": "为改写组装原文包；必须拿到推文素材卡后才能 final。不要写改写正文。",
                     "branch": "source",
-                    "source_anchor": state.get("source_anchor"),
+                    "source_anchor": source_anchor,
                     "tools": tools_schema,
-                    "已完成步骤": tool_result_cleaned,
+                    "已完成步骤": _summarize_cleaned_for_reason(tool_result_cleaned),
                     "budget": {
                         "step": step,
                         "max_steps": MAX_STEPS,
@@ -129,9 +380,10 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
                 [
                     "你只做决策，不执行工具。",
                     "对照「可用工具」与「已完成步骤」，判断还缺什么原文材料。",
-                    "若需采集:在 tools 中列出要调用的函数名与完整入参（可一次多个）。",
+                    "只输出一个 JSON 对象，不要 markdown 代码块，不要额外说明。",
+                    "若需采集:type=tool，在 tool_calls 中列出 [{name, args}]（必须是数组）。",
                     "name 必须来自 tools; args 只填该工具声明的字段。",
-                    "材料已够（至少有原文正文或可改粘贴）:填写 answer; tools 置空。",
+                    "仅当「已完成步骤」中已有推文素材卡时:type=final，填写 answer，tool_calls 必须为 []。",
                     *extra,
                 ]
             )
@@ -140,8 +392,13 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
                     "type": (str, "tool 或 final", "not_null"),
                     "reasoning": (str, "推理：目标还缺什么、为何选这些工具", "not_null"),
                     "tool_calls": (
-                        list,
-                        "tools 时填 [{name: 工具名, args: 入参字典}]；否则 []",
+                        [
+                            {
+                                "name": (str, "工具名", "not_null"),
+                                "args": (dict, "工具入参"),
+                            }
+                        ],
+                        "type=tool 时填写；type=final 时必须为 []",
                     ),
                     "answer": (str, "final 时填最终结论，否则空串"),
                 },
@@ -153,6 +410,8 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
         code = f"source_reason_error:{type(exc).__name__}"
         if code not in limitations:
             limitations.append(code)
+        if "source_no_tweet_cards" not in limitations:
+            limitations.append("source_no_tweet_cards")
         await _finalize_source(
             data,
             tool_result=tool_result_cleaned,
@@ -169,35 +428,23 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
     if decision not in {"tool", "final"}:
         decision = "final"
 
-    pending_tools: list[dict[str, Any]] = []
-    for item in raw.get("tool_calls") or []:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        args = item.get("args") if isinstance(item.get("args"), dict) else {}
-        if not name:
-            continue
-        pending_tools.append({"name": name, "args": cast(dict[str, Any], args)})
-
+    pending_tools = _filter_new_tools(_parse_pending_tools(raw), tool_result_cleaned)
     answer = str(raw.get("answer") or "")
-    new_state = {
-        **state,
-        "step": step,
-        "tool_result_cleaned": tool_result_cleaned,
-    }
 
-    if budget_left <= 0 or decision == "final" or not pending_tools:
-        await _finalize_source(
-            data,
-            tool_result=tool_result_cleaned,
-            answer=answer or ("已达到最大步骤数" if budget_left <= 0 else ""),
-            limitations=limitations,
-            task_id=str(state.get("task_id") or ""),
-            step=step,
-        )
+    if decision == "tool" and pending_tools:
+        data.emit_nowait("Act", {**new_state, "pending_tools": pending_tools})
         return
 
-    data.emit_nowait("Act", {**new_state, "pending_tools": pending_tools})
+    if "source_no_tweet_cards" not in limitations:
+        limitations.append("source_no_tweet_cards")
+    await _finalize_source(
+        data,
+        tool_result=tool_result_cleaned,
+        answer=answer or "无法继续拉取推文素材卡",
+        limitations=limitations,
+        task_id=str(state.get("task_id") or ""),
+        step=step,
+    )
 
 
 async def source_act(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -248,28 +495,36 @@ async def _finalize_source(
     task_id: str,
     step: int,
 ) -> None:
-    tool_logs = list(tool_result)
+    cleaned = list(tool_result)
+    package = _materialize_source_package(cleaned)
+    tweet_cards = package["tweet_cards"]
+    if not tweet_cards and "source_no_tweet_cards" not in limitations:
+        limitations.append("source_no_tweet_cards")
+
     used = {
         str(item.get("tool") or "").strip()
-        for item in tool_logs
-        if str(item.get("tool") or "").strip()
+        for item in cleaned
+        if isinstance(item, dict) and str(item.get("tool") or "").strip()
     }
-    await data.async_set_state("tool_logs", tool_logs, emit=False)
-    await data.async_set_state("tool_result_cleaned", tool_logs, emit=False)
+    await data.async_set_state("tool_logs", cleaned, emit=False)
+    await data.async_set_state("tool_result_cleaned", cleaned, emit=False)
     await data.async_set_state("source_result", answer, emit=False)
-    await data.async_set_state("source_post", None, emit=False)
-    await data.async_set_state("source_media", [], emit=False)
+    await data.async_set_state("source_post", package["source_post"], emit=False)
+    await data.async_set_state("source_media", package["source_media"], emit=False)
     await data.async_set_state("author_card", None, emit=False)
-    await data.async_set_state("related_tweet_cards", [], emit=False)
+    await data.async_set_state(
+        "related_tweet_cards", package["related_tweet_cards"], emit=False
+    )
     await data.async_set_state("limitations", limitations, emit=False)
     trace = cast(TraceLog, data.require_resource("trace"))
     trace.log(
         layer="business",
         event_type="business.matrix.source",
-        status="completed",
+        status="completed" if tweet_cards else "failed",
         subject_id=task_id,
         facts={
-            "tool_calls": len(tool_logs),
+            "tweet_cards": len(tweet_cards),
+            "tool_calls": len(cleaned),
             "tool_names": sorted(used),
             "react_steps": step,
             "limitations": limitations,
