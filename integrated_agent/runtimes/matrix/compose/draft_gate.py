@@ -9,6 +9,7 @@ from agently import Agently, TriggerFlowRuntimeData
 from integrated_agent.runtimes.matrix.compose.draft_media import (
     resolve_draft_cta,
     resolve_draft_media,
+    resolve_draft_refs,
     to_draft_media_cards,
 )
 from integrated_agent.runtimes.matrix.host.drafting import retrieve_and_gate_draft
@@ -73,6 +74,7 @@ async def gate_compose_draft(
     draft_agent_name: str,
     instruct: list[str],
     source_text: str = "",
+    draft_repair: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """检索案例/手册 → 写稿 → Gate；返回 for_each 载荷。"""
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
@@ -125,12 +127,13 @@ async def gate_compose_draft(
         repair: dict | None = None,
     ) -> ComposeDraftOut:
         merged = {**info, **extra_info}
+        effective_repair = repair if repair is not None else (draft_repair or {})
         result = await (
             Agently.create_agent(name=draft_agent_name)
             .input(
                 {
                     "work_item": work_item,
-                    "repair": repair or {},
+                    "repair": effective_repair,
                     "user_instruction": user_instruction,
                     "source_text": str(
                         merged.get("allocated_source_text") or source_text or ""
@@ -185,8 +188,9 @@ async def gate_compose_draft(
             if note not in limitations:
                 limitations.append(note)
         if gated.text.strip():
+            display_text = resolve_draft_refs(gated.text)
             display_text = resolve_draft_cta(
-                gated.text,
+                display_text,
                 offered_cta_urls=offered_cta_urls,
             )
             if media_catalog:

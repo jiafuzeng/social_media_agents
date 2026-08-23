@@ -7,6 +7,7 @@ from typing import Any
 
 _MEDIA_TOKEN_RE = re.compile(r"\[\[media:(m\d+)\]\]")
 _CTA_TOKEN_RE = re.compile(r"\[\[cta:(\d+)\]\]")
+_REF_CITE_RE = re.compile(r"\[\[ref:([^\]]+)\]\]")
 
 
 def media_kind(raw_type: str) -> str:
@@ -16,6 +17,15 @@ def media_kind(raw_type: str) -> str:
     if lowered in {"gif", "animated_gif"}:
         return "gif"
     return "photo"
+
+
+def resolve_draft_refs(draft_text: str) -> str:
+    """Gate 通过后剥掉 [[ref:e*]]；合规证据只保留在 evidence_ids。"""
+    display_text = _REF_CITE_RE.sub("", draft_text or "")
+    display_text = re.sub(r"\s{2,}", " ", display_text).strip()
+    if not display_text:
+        display_text = (draft_text or "").strip()
+    return display_text
 
 
 def resolve_draft_cta(
@@ -92,4 +102,4 @@ def to_draft_media_cards(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return cards
 
 
-__all__ = ["media_kind", "resolve_draft_cta", "resolve_draft_media", "to_draft_media_cards"]
+__all__ = ["media_kind", "resolve_draft_cta", "resolve_draft_media", "resolve_draft_refs", "to_draft_media_cards"]

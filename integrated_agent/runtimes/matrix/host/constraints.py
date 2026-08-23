@@ -134,16 +134,17 @@ def _sanitize_unoffered_cites(
         if offered_ref_set:
             kept.append(ref_id)
     cleaned = text or ""
-    if not offered_ref_set:
-        cleaned = REF_CITE_RE.sub("", cleaned)
+    cleaned = REF_CITE_RE.sub("", cleaned)
     if not offered_kb_set:
         cleaned = KB_CITE_RE.sub("", cleaned)
     return cleaned, kept
 
 
 def effective_text_length(text: str) -> int:
-    """剥 media/cta 占位符；正文 URL 按 X 规则各计 23 字。"""
+    """剥 media/ref/kb/cta 占位符；正文 URL 按 X 规则各计 23 字。"""
     body = MEDIA_TOKEN_RE.sub("", text or "")
+    body = REF_CITE_RE.sub("", body)
+    body = KB_CITE_RE.sub("", body)
     body = CTA_TOKEN_RE.sub(" " * URL_CHAR_BUDGET, body)
     for match in URL_RE.finditer(body):
         span = match.span()

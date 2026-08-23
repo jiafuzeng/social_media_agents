@@ -27,7 +27,10 @@ from integrated_agent.runtimes.matrix.compose.source import (
     _tweet_status_url,
 )
 from integrated_agent.runtimes.matrix.compose.draft_gate import gate_compose_draft
-from integrated_agent.runtimes.matrix.compose.review import compose_review
+from integrated_agent.runtimes.matrix.compose.review import (
+    _coerce_gated_draft,
+    review_compose_draft_item,
+)
 from integrated_agent.runtimes.matrix.compose.rewrite_plan import (
     build_rewrite_plan_card,
     build_rewrite_work_item,
@@ -38,10 +41,14 @@ from integrated_agent.runtimes.matrix.compose.material import (
 )
 from integrated_agent.runtimes.matrix.compose.originaltweet import (
     MAX_DRAFT_CONCURRENCY,
+    MAX_DRAFT_REGEN_ATTEMPTS,
+    _draft_payload_from_gated,
+    _is_publishable_compose_draft,
     _normalize_draft,
+    _regen_repair,
 )
 from integrated_agent.runtimes.matrix.host.drafting import rollup_status
-from integrated_agent.runtimes.matrix.host.models import GatedDraft, WorkItem
+from integrated_agent.runtimes.matrix.host.models import WorkItem
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
@@ -649,8 +656,60 @@ async def plan_rewrite_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, An
     return work_items
 
 
+def _rewrite_draft_instruct(
+    *,
+    total_count: int,
+    draft_index: int,
+    draft_key: str,
+    focus_hint: str,
+) -> list[str]:
+    return [
+        f"本次共需生成 {total_count} 条改写推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
+        f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
+        "优先遵循 work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
+        "只改写 input.source_text 这一段，并结合 input.user_instruction。",
+        "source_text 是原文事实；user_instruction 只是口吻/写法要求，不得当正文主题。",
+        "必须原创表述，禁止整段照抄原文；可保留事实点，但句式与结构要改写。",
+        "遵守 info.account 的 voice、pillars、must_do、must_not。",
+        "正文不超过 info.max_chars 字。",
+        "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
+        "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
+        "若 info.offered_media 非空且计划复用媒体，draft_text 用 [[media:m1]] 占位。",
+        "不要输出 hashtags 堆砌；不要编造原文中没有的事实。",
+        "证据只能引用 info.offered_refs 的 ref_id，填 evidence_ids；正文不要写 [[ref:]]。offered_refs 为空时 evidence_ids 必须是 []。",
+    ]
+
+
+def _rewrite_skip_payload(
+    *,
+    draft_key: str,
+    draft_index: int,
+    error: str,
+    rationale: str,
+) -> dict[str, Any]:
+    return {
+        "draft_key": draft_key,
+        "draft_index": draft_index,
+        "kind": "compose_post",
+        "platform_key": TWITTER_PLATFORM_KEY,
+        "degrade_op": "skip",
+        "text": "",
+        "rationale": rationale,
+        "decision": "skip",
+        "status": "skipped",
+        "issues": [error],
+        "ok": False,
+        "error": error,
+    }
+
+
 async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """检索 + 改写写稿 + Gate。"""
+    """检索 + 改写写稿 + Gate + Review；不合格则重试。"""
+    return await rewrite_tweet_draft_with_review(data)
+
+
+async def rewrite_tweet_draft_with_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """改写写稿 + Gate + Review；不合格则带 repair 再生成（至多 MAX_DRAFT_REGEN_ATTEMPTS 次）。"""
     work = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
     draft_index = int(work.get("draft_index") or 1)
     total_count = int(work.get("total_count") or 1)
@@ -660,41 +719,89 @@ async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     ).strip()
     focus_hint = str(work.get("focus_hint") or _draft_angle_hint(draft_index)).strip()
     if not allocated_source_text:
-        return {
-            "draft_key": draft_key,
-            "draft_index": draft_index,
-            "kind": "compose_post",
-            "platform_key": TWITTER_PLATFORM_KEY,
-            "degrade_op": "skip",
-            "text": "",
-            "rationale": "缺少可改写的原文片段。",
-            "decision": "skip",
-            "status": "skipped",
-            "issues": ["rewrite_missing_source"],
-            "ok": False,
-            "error": "rewrite_missing_source",
-        }
-    return await gate_compose_draft(
-        data,
-        work=work,
-        draft_agent_name="matrix-compose-draft",
-        source_text=allocated_source_text,
-        instruct=[
-            f"本次共需生成 {total_count} 条改写推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
-            f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
-            "优先遵循 work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
-            "只改写 input.source_text 这一段，并结合 input.user_instruction。",
-            "source_text 是原文事实；user_instruction 只是口吻/写法要求，不得当正文主题。",
-            "必须原创表述，禁止整段照抄原文；可保留事实点，但句式与结构要改写。",
-            "遵守 info.account 的 voice、pillars、must_do、must_not。",
-            "正文不超过 info.max_chars 字。",
-            "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
-            "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
-            "若 info.offered_media 非空且计划复用媒体，draft_text 用 [[media:m1]] 占位。",
-            "不要输出 hashtags 堆砌；不要编造原文中没有的事实。",
-            "证据只能引用 info.offered_refs 的 ref_id；offered_refs 为空时 evidence_ids 必须是 []。",
-        ],
+        return _rewrite_skip_payload(
+            draft_key=draft_key,
+            draft_index=draft_index,
+            error="rewrite_missing_source",
+            rationale="缺少可改写的原文片段。",
+        )
+
+    instruct = _rewrite_draft_instruct(
+        total_count=total_count,
+        draft_index=draft_index,
+        draft_key=draft_key,
+        focus_hint=focus_hint,
     )
+    limitations = list(cast(list[str], data.get_state("limitations") or []))
+    repair: dict[str, Any] | None = None
+    last_payload: dict[str, Any] = {}
+
+    for attempt in range(1, MAX_DRAFT_REGEN_ATTEMPTS + 1):
+        attempt_instruct = list(instruct)
+        if repair:
+            attempt_instruct.append(
+                "上一稿未通过 Gate/Review，请按 repair.issues、review_notes 重写，"
+                "相对 source_text 与 previous_text 都要明显改写，不要复读。"
+            )
+        last_payload = await gate_compose_draft(
+            data,
+            work=work,
+            draft_agent_name="matrix-compose-draft",
+            source_text=allocated_source_text,
+            instruct=attempt_instruct,
+            draft_repair=repair,
+        )
+        gated = _coerce_gated_draft(last_payload)
+
+        if not gated.text.strip() or gated.degrade_op == "skip":
+            if attempt < MAX_DRAFT_REGEN_ATTEMPTS:
+                note = f"rewrite_draft_regen:{draft_key}:gate:{attempt}"
+                if note not in limitations:
+                    limitations.append(note)
+                repair = _regen_repair(
+                    gated=gated,
+                    attempt=attempt,
+                    reason="gate_skip_or_empty",
+                )
+                continue
+            break
+
+        reviewed, review_notes = await review_compose_draft_item(
+            data,
+            gated,
+            limitations=limitations,
+        )
+        for note in review_notes:
+            if note not in limitations:
+                limitations.append(note)
+
+        last_payload = _draft_payload_from_gated(reviewed, work=work, base=last_payload)
+        if _is_publishable_compose_draft(reviewed):
+            break
+
+        if attempt < MAX_DRAFT_REGEN_ATTEMPTS:
+            note = f"rewrite_draft_regen:{draft_key}:review:{attempt}"
+            if note not in limitations:
+                limitations.append(note)
+            repair = _regen_repair(
+                gated=reviewed,
+                attempt=attempt,
+                reason="review_not_publishable",
+                review_notes="；".join(
+                    part
+                    for part in (
+                        reviewed.issues[0] if reviewed.issues else "",
+                        str(repair.get("review_notes") or "") if repair else "",
+                    )
+                    if part
+                ),
+            )
+            continue
+        break
+
+    if limitations:
+        await data.async_set_state("limitations", limitations, emit=False)
+    return last_payload
 
 
 async def normalized_output_rewrite(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -710,24 +817,39 @@ async def normalized_output_rewrite(data: TriggerFlowRuntimeData) -> dict[str, A
     post_count = _resolve_post_count(request, snapshot)
 
     review_payload = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    drafts_raw = list(
-        cast(list[Any], data.get_state("drafts") or review_payload.get("drafts") or [])
-    )
-    summary = str(review_payload.get("review_summary") or "").strip()
+    raw_input = data.input
+    if isinstance(raw_input, list):
+        drafts_raw = [item for item in raw_input if isinstance(item, dict)]
+    else:
+        drafts_raw = list(
+            cast(
+                list[Any],
+                data.get_state("drafts") or review_payload.get("drafts") or [],
+            )
+        )
+    if not drafts_raw:
+        drafts_raw = list(cast(list[Any], data.get_state("drafts") or []))
+    summary = str(
+        review_payload.get("review_summary")
+        or data.get_state("review_summary")
+        or ""
+    ).strip()
 
     drafts: list[dict[str, Any]] = []
     for index, item in enumerate(drafts_raw, start=1):
         if not isinstance(item, dict):
             continue
-        gated = GatedDraft.model_validate(item)
+        gated = _coerce_gated_draft(item)
         draft = gated.model_dump(mode="json")
         if not draft.get("draft_key"):
             draft["draft_key"] = f"d{index}"
         drafts.append(draft)
 
-    status = str(review_payload.get("rollup_status") or rollup_status(
-        [GatedDraft.model_validate(item) for item in drafts]
-    ))
+    status = str(
+        review_payload.get("rollup_status")
+        or data.get_state("rollup_status")
+        or rollup_status([_coerce_gated_draft(item) for item in drafts_raw if isinstance(item, dict)])
+    )
     if not summary:
         ready = sum(1 for item in drafts if str(item.get("text") or "").strip())
         summary = (
@@ -784,9 +906,8 @@ def build_rewrite_tweet_subflow() -> TriggerFlow:
         .to(host_rewrite_plan)
         .to(plan_rewrite_drafts)
         .for_each(concurrency=MAX_DRAFT_CONCURRENCY)
-        .to(rewrite_tweet_reason)
+        .to(rewrite_tweet_draft_with_review)
         .end_for_each()
-        .to(compose_review)
         .to(normalized_output_rewrite)
     )
     return flow
@@ -840,10 +961,10 @@ __all__ = [
     "REWRITE_TWEET_SUBFLOW_CAPTURE",
     "REWRITE_TWEET_SUBFLOW_WRITE_BACK",
     "build_rewrite_tweet_subflow",
-    "compose_review",
     "host_rewrite_plan",
     "normalized_output_rewrite",
     "plan_rewrite_drafts",
+    "rewrite_tweet_draft_with_review",
     "rewrite_tweet_prelude",
     "rewrite_tweet_reason",
 ]

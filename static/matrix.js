@@ -2279,7 +2279,12 @@ function addEvent(type, payload) {
 
 function errorMessage(body, fallback) {
   const detail = body?.detail;
-  if (typeof detail === "string") return detail;
+  if (typeof detail === "string") {
+    if (detail === "task not found") {
+      return "找不到该任务结果（可能尚未完成或日志已清理），请重新生成。";
+    }
+    return detail;
+  }
   if (Array.isArray(detail)) {
     return detail.map(item => item.msg || JSON.stringify(item)).join("；");
   }

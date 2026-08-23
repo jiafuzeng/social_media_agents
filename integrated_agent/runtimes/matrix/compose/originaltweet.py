@@ -15,7 +15,10 @@ from integrated_agent.runtimes.matrix.compose.brief import (
     compose_brief,
 )
 from integrated_agent.runtimes.matrix.compose.draft_gate import gate_compose_draft
-from integrated_agent.runtimes.matrix.compose.review import compose_review
+from integrated_agent.runtimes.matrix.compose.review import (
+    _coerce_gated_draft,
+    review_compose_draft_item,
+)
 from integrated_agent.runtimes.matrix.compose.material import (
     _align_material_cards,
     _collect_material_cards,
@@ -30,6 +33,81 @@ from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PL
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 MAX_DRAFT_CONCURRENCY = 3
+MAX_DRAFT_REGEN_ATTEMPTS = 2
+
+
+def _compose_draft_instruct(
+    *,
+    total_count: int,
+    draft_index: int,
+    draft_key: str,
+    focus_hint: str,
+) -> list[str]:
+    return [
+        f"本次共需生成 {total_count} 条推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
+        f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
+        "优先遵循 work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
+        "只根据 info.material_card 这一张素材卡写一条原创推文，不要混用其他素材。",
+        "只借鉴素材的结构与事实点，不要整段抄袭；不要写长文分析。",
+        "遵守 info.account 的 voice、pillars、must_do、must_not。",
+        "正文不超过 info.max_chars 字。",
+        "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
+        "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
+        "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
+        "证据只能引用 info.offered_refs 的 ref_id，填 evidence_ids；正文不要写 [[ref:]] 或 [[kb:]]。offered_refs 为空时 evidence_ids 必须是 []。",
+        "不要输出 hashtags 堆砌；不要编造素材卡中没有的事实。",
+        "素材为空时仍可基于用户意图与人设创作，但语气要保守。",
+    ]
+
+
+def _is_publishable_compose_draft(gated: GatedDraft) -> bool:
+    if not gated.text.strip():
+        return False
+    if gated.status in {"skipped", "failed"}:
+        return False
+    if gated.degrade_op == "skip":
+        return False
+    if "review_reject" in gated.issues:
+        return False
+    if any(str(item).startswith("revise_rejected:") for item in gated.issues):
+        return False
+    return gated.status in {"ready", "degraded"}
+
+
+def _draft_payload_from_gated(
+    gated: GatedDraft,
+    *,
+    work: dict[str, Any],
+    base: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = gated.model_dump(mode="json")
+    payload.update(
+        {
+            "draft_index": int(
+                (base or {}).get("draft_index") or work.get("draft_index") or 1
+            ),
+            "ok": bool(gated.text.strip()),
+            "error": gated.issues[0] if gated.issues else "",
+            "material_card": work.get("material_card") or {},
+        }
+    )
+    return payload
+
+
+def _regen_repair(
+    *,
+    gated: GatedDraft,
+    attempt: int,
+    reason: str,
+    review_notes: str = "",
+) -> dict[str, Any]:
+    return {
+        "issues": list(gated.issues) or [reason],
+        "previous_text": gated.text,
+        "review_notes": review_notes,
+        "regen_reason": reason,
+        "regen_attempt": attempt,
+    }
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -119,6 +197,11 @@ async def plan_compose_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, An
 
 async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     """检索 + 写稿 + Gate，生成单条原创推文草稿。"""
+    return await original_tweet_draft_with_review(data)
+
+
+async def original_tweet_draft_with_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
+    """写稿 + Gate + Review；不合格则带 repair 再生成（至多 MAX_DRAFT_REGEN_ATTEMPTS 次）。"""
     work = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
     draft_index = int(work.get("draft_index") or 1)
     total_count = int(work.get("total_count") or 1)
@@ -132,26 +215,82 @@ async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     focus_hint = str(work.get("focus_hint") or angle_hint)
     if talking_points:
         focus_hint = "；".join(talking_points[:3])
-    return await gate_compose_draft(
-        data,
-        work=work,
-        draft_agent_name="matrix-compose-draft",
-        instruct=[
-            f"本次共需生成 {total_count} 条推文，你负责第 {draft_index} 条（draft_key={draft_key}）。",
-            f"写法角度：{focus_hint}。与其他条目的开头、结构、落脚点要有明显区分，禁止复读同一句。",
-            "优先遵循 work_item.goal 与 talking_points；它们是包级计划，不要偏离。",
-            "只根据 info.material_card 这一张素材卡写一条原创推文，不要混用其他素材。",
-            "只借鉴素材的结构与事实点，不要整段抄袭；不要写长文分析。",
-            "遵守 info.account 的 voice、pillars、must_do、must_not。",
-            "正文不超过 info.max_chars 字。",
-            "结尾只给一个增长 CTA：关注系列/点置顶/去官方渠道；禁止评论区互动话术。",
-            "结尾只用文字 CTA；不要写 [[cta:0]] 或任意 https。",
-            "若 info.offered_media 非空，默认保留配图：draft_text 用 [[media:m1]] 占位，不要把图片/视频链接写进正文。",
-            "证据只能引用 info.offered_refs 的 ref_id，正文写成 [[ref:e1]]；offered_refs 为空时 evidence_ids 必须是 []。",
-            "不要输出 hashtags 堆砌；不要编造素材卡中没有的事实。",
-            "素材为空时仍可基于用户意图与人设创作，但语气要保守。",
-        ],
+
+    instruct = _compose_draft_instruct(
+        total_count=total_count,
+        draft_index=draft_index,
+        draft_key=draft_key,
+        focus_hint=focus_hint,
     )
+    limitations = list(cast(list[str], data.get_state("limitations") or []))
+    repair: dict[str, Any] | None = None
+    last_payload: dict[str, Any] = {}
+
+    for attempt in range(1, MAX_DRAFT_REGEN_ATTEMPTS + 1):
+        attempt_instruct = list(instruct)
+        if repair:
+            attempt_instruct.append(
+                "上一稿未通过 Gate/Review，请按 repair.issues、review_notes 重写，"
+                "与 previous_text 明显区分，不要复读。"
+            )
+        last_payload = await gate_compose_draft(
+            data,
+            work=work,
+            draft_agent_name="matrix-compose-draft",
+            instruct=attempt_instruct,
+            draft_repair=repair,
+        )
+        gated = _coerce_gated_draft(last_payload)
+
+        if not gated.text.strip() or gated.degrade_op == "skip":
+            if attempt < MAX_DRAFT_REGEN_ATTEMPTS:
+                note = f"compose_draft_regen:{draft_key}:gate:{attempt}"
+                if note not in limitations:
+                    limitations.append(note)
+                repair = _regen_repair(
+                    gated=gated,
+                    attempt=attempt,
+                    reason="gate_skip_or_empty",
+                )
+                continue
+            break
+
+        reviewed, review_notes = await review_compose_draft_item(
+            data,
+            gated,
+            limitations=limitations,
+        )
+        for note in review_notes:
+            if note not in limitations:
+                limitations.append(note)
+
+        last_payload = _draft_payload_from_gated(reviewed, work=work, base=last_payload)
+        if _is_publishable_compose_draft(reviewed):
+            break
+
+        if attempt < MAX_DRAFT_REGEN_ATTEMPTS:
+            note = f"compose_draft_regen:{draft_key}:review:{attempt}"
+            if note not in limitations:
+                limitations.append(note)
+            repair = _regen_repair(
+                gated=reviewed,
+                attempt=attempt,
+                reason="review_not_publishable",
+                review_notes="；".join(
+                    part
+                    for part in (
+                        reviewed.issues[0] if reviewed.issues else "",
+                        str(repair.get("review_notes") or "") if repair else "",
+                    )
+                    if part
+                ),
+            )
+            continue
+        break
+
+    if limitations:
+        await data.async_set_state("limitations", limitations, emit=False)
+    return last_payload
 
 
 def _normalize_draft(
@@ -220,9 +359,18 @@ async def normalized_output_tweet(data: TriggerFlowRuntimeData) -> dict[str, Any
     post_count = _resolve_post_count(request, cast(Snapshot, data.require_resource("snapshot")))
 
     review_payload = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
-    drafts_raw = list(
-        cast(list[Any], data.get_state("drafts") or review_payload.get("drafts") or [])
-    )
+    raw_input = data.input
+    if isinstance(raw_input, list):
+        drafts_raw = [item for item in raw_input if isinstance(item, dict)]
+    else:
+        drafts_raw = list(
+            cast(
+                list[Any],
+                data.get_state("drafts") or review_payload.get("drafts") or [],
+            )
+        )
+    if not drafts_raw:
+        drafts_raw = list(cast(list[Any], data.get_state("drafts") or []))
     summary = str(
         review_payload.get("review_summary")
         or data.get_state("review_summary")
@@ -233,15 +381,19 @@ async def normalized_output_tweet(data: TriggerFlowRuntimeData) -> dict[str, Any
     for index, item in enumerate(drafts_raw, start=1):
         if not isinstance(item, dict):
             continue
-        gated = GatedDraft.model_validate(item)
+        gated = _coerce_gated_draft(item)
         draft = gated.model_dump(mode="json")
         if not draft.get("draft_key"):
             draft["draft_key"] = f"d{index}"
         drafts.append(draft)
 
-    status = str(review_payload.get("rollup_status") or rollup_status(
-        [GatedDraft.model_validate(item) for item in drafts if isinstance(item, dict)]
-    ))
+    status = str(
+        review_payload.get("rollup_status")
+        or data.get_state("rollup_status")
+        or rollup_status(
+            [_coerce_gated_draft(item) for item in drafts if isinstance(item, dict)]
+        )
+    )
     if not summary:
         ready = sum(1 for item in drafts if str(item.get("text") or "").strip())
         if ready == 0:
@@ -297,9 +449,8 @@ def build_original_tweet_subflow() -> TriggerFlow:
         .to(compose_brief)
         .to(collect_compose_work_items)
         .for_each(concurrency=MAX_DRAFT_CONCURRENCY)
-        .to(original_tweet_reason)
+        .to(original_tweet_draft_with_review)
         .end_for_each()
-        .to(compose_review)
         .to(normalized_output_tweet)
     )
     return flow
@@ -355,8 +506,8 @@ __all__ = [
     "build_original_tweet_subflow",
     "collect_compose_work_items",
     "compose_brief",
-    "compose_review",
     "normalized_output_tweet",
+    "original_tweet_draft_with_review",
     "original_tweet_prelude",
     "original_tweet_reason",
     "plan_compose_drafts",

@@ -312,3 +312,36 @@ def test_account_catalog_endpoint(tmp_path: Path, monkeypatch) -> None:
         assert "help-first" in interaction_keys
         assert "support-handoff" in interaction_keys
         assert len(interaction_keys) == 4
+
+
+def test_task_survives_service_restart_from_logs(tmp_path: Path, monkeypatch) -> None:
+    logs_root = tmp_path / "logs" / "matrix"
+    service = _matrix_service(monkeypatch, tmp_path, logs_root=logs_root)
+    app = create_matrix_api(service)
+    with TestClient(app) as client:
+        accepted = client.post(
+            "/v1/matrix/tasks",
+            json={
+                "text": "为秋季上新写一条预热推文",
+                "scenario": "compose",
+                "session_id": "s1",
+            },
+        )
+        assert accepted.status_code == 202
+        payload = accepted.json()
+        snapshot: dict[str, object] = {}
+        for _ in range(200):
+            snapshot = client.get(payload["task_url"]).json()
+            if snapshot["status"] in {"completed", "failed"}:
+                break
+            time.sleep(0.02)
+        assert snapshot["status"] == "completed"
+
+    restarted = _matrix_service(monkeypatch, tmp_path, logs_root=logs_root)
+    restarted_app = create_matrix_api(restarted)
+    with TestClient(restarted_app) as client:
+        reloaded = client.get(payload["task_url"])
+        assert reloaded.status_code == 200
+        body = reloaded.json()
+        assert body["status"] == "completed"
+        assert body["result"]["drafts"]

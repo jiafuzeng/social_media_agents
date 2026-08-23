@@ -134,3 +134,39 @@ def test_resolve_draft_cta_expands_offered_url() -> None:
     )
     assert "[[cta:0]]" not in text
     assert "https://matrix.demo/official" in text
+
+
+def test_resolve_draft_refs_strips_offered_ref_token() -> None:
+    from integrated_agent.runtimes.matrix.compose.draft_media import resolve_draft_refs
+
+    text = resolve_draft_refs("秋季上新[[ref:e1]]，详情见官方说明。")
+    assert "[[ref:" not in text
+    assert "秋季上新，详情见官方说明。" in text
+
+
+@pytest.mark.asyncio
+async def test_gate_strips_ref_tokens_when_offered() -> None:
+    gated = await apply_constraint_gate(
+        work_item_id="w1",
+        kind="compose_post",
+        platform_key="x-twitter",
+        source_comment_key=None,
+        text="秋季上新[[ref:e1]]，详情见官方说明。",
+        rationale="ok",
+        evidence_ids=["e1"],
+        risk_flags=[],
+        claim_types=["format"],
+        reply_decision=None,
+        proposed_degrade=None,
+        max_chars=280,
+        matcher=AhoCorasickMatcher([]),
+        offered_refs=["e1"],
+        offered_kbs=[],
+        retrieval_state="hits",
+        templates=[],
+        offered_cta_urls=[],
+        offered_media_keys=[],
+    )
+    assert gated.degrade_op == "pass"
+    assert gated.evidence_ids == ["e1"]
+    assert "[[ref:" not in gated.text

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
+from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from .models import (
     TaskSnapshot,
 )
 from .stores import InMemoryEventStore, InMemoryTaskStore
+from .task_persistence import load_task_snapshot, persist_task_snapshot
 
 
 class TaskWorker(Protocol):
@@ -41,6 +43,7 @@ class MatrixTaskService:
         knowledge: KnowledgeStore | None = None,
         worker_count: int = 4,
         queue_capacity: int = 32,
+        logs_root: Path | None = None,
     ) -> None:
         if worker_count < 1:
             raise ValueError("worker_count must be positive")
@@ -53,6 +56,7 @@ class MatrixTaskService:
         self.queue_capacity = queue_capacity
         self.identity = identity
         self.knowledge = knowledge or KnowledgeStore()
+        self.logs_root = logs_root
         self._queue: asyncio.Queue[MatrixTaskRequest] = asyncio.Queue(
             maxsize=queue_capacity
         )
@@ -115,7 +119,15 @@ class MatrixTaskService:
         )
 
     async def get(self, task_id: str) -> TaskSnapshot | None:
-        return await self.tasks.get(task_id)
+        snapshot = await self.tasks.get(task_id)
+        if snapshot is not None:
+            return snapshot
+        if self.logs_root is None:
+            return None
+        loaded = load_task_snapshot(self.logs_root, task_id)
+        if loaded is not None:
+            await self.tasks.restore(loaded)
+        return loaded
 
     async def _run(self, worker_index: int) -> None:
         while True:
@@ -150,4 +162,11 @@ class MatrixTaskService:
                     {"error_type": type(exc).__name__, "message": str(exc)},
                 )
             finally:
+                if self.logs_root is not None:
+                    snapshot = await self.tasks.get(request.task_id)
+                    if snapshot is not None and snapshot.status in {
+                        "completed",
+                        "failed",
+                    }:
+                        persist_task_snapshot(self.logs_root, snapshot)
                 self._queue.task_done()

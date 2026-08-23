@@ -29,6 +29,7 @@ def build_matrix_service(
     identity_root: Path | None = None,
     identity: IdentityStore | None = None,
     knowledge: KnowledgeStore | None = None,
+    logs_root: Path | None = None,
 ) -> MatrixTaskService:
     events = InMemoryEventStore()
     settings = None
@@ -39,17 +40,17 @@ def build_matrix_service(
         settings=settings,
     )
     knowledge_store = knowledge or KnowledgeStore()
-    logs_root = root / "logs" / "matrix"
+    matrix_logs_root = logs_root or (root / "logs" / "matrix")
     data_root = root / "data" / "matrix"
     worker = MatrixWorkflowWorker(
         WorkerDependencies(
             analyze_compose=make_analyze_compose(
-                logs_root=logs_root,
+                logs_root=matrix_logs_root,
                 data_root=data_root,
                 knowledge=knowledge_store,
             ),
             analyze_reply=make_analyze_reply(
-                logs_root=logs_root,
+                logs_root=matrix_logs_root,
                 data_root=data_root,
                 knowledge=knowledge_store,
             ),
@@ -64,4 +65,5 @@ def build_matrix_service(
         queue_capacity=queue_capacity,
         identity=store,
         knowledge=knowledge_store,
+        logs_root=matrix_logs_root,
     )

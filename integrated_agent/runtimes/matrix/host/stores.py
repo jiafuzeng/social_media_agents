@@ -40,6 +40,11 @@ class InMemoryTaskStore:
     async def fail(self, task_id: str, error: str) -> TaskSnapshot:
         return await self._replace(task_id, status="failed", error=error)
 
+    async def restore(self, snapshot: TaskSnapshot) -> TaskSnapshot:
+        async with self._lock:
+            self._records[snapshot.task_id] = snapshot
+            return snapshot
+
     async def _replace(self, task_id: str, **updates: Any) -> TaskSnapshot:
         # 快照整体替换，避免并发下读到半更新字段。
         async with self._lock:
