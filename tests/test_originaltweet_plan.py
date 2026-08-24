@@ -1,4 +1,4 @@
-from integrated_agent.runtimes.matrix.compose.originaltweet import (
+from integrated_agent.runtimes.matrix.compose.material import (
     _align_material_cards,
     _compose_media_bundle,
 )

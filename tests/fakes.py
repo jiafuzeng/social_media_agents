@@ -488,7 +488,6 @@ def install_compose_ask(monkeypatch, model) -> None:
         "integrated_agent.runtimes.matrix.compose.draft_gate",
         "integrated_agent.runtimes.matrix.compose.intel",
         "integrated_agent.runtimes.matrix.compose.review",
-        "integrated_agent.runtimes.matrix.compose.rewritetweet",
         "integrated_agent.runtimes.matrix.compose.source",
     ):
         monkeypatch.setattr(f"{module}.Agently.create_agent", fake_agent)

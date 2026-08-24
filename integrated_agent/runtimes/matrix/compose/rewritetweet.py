@@ -6,11 +6,7 @@ from typing import Any, cast
 
 import re
 
-from agently import Agently, TriggerFlow, TriggerFlowRuntimeData
-from agently.types.trigger_flow.trigger_flow import (
-    TriggerFlowSubFlowCapture,
-    TriggerFlowSubFlowWriteBack,
-)
+from agently import TriggerFlow, TriggerFlowRuntimeData
 
 from integrated_agent.runtimes.matrix.compose.branch_hold import (
     _collect_upstream,
@@ -18,7 +14,6 @@ from integrated_agent.runtimes.matrix.compose.branch_hold import (
 )
 from integrated_agent.runtimes.matrix.compose.draft_media import (
     media_kind as _media_kind,
-    resolve_draft_media as _resolve_draft_media,
     to_draft_media_cards as _to_draft_media_cards,
 )
 from integrated_agent.runtimes.matrix.compose.source import (
@@ -46,6 +41,13 @@ from integrated_agent.runtimes.matrix.compose.originaltweet import (
     _is_publishable_compose_draft,
     _normalize_draft,
     _regen_repair,
+)
+from integrated_agent.runtimes.matrix.compose.subflow import (
+    DRAFT_RESOURCES,
+    ROUTE_STATE,
+    SubFlow,
+    capture_state,
+    write_back_result,
 )
 from integrated_agent.runtimes.matrix.host.drafting import rollup_status
 from integrated_agent.runtimes.matrix.host.models import WorkItem
@@ -412,38 +414,6 @@ def _normalize_rewrite_draft(
     return draft
 
 
-def _normalize_rewrite_package(
-    *,
-    drafts: list[dict[str, Any]],
-    material_cards: list[dict[str, Any]],
-    evidence_cards: list[dict[str, Any]],
-    branch_context: dict[str, Any],
-    limitations: list[str],
-    post_count: int,
-) -> dict[str, Any]:
-    ready_count = sum(1 for item in drafts if str(item.get("text") or "").strip())
-    if ready_count == 0:
-        summary = "未生成改写推文草稿"
-        status = "partial"
-    elif ready_count < post_count:
-        summary = f"已生成 {ready_count}/{post_count} 条改写推文草稿"
-        status = "partial"
-    else:
-        summary = f"已生成 {ready_count} 条改写推文草稿"
-        status = "completed"
-    return {
-        "status": status,
-        "intent": "rewrite",
-        "task_type": "compose_post",
-        "summary": summary,
-        "material_cards": material_cards,
-        "evidence_cards": evidence_cards,
-        "branch_context": branch_context,
-        "drafts": drafts,
-        "limitations": limitations,
-    }
-
-
 async def rewrite_tweet_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     """归一化 Source 原文包，准备改写上下文。"""
     ctx = _rewrite_context(data)
@@ -721,11 +691,6 @@ def _rewrite_skip_payload(
     }
 
 
-async def rewrite_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """检索 + 改写写稿 + Gate + Review；不合格则重试。"""
-    return await rewrite_tweet_draft_with_review(data)
-
-
 async def rewrite_tweet_draft_with_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     """改写写稿 + Gate + Review；不合格则带 repair 再生成（至多 MAX_DRAFT_REGEN_ATTEMPTS 次）。"""
     work = cast(dict[str, Any], data.input if isinstance(data.input, dict) else {})
@@ -938,7 +903,7 @@ async def normalized_output_rewrite(data: TriggerFlowRuntimeData) -> dict[str, A
     }
 
 
-def build_rewrite_tweet_subflow() -> TriggerFlow:
+def build_rewrite_tweet_subflow() -> SubFlow:
     flow = TriggerFlow(name="matrix-compose-rewrite-tweet-v1")
     (
         flow.to(rewrite_tweet_prelude)
@@ -949,60 +914,39 @@ def build_rewrite_tweet_subflow() -> TriggerFlow:
         .end_for_each()
         .to(normalized_output_rewrite)
     )
-    return flow
-
-
-REWRITE_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
-    "input": "value",
-    "runtime_data": {
-        "request": "runtime_data.request",
-        "intent": "runtime_data.intent",
-        "source_kind": "runtime_data.source_kind",
-        "source_anchor": "runtime_data.source_anchor",
-        "user_instruction": "runtime_data.user_instruction",
-        "source_text": "runtime_data.source_text",
-        "search_query": "runtime_data.search_query",
-        "limitations": "runtime_data.limitations",
-        "tool_logs": "runtime_data.tool_logs",
-        "tool_result_cleaned": "runtime_data.tool_result_cleaned",
-        "source_result": "runtime_data.source_result",
-        "source_post": "runtime_data.source_post",
-        "source_media": "runtime_data.source_media",
-        "author_card": "runtime_data.author_card",
-        "related_tweet_cards": "runtime_data.related_tweet_cards",
-    },
-    "resources": {
-        "trace": "resources.trace",
-        "snapshot": "resources.snapshot",
-        "data_root": "resources.data_root",
-        "knowledge": "resources.knowledge",
-        "kb_user_id": "resources.kb_user_id",
-        "events": "resources.events",
-    },
-}
-
-REWRITE_TWEET_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
-    "runtime_data": {
-        "package": "result.package",
-        "drafts": "result.drafts",
-        "limitations": "result.limitations",
-        "material_list": "result.material_list",
-        "evidence_cards": "result.evidence_cards",
-        "branch_context": "result.branch_context",
-        "rewrite_plan_card": "result.rewrite_plan_card",
-        "work_items": "result.work_items",
-    },
-}
+    return SubFlow(
+        flow,
+        capture_state(
+            *ROUTE_STATE,
+            "source_text",
+            "search_query",
+            "tool_logs",
+            "tool_result_cleaned",
+            "source_result",
+            "source_post",
+            "source_media",
+            "author_card",
+            "related_tweet_cards",
+            resources=DRAFT_RESOURCES,
+        ),
+        write_back_result(
+            "package",
+            "drafts",
+            "limitations",
+            "material_list",
+            "evidence_cards",
+            "branch_context",
+            "rewrite_plan_card",
+            "work_items",
+        ),
+    )
 
 
 __all__ = [
-    "REWRITE_TWEET_SUBFLOW_CAPTURE",
-    "REWRITE_TWEET_SUBFLOW_WRITE_BACK",
     "build_rewrite_tweet_subflow",
     "host_rewrite_plan",
     "normalized_output_rewrite",
     "plan_rewrite_drafts",
     "rewrite_tweet_draft_with_review",
     "rewrite_tweet_prelude",
-    "rewrite_tweet_reason",
 ]

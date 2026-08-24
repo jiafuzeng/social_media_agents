@@ -280,9 +280,9 @@ async def test_rewrite_post_count_fans_out_drafts(tmp_path, monkeypatch) -> None
 
 @pytest.mark.asyncio
 async def test_rewrite_preserves_source_media_in_draft(tmp_path, monkeypatch) -> None:
+    from integrated_agent.runtimes.matrix.compose.draft_media import resolve_draft_media
     from integrated_agent.runtimes.matrix.compose.rewritetweet import (
         _build_rewrite_media_catalog,
-        _resolve_draft_media,
     )
 
     offered, catalog, _ = _build_rewrite_media_catalog(
@@ -297,7 +297,7 @@ async def test_rewrite_preserves_source_media_in_draft(tmp_path, monkeypatch) ->
         None,
     )
     assert offered == [{"media_key": "m1", "kind": "photo", "width": 1200, "height": 675}]
-    text, media = _resolve_draft_media(
+    text, media = resolve_draft_media(
         "我们口吻版 [[media:m1]]",
         media_catalog=catalog,
         default_reuse=True,

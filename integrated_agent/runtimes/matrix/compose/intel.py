@@ -15,10 +15,6 @@ from typing import Any, cast
 
 from agently import Agently, TriggerFlow, TriggerFlowRuntimeData
 from agently.builtins.actions import Browse, Search
-from agently.types.trigger_flow.trigger_flow import (
-    TriggerFlowSubFlowCapture,
-    TriggerFlowSubFlowWriteBack,
-)
 
 from integrated_agent.runtimes.matrix.compose.branch_hold import (
     _media_links_from_raw,
@@ -29,6 +25,12 @@ from integrated_agent.runtimes.matrix.compose.web_media import (
     fetch_public_media_from_page,
     is_public_page_url,
     sanitize_public_media_links,
+)
+from integrated_agent.runtimes.matrix.compose.subflow import (
+    ROUTE_STATE,
+    SubFlow,
+    capture_state,
+    write_back_result,
 )
 from integrated_agent.runtimes.matrix.host.models import media_links_as_dicts
 from integrated_agent.runtimes.matrix.host.tikhubtools import compose_tools_list
@@ -1074,50 +1076,29 @@ async def _finalize_intel(
     }
 
 
-def build_intel_subflow() -> TriggerFlow:
+def build_intel_subflow() -> SubFlow:
     flow = TriggerFlow(name="matrix-compose-intel-v1")
     flow.to(intel_prelude)
     flow.when("Act").to(intel_act).to(clean_intel_tool_result)
     flow.when("Reason").to(intel_reason)
-    return flow
-
-
-INTEL_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
-    "input": "value",
-    "runtime_data": {
-        "request": "runtime_data.request",
-        "intent": "runtime_data.intent",
-        "source_kind": "runtime_data.source_kind",
-        "source_anchor": "runtime_data.source_anchor",
-        "user_instruction": "runtime_data.user_instruction",
-        "limitations": "runtime_data.limitations",
-        "need_trends": "runtime_data.need_trends",
-    },
-    "resources": {
-        "trace": "resources.trace",
-        "snapshot": "resources.snapshot",
-        "events": "resources.events",
-    },
-}
-
-INTEL_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
-    "runtime_data": {
-        "tweet_cards": "result.tweet_cards",
-        "trend_cards": "result.trend_cards",
-        "material_list": "result.material_list",
-        "material_plan": "result.material_plan",
-        "plan_summary": "result.plan_summary",
-        "tool_logs": "result.tool_logs",
-        "intel_result": "result.intel_result",
-        "evidence_cards": "result.evidence_cards",
-        "limitations": "result.limitations",
-    },
-}
+    return SubFlow(
+        flow,
+        capture_state(*ROUTE_STATE, "need_trends"),
+        write_back_result(
+            "tweet_cards",
+            "trend_cards",
+            "material_list",
+            "material_plan",
+            "plan_summary",
+            "tool_logs",
+            "intel_result",
+            "evidence_cards",
+            "limitations",
+        ),
+    )
 
 
 __all__ = [
-    "INTEL_SUBFLOW_CAPTURE",
-    "INTEL_SUBFLOW_WRITE_BACK",
     "build_intel_subflow",
     "confirm_intel_tool",
     "intel_prelude",

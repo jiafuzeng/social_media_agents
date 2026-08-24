@@ -5,10 +5,6 @@ from __future__ import annotations
 from typing import Any, cast
 
 from agently import TriggerFlow, TriggerFlowRuntimeData
-from agently.types.trigger_flow.trigger_flow import (
-    TriggerFlowSubFlowCapture,
-    TriggerFlowSubFlowWriteBack,
-)
 
 from integrated_agent.runtimes.matrix.compose.brief import (
     collect_compose_work_items,
@@ -20,16 +16,20 @@ from integrated_agent.runtimes.matrix.compose.review import (
     review_compose_draft_item,
 )
 from integrated_agent.runtimes.matrix.compose.material import (
-    _align_material_cards,
     _collect_material_cards,
-    _compose_media_bundle,
     _draft_angle_hint,
-    _focus_hint_for_card,
     _resolve_post_count,
+)
+from integrated_agent.runtimes.matrix.compose.subflow import (
+    DRAFT_RESOURCES,
+    ROUTE_STATE,
+    SubFlow,
+    capture_state,
+    write_back_result,
 )
 from integrated_agent.runtimes.matrix.host.drafting import rollup_status
 from integrated_agent.runtimes.matrix.host.models import GatedDraft
-from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
+from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
 
 MAX_DRAFT_CONCURRENCY = 3
@@ -162,45 +162,6 @@ async def original_tweet_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]
         "voice_summary": account.voice_summary if account else "",
         "content_pillars": list(account.content_pillars) if account else [],
     }
-
-
-async def plan_compose_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
-    """按 post_count 将素材卡一对一（或多退少补）分发为写稿任务。"""
-    snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    request = cast(dict[str, Any], data.get_state("request") or {})
-    post_count = _resolve_post_count(request, snapshot)
-    source_cards = _collect_material_cards(data)
-    aligned_cards, allocation_mode = _align_material_cards(source_cards, post_count)
-
-    work_items: list[dict[str, Any]] = []
-    for index in range(1, post_count + 1):
-        material_card = aligned_cards[index - 1]
-        offered_media, media_catalog = _compose_media_bundle(material_card)
-        angle_hint = _draft_angle_hint(index)
-        work_items.append(
-            {
-                "draft_key": f"d{index}",
-                "draft_index": index,
-                "total_count": post_count,
-                "angle_hint": angle_hint,
-                "focus_hint": _focus_hint_for_card(material_card, angle_hint),
-                "material_card": material_card,
-                "card_allocation": allocation_mode,
-                "offered_media": offered_media,
-                "media_catalog": media_catalog,
-            }
-        )
-
-    await data.async_set_state("post_count", post_count, emit=False)
-    await data.async_set_state("material_list", aligned_cards, emit=False)
-    await data.async_set_state("material_allocation", allocation_mode, emit=False)
-    await data.async_set_state("compose_draft_plan", work_items, emit=False)
-    return work_items
-
-
-async def original_tweet_reason(data: TriggerFlowRuntimeData) -> dict[str, Any]:
-    """检索 + 写稿 + Gate，生成单条原创推文草稿。"""
-    return await original_tweet_draft_with_review(data)
 
 
 async def original_tweet_draft_with_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -346,34 +307,6 @@ def _normalize_draft(
     return draft
 
 
-def _normalize_package(
-    *,
-    drafts: list[dict[str, Any]],
-    material_cards: list[dict[str, Any]],
-    limitations: list[str],
-    post_count: int,
-) -> dict[str, Any]:
-    ready_count = sum(1 for item in drafts if str(item.get("text") or "").strip())
-    if ready_count == 0:
-        summary = "未生成推文草稿"
-        status = "partial"
-    elif ready_count < post_count:
-        summary = f"已生成 {ready_count}/{post_count} 条原创推文草稿"
-        status = "partial"
-    else:
-        summary = f"已生成 {ready_count} 条原创推文草稿"
-        status = "completed"
-    return {
-        "status": status,
-        "intent": "compose",
-        "task_type": "compose_post",
-        "summary": summary,
-        "material_cards": material_cards,
-        "drafts": drafts,
-        "limitations": limitations,
-    }
-
-
 async def normalized_output_tweet(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     """汇总 review 后的 Gate 草稿，归一化为 package / drafts 结构。"""
     ctx = _compose_context(data)
@@ -466,7 +399,7 @@ async def normalized_output_tweet(data: TriggerFlowRuntimeData) -> dict[str, Any
     }
 
 
-def build_original_tweet_subflow() -> TriggerFlow:
+def build_original_tweet_subflow() -> SubFlow:
     flow = TriggerFlow(name="matrix-compose-original-tweet-v1")
     (
         flow.to(original_tweet_prelude)
@@ -477,54 +410,33 @@ def build_original_tweet_subflow() -> TriggerFlow:
         .end_for_each()
         .to(normalized_output_tweet)
     )
-    return flow
-
-
-ORIGINAL_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
-    "input": "value",
-    "runtime_data": {
-        "request": "runtime_data.request",
-        "intent": "runtime_data.intent",
-        "source_kind": "runtime_data.source_kind",
-        "source_anchor": "runtime_data.source_anchor",
-        "user_instruction": "runtime_data.user_instruction",
-        "limitations": "runtime_data.limitations",
-        "material_list": "runtime_data.material_list",
-        "intel_result": "runtime_data.intel_result",
-        "plan_summary": "runtime_data.plan_summary",
-        "material_plan": "runtime_data.material_plan",
-        "brief": "runtime_data.brief",
-        "work_items": "runtime_data.work_items",
-        "tweet_cards": "runtime_data.tweet_cards",
-        "trend_cards": "runtime_data.trend_cards",
-        "tool_logs": "runtime_data.tool_logs",
-    },
-    "resources": {
-        "trace": "resources.trace",
-        "snapshot": "resources.snapshot",
-        "data_root": "resources.data_root",
-        "knowledge": "resources.knowledge",
-        "kb_user_id": "resources.kb_user_id",
-        "events": "resources.events",
-    },
-}
-
-ORIGINAL_TWEET_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
-    "runtime_data": {
-        "package": "result.package",
-        "drafts": "result.drafts",
-        "limitations": "result.limitations",
-        "material_list": "result.material_list",
-        "brief": "result.brief",
-        "work_items": "result.work_items",
-    },
-}
+    return SubFlow(
+        flow,
+        capture_state(
+            *ROUTE_STATE,
+            "material_list",
+            "intel_result",
+            "plan_summary",
+            "material_plan",
+            "brief",
+            "work_items",
+            "tweet_cards",
+            "trend_cards",
+            "tool_logs",
+            resources=DRAFT_RESOURCES,
+        ),
+        write_back_result(
+            "package",
+            "drafts",
+            "limitations",
+            "material_list",
+            "brief",
+            "work_items",
+        ),
+    )
 
 
 __all__ = [
-    "ORIGINAL_TWEET_SUBFLOW_CAPTURE",
-    "ORIGINAL_TWEET_SUBFLOW_WRITE_BACK",
-    "_align_material_cards",
     "_collect_material_cards",
     "build_original_tweet_subflow",
     "collect_compose_work_items",
@@ -532,6 +444,4 @@ __all__ = [
     "normalized_output_tweet",
     "original_tweet_draft_with_review",
     "original_tweet_prelude",
-    "original_tweet_reason",
-    "plan_compose_drafts",
 ]

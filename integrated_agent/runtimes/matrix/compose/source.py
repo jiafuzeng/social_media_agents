@@ -14,16 +14,18 @@ import json
 from typing import Any, cast
 
 from agently import Agently, TriggerFlow, TriggerFlowRuntimeData
-from agently.types.trigger_flow.trigger_flow import (
-    TriggerFlowSubFlowCapture,
-    TriggerFlowSubFlowWriteBack,
-)
 
 from integrated_agent.runtimes.matrix.compose.materialize import materialize_tool_batch
 from integrated_agent.runtimes.matrix.compose.retrieval import (
     extract_search_query,
     pick_primary_tweet,
     prefer_search_over_handle,
+)
+from integrated_agent.runtimes.matrix.compose.subflow import (
+    ROUTE_STATE,
+    SubFlow,
+    capture_state,
+    write_back_result,
 )
 from integrated_agent.runtimes.matrix.host.tikhubtools import source_tools_list
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
@@ -680,50 +682,28 @@ async def _finalize_source(
         )
 
 
-def build_source_subflow() -> TriggerFlow:
+def build_source_subflow() -> SubFlow:
     flow = TriggerFlow(name="matrix-compose-source-v1")
     flow.to(source_prelude)
     flow.when("Act").to(source_act).to(clean_tool_result)
     flow.when("Reason").to(source_reason)
-    return flow
-
-
-SOURCE_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
-    "input": "value",
-    "runtime_data": {
-        "request": "runtime_data.request",
-        "intent": "runtime_data.intent",
-        "source_kind": "runtime_data.source_kind",
-        "source_anchor": "runtime_data.source_anchor",
-        "user_instruction": "runtime_data.user_instruction",
-        "source_text": "runtime_data.source_text",
-        "search_query": "runtime_data.search_query",
-        "limitations": "runtime_data.limitations",
-    },
-    "resources": {
-        "trace": "resources.trace",
-        "snapshot": "resources.snapshot",
-        "events": "resources.events",
-    },
-}
-
-SOURCE_SUBFLOW_WRITE_BACK: TriggerFlowSubFlowWriteBack = {
-    "runtime_data": {
-        "tool_logs": "result.tool_logs",
-        "tool_result_cleaned": "result.tool_result_cleaned",
-        "source_result": "result.source_result",
-        "source_post": "result.source_post",
-        "source_media": "result.source_media",
-        "author_card": "result.author_card",
-        "related_tweet_cards": "result.related_tweet_cards",
-        "limitations": "result.limitations",
-    },
-}
+    return SubFlow(
+        flow,
+        capture_state(*ROUTE_STATE, "source_text", "search_query"),
+        write_back_result(
+            "tool_logs",
+            "tool_result_cleaned",
+            "source_result",
+            "source_post",
+            "source_media",
+            "author_card",
+            "related_tweet_cards",
+            "limitations",
+        ),
+    )
 
 
 __all__ = [
-    "SOURCE_SUBFLOW_CAPTURE",
-    "SOURCE_SUBFLOW_WRITE_BACK",
     "build_source_subflow",
     "clean_tool_result",
     "source_act",

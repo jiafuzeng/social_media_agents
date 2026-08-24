@@ -12,53 +12,27 @@ from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 from integrated_agent.runtimes.matrix.host.snapshots import SnapshotError, bind_snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
 from .init import compose_init
-from .intel import (
-    INTEL_SUBFLOW_CAPTURE,
-    INTEL_SUBFLOW_WRITE_BACK,
-    build_intel_subflow,
-)
+from .intel import build_intel_subflow
+from .originaltweet import build_original_tweet_subflow
 from .package import compose_package
 from .route import compose_route
-from .rewritetweet import (
-    REWRITE_TWEET_SUBFLOW_CAPTURE,
-    REWRITE_TWEET_SUBFLOW_WRITE_BACK,
-    build_rewrite_tweet_subflow,
-)
-from .source import (
-    SOURCE_SUBFLOW_CAPTURE,
-    SOURCE_SUBFLOW_WRITE_BACK,
-    build_source_subflow,
-)
-
-from .originaltweet import (
-    build_original_tweet_subflow,
-    ORIGINAL_TWEET_SUBFLOW_CAPTURE,
-    ORIGINAL_TWEET_SUBFLOW_WRITE_BACK,
-)
-
+from .rewritetweet import build_rewrite_tweet_subflow
+from .source import build_source_subflow
+from .subflow import attach_subflows
 
 PIPELINE_VERSION = "matrix-compose-v1"
 
-COMPOSE_FLOW = TriggerFlow(name="matrix-compose-v1")
+COMPOSE_FLOW = TriggerFlow(name=PIPELINE_VERSION)
 COMPOSE_FLOW.to(compose_init).to(compose_route)
-COMPOSE_FLOW.when("compose").to_sub_flow(
+attach_subflows(
+    COMPOSE_FLOW.when("compose"),
     build_intel_subflow(),
-    capture=INTEL_SUBFLOW_CAPTURE,
-    write_back=INTEL_SUBFLOW_WRITE_BACK,
-).to_sub_flow(
     build_original_tweet_subflow(),
-    capture=ORIGINAL_TWEET_SUBFLOW_CAPTURE,
-    write_back=ORIGINAL_TWEET_SUBFLOW_WRITE_BACK,
 )
-
-COMPOSE_FLOW.when("rewrite").to_sub_flow(
+attach_subflows(
+    COMPOSE_FLOW.when("rewrite"),
     build_source_subflow(),
-    capture=SOURCE_SUBFLOW_CAPTURE,
-    write_back=SOURCE_SUBFLOW_WRITE_BACK,
-).to_sub_flow(
     build_rewrite_tweet_subflow(),
-    capture=REWRITE_TWEET_SUBFLOW_CAPTURE,
-    write_back=REWRITE_TWEET_SUBFLOW_WRITE_BACK,
 )
 COMPOSE_FLOW.when("PACKAGE").to(compose_package)
 
