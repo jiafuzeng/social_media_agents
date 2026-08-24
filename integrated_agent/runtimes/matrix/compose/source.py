@@ -388,7 +388,6 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
     tools_schema = [
         {"name": k, "desc": v["desc"], "args": v["args"]} for k, v in tools.items()
     ]
-    session_id = str(data.require_resource("session_id"))
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     tool_result_cleaned = list(cast(list[Any], data.get_state("tool_result_cleaned") or []))
     tweet_cards = _tweet_cards_from_cleaned(tool_result_cleaned)
@@ -476,7 +475,6 @@ async def source_reason(data: TriggerFlowRuntimeData) -> None:
     try:
         raw = await (
             Agently.create_agent(name="matrix-compose-source-react")
-            .activate_session(session_id=session_id)
             .input(question)
             .info(
                 {
@@ -694,7 +692,6 @@ SOURCE_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
     },
     "resources": {
         "trace": "resources.trace",
-        "session_id": "resources.session_id",
         "snapshot": "resources.snapshot",
     },
 }

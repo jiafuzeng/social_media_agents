@@ -15,7 +15,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 KB_RECORD_ROOT = (PROJECT_ROOT / "workspace" / "rag" / "records").resolve()
 KB_FILES_ROOT = (PROJECT_ROOT / "workspace" / "rag" / "files").resolve()
 _env_file = PROJECT_ROOT / ".env"
-load_dotenv(_env_file if _env_file.is_file() else find_dotenv(usecwd=True))
+# override=True：以项目 .env 为准。Debug/终端里残留的旧 DEEPSEEK_* 否则会盖住新 key/base_url。
+load_dotenv(_env_file if _env_file.is_file() else find_dotenv(usecwd=True), override=True)
 
 Agently.set_settings(
     "model_pool",

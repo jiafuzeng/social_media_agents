@@ -148,10 +148,8 @@ async def _collect_search_browse_materials(
     *,
     goal: str,
     task_id: str,
-    session_id: str,
 ) -> list[dict[str, Any]]:
     """TikHub 无卡时的 Search/Browse fallback（仍不写正文）。"""
-    del session_id  # 不与工作台 session 共享，避免并发污染
 
     async def _run() -> Any:
         return await (
@@ -292,7 +290,6 @@ async def _ensure_material_media(
     *,
     goal: str,
     task_id: str,
-    session_id: str,
     fallback_search_browse: bool,
     limitations: list[str],
 ) -> list[dict[str, Any]]:
@@ -306,7 +303,6 @@ async def _ensure_material_media(
         browse_cards = await _collect_search_browse_materials(
             goal=goal,
             task_id=task_id or "intel-fallback",
-            session_id=session_id,
         )
         if browse_cards:
             out = _dedupe_materials([*browse_cards, *out])
@@ -985,12 +981,10 @@ async def _finalize_intel(
     material_list = _dedupe_materials([_material_card_from_tweet(tw) for tw in tweets])
 
     goal = str(user_instruction or data.get_state("user_instruction") or "").strip()
-    session_id = str(data.require_resource("session_id"))
     material_list = await _ensure_material_media(
         material_list,
         goal=goal,
         task_id=task_id,
-        session_id=session_id,
         fallback_search_browse=fallback_search_browse,
         limitations=limitations,
     )
@@ -1087,7 +1081,6 @@ INTEL_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
     },
     "resources": {
         "trace": "resources.trace",
-        "session_id": "resources.session_id",
         "snapshot": "resources.snapshot",
     },
 }

@@ -498,7 +498,6 @@ ORIGINAL_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
     },
     "resources": {
         "trace": "resources.trace",
-        "session_id": "resources.session_id",
         "snapshot": "resources.snapshot",
         "data_root": "resources.data_root",
         "knowledge": "resources.knowledge",
