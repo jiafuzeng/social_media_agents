@@ -28,7 +28,7 @@ const FALLBACK_STRATEGIES = [
 
 const FALLBACK_PROFILES = {
   default: "bge-m3",
-  profiles: ["openai-small", "bge-m3", "qwen3"]
+  profiles: ["text-embedding-v3", "bge-m3", "qwen3"]
 };
 
 const ELEMENT_LABELS = {

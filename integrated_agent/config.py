@@ -34,12 +34,12 @@ Agently.set_settings(
                 "max_tokens": 8192,
             },
         },
-        "openai-small": {
+        "text-embedding-v3": {
             "provider": "OpenAICompatible",
             "model_type": "embeddings",
-            "model": "text-embedding-3-small",
-            "base_url": os.environ.get("OPENAI_SMALL_EMBEDDING_BASE_URL", ""),
-            "api_key": os.environ.get("OPENAI_SMALL_EMBEDDING_API_KEY", ""),
+            "model": "text-embedding-v3",
+            "base_url": os.environ.get("TEXT_EMBEDDING_V3_BASE_URL", ""),
+            "api_key": os.environ.get("TEXT_EMBEDDING_V3_API_KEY", ""),
             "stream": False,
             "path_mapping": {"embeddings": "/embeddings"},
         },
@@ -81,7 +81,11 @@ def _kb_embedding_agent(profile_id: str):
     return agent.activate_model(profile_id)
 
 
-KB_EMBEDDING_PROFILE_IDS: Final[tuple[str, ...]] = ("openai-small", "bge-m3", "qwen3")
+KB_EMBEDDING_PROFILE_IDS: Final[tuple[str, ...]] = (
+    "text-embedding-v3",
+    "bge-m3",
+    "qwen3",
+)
 KB_DEFAULT_EMBEDDING_PROFILE: Final[str] = "bge-m3"
 KB_EMBEDDING_AGENTS = {
     profile_id: _kb_embedding_agent(profile_id) for profile_id in KB_EMBEDDING_PROFILE_IDS

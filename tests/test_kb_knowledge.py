@@ -38,7 +38,7 @@ class _FailNeedle(_ProbeProvider):
 def _open_stores(tmp_path: Path, monkeypatch) -> tuple[dict, dict[str, _ProbeProvider]]:
     monkeypatch.setattr(kb_store_mod, "KB_RECORD_ROOT", tmp_path / "kb" / "records")
     probes = {
-        "openai-small": _ProbeProvider([1.0, 0.0, 0.0]),
+        "text-embedding-v3": _ProbeProvider([0.5, 0.5, 0.0]),
         "bge-m3": _ProbeProvider([0.0, 1.0, 0.0]),
         "qwen3": _ProbeProvider([0.0, 0.0, 1.0]),
     }
@@ -99,7 +99,7 @@ async def test_paste_document_is_listed_and_retrievable(tmp_path: Path, monkeypa
     assert [item.doc_id for item in listed.documents] == [doc.doc_id]
     hits = await knowledge.retrieve("user-a", "退款", "bge-m3")
     assert any((item.get("scope") or {}).get("doc_id") == doc.doc_id for item in hits)
-    other_profile = await knowledge.retrieve("user-a", "退款", "openai-small")
+    other_profile = await knowledge.retrieve("user-a", "退款", "text-embedding-v3")
     assert other_profile == []
     cards = await knowledge.retrieve_draft_cards("user-a", "退款", "bge-m3")
     assert cards
@@ -353,14 +353,14 @@ async def test_chunk_rejects_other_embedding_profile(
             "user-a",
             doc.doc_id,
             chunk.chunk_id,
-            UpdateChunkIn(text="换模型改正文。", embedding_profile_id="openai-small"),
+            UpdateChunkIn(text="换模型改正文。", embedding_profile_id="text-embedding-v3"),
         )
     assert caught.value.status == 422
     with pytest.raises(KnowledgeError) as caught:
         await knowledge.update_document(
             "user-a",
             doc.doc_id,
-            UpdateDocumentIn(embedding_profile_id="openai-small"),
+            UpdateDocumentIn(embedding_profile_id="text-embedding-v3"),
         )
     assert caught.value.status == 422
     assert str(caught.value) == "cannot change embedding_profile_id without rechunk"
@@ -454,11 +454,11 @@ async def test_rechunk_purges_old_chunk_records(tmp_path: Path, monkeypatch) -> 
         doc.doc_id,
         UpdateDocumentIn(
             rechunk=True,
-            embedding_profile_id="openai-small",
+            embedding_profile_id="text-embedding-v3",
             text="新的发票说明可下载。",
         ),
     )
-    assert updated.embedding_profile_id == "openai-small"
+    assert updated.embedding_profile_id == "text-embedding-v3"
     for record_id in old_ids:
         assert await knowledge._catalog.backend.get_record(record_id) is None
     leftover = await knowledge._catalog.search(
@@ -473,7 +473,7 @@ async def test_rechunk_purges_old_chunk_records(tmp_path: Path, monkeypatch) -> 
     chunks = await knowledge.list_chunks("user-a", doc.doc_id)
     assert any("发票" in item.text for item in chunks.chunks)
     assert all("旧退款" not in item.text for item in chunks.chunks)
-    assert await knowledge.retrieve("user-a", "发票", "openai-small")
+    assert await knowledge.retrieve("user-a", "发票", "text-embedding-v3")
     assert await knowledge.retrieve("user-a", "退款", "bge-m3") == []
 
 
@@ -494,7 +494,7 @@ async def test_rechunk_keeps_old_chunks_when_ingest_fails(
         for item in await knowledge._chunk_refs("user-a", doc.doc_id, active_only=True)
     ]
     failing = _FailNeedle([1.0, 0.0, 0.0], "FAILME")
-    store = knowledge._stores["openai-small"]
+    store = knowledge._stores["text-embedding-v3"]
     store.backend.embedding_provider = failing
     store.backend.vector_index.embedding_provider = failing
     with pytest.raises(KnowledgeError) as caught:
@@ -503,7 +503,7 @@ async def test_rechunk_keeps_old_chunks_when_ingest_fails(
             doc.doc_id,
             UpdateDocumentIn(
                 rechunk=True,
-                embedding_profile_id="openai-small",
+                embedding_profile_id="text-embedding-v3",
                 text="FAILME 新的发票说明。",
             ),
         )
@@ -639,7 +639,7 @@ async def test_search_requires_profile_and_respects_lock(
     assert any(hit.doc_id == doc.doc_id for hit in same.hits)
     other = await knowledge.search(
         "user-a",
-        SearchKbIn(query="退款", embedding_profile_id="openai-small"),
+        SearchKbIn(query="退款", embedding_profile_id="text-embedding-v3"),
     )
     assert other.hits == []
     assert other.empty_reason == "no_docs_for_profile"
@@ -691,7 +691,7 @@ async def test_search_auto_selects_profile_for_matching_corpus(
     assert any(hit.doc_id == tweet.doc_id for hit in tweet_hits.hits)
     pinned = await knowledge.search(
         "user-a",
-        SearchKbIn(query="退款", embedding_profile_id="openai-small"),
+        SearchKbIn(query="退款", embedding_profile_id="text-embedding-v3"),
     )
     assert pinned.auto_selected is False
     assert pinned.hits == []

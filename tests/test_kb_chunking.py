@@ -463,7 +463,11 @@ def test_http_embedding_profiles_are_public_labels(tmp_path: Path, monkeypatch) 
         assert payload.status_code == 200
         body = payload.json()
         assert body["default"] == "bge-m3"
-        assert body["profiles"] == ["openai-small", "bge-m3", "qwen3"]
+        assert body["profiles"] == [
+            "text-embedding-v3",
+            "bge-m3",
+            "qwen3",
+        ]
         dumped = str(body)
         assert "api_key" not in dumped
         assert "base_url" not in dumped

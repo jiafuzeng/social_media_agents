@@ -28,7 +28,7 @@ class _ProbeProvider:
 def _open(tmp_path: Path, monkeypatch, profile_id: str = "bge-m3") -> tuple[RecordStore, dict[str, _ProbeProvider]]:
     monkeypatch.setattr(kb_store_mod, "KB_RECORD_ROOT", tmp_path / "kb" / "records")
     probes = {
-        "openai-small": _ProbeProvider([1.0, 0.0, 0.0]),
+        "text-embedding-v3": _ProbeProvider([0.5, 0.5, 0.0]),
         "bge-m3": _ProbeProvider([0.0, 1.0, 0.0]),
         "qwen3": _ProbeProvider([0.0, 0.0, 1.0]),
     }
@@ -93,7 +93,7 @@ async def test_cross_profile_delete_then_put_keeps_sqlite_writable(
 ) -> None:
     monkeypatch.setattr(kb_store_mod, "KB_RECORD_ROOT", tmp_path / "kb" / "records")
     probes = {
-        "openai-small": _ProbeProvider([1.0, 0.0, 0.0]),
+        "text-embedding-v3": _ProbeProvider([0.5, 0.5, 0.0]),
         "bge-m3": _ProbeProvider([0.0, 1.0, 0.0]),
         "qwen3": _ProbeProvider([0.0, 0.0, 1.0]),
     }
@@ -105,7 +105,7 @@ async def test_cross_profile_delete_then_put_keeps_sqlite_writable(
 
     monkeypatch.setattr(kb_store_mod, "AgentEmbeddingProvider", _wrap)
     old_store = kb_store_mod._open_store("bge-m3")
-    new_store = kb_store_mod._open_store("openai-small")
+    new_store = kb_store_mod._open_store("text-embedding-v3")
     assert (
         old_store.backend.vector_store_provider
         is new_store.backend.vector_store_provider
@@ -124,7 +124,7 @@ async def test_cross_profile_delete_then_put_keeps_sqlite_writable(
         vector=True,
     )
     hits = await new_store.backend.vector_store_provider.search_by_embedding(
-        [1.0, 0.0, 0.0],
+        [0.5, 0.5, 0.0],
         filters={"collection": "kb"},
         limit=5,
     )
@@ -133,7 +133,7 @@ async def test_cross_profile_delete_then_put_keeps_sqlite_writable(
 
 @pytest.mark.asyncio
 async def test_put_vector_indexes_sqlite(tmp_path: Path, monkeypatch) -> None:
-    store, probes = _open(tmp_path, monkeypatch, "openai-small")
+    store, probes = _open(tmp_path, monkeypatch, "text-embedding-v3")
     assert store.backend.vector_store_provider.name == "sqlite"
     ref = await store.put(
         {"text": "alpha handbook"},
@@ -141,9 +141,9 @@ async def test_put_vector_indexes_sqlite(tmp_path: Path, monkeypatch) -> None:
         kind="chunk",
         vector=True,
     )
-    assert probes["openai-small"].calls
+    assert probes["text-embedding-v3"].calls
     hits = await store.backend.vector_store_provider.search_by_embedding(
-        [1.0, 0.0, 0.0],
+        [0.5, 0.5, 0.0],
         filters={"collection": "kb"},
         limit=5,
     )
