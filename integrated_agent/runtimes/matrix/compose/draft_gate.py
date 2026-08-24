@@ -21,7 +21,6 @@ from integrated_agent.runtimes.matrix.host.models import (
 )
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import publish_progress
 
 
 def _optional_resource(data: TriggerFlowRuntimeData, key: str) -> Any:
@@ -179,7 +178,6 @@ async def gate_compose_draft(
             kind="compose_post",
             knowledge=_optional_resource(data, "knowledge"),
             user_id=str(_optional_resource(data, "kb_user_id") or "") or None,
-            embedding_profile_id=str(_optional_resource(data, "kb_profile_id") or "") or None,
             extra_info=extra_info,
             offered_cta_urls=offered_cta_urls,
             offered_media_keys=media_keys,
@@ -244,15 +242,19 @@ async def gate_compose_draft(
             "material_card": work.get("material_card") or {},
         }
     )
-    await publish_progress(
-        data,
-        "draft.ready",
-        {
-            "draft_key": gated.draft_key,
-            "decision": gated.decision,
-            "degrade_op": gated.degrade_op,
-        },
-    )
+    events = data.get_resource("events")
+    request = data.get_state("request")
+    task_id = str(request.get("task_id") or "") if isinstance(request, dict) else ""
+    if events is not None and task_id:
+        await events.publish(
+            task_id,
+            "draft.ready",
+            {
+                "draft_key": gated.draft_key,
+                "decision": gated.decision,
+                "degrade_op": gated.degrade_op,
+            },
+        )
     return payload
 
 

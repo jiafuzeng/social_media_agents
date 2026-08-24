@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -8,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from integrated_agent.runtimes.matrix.host.service import MatrixTaskService, ServiceBusyError
+from integrated_agent.runtimes.matrix.host.service import MatrixTaskService
 from integrated_agent.runtimes.question.service import QuestionTaskService
 
 from .matrix import build_matrix_router
@@ -44,11 +45,12 @@ def create_http_app(
 
     app = FastAPI(title="综合智能体 HTTP 服务", version="1.0.0", lifespan=lifespan)
 
-    @app.exception_handler(ServiceBusyError)
-    async def service_busy(_request: Request, exc: ServiceBusyError) -> JSONResponse:
+    @app.exception_handler(asyncio.QueueFull)
+    async def service_busy(_request: Request, exc: asyncio.QueueFull) -> JSONResponse:
+        del exc
         return JSONResponse(
             status_code=503,
-            content={"detail": str(exc)},
+            content={"detail": "task queue is full"},
             headers={"Retry-After": "1"},
         )
 

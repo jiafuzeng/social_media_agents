@@ -348,7 +348,6 @@ function fillKbProfiles(payload) {
     payload.default
   );
   syncKbChrome();
-  window.refreshKbDraftHint?.();
 }
 
 function kbPreviewBody() {
@@ -1045,7 +1044,6 @@ function applyKbSessionPreferences() {
   if (workspace) persistKbProfile(workspace);
   if (kbSelectedStrategy) persistKbStrategy(kbSelectedStrategy);
   syncKbChrome();
-  window.refreshKbDraftHint?.();
 }
 
 function resetKbWorkspaceState() {
@@ -2370,7 +2368,6 @@ function bindKbWorkspace() {
   document.querySelector("#kbEmbedding")?.addEventListener("change", () => {
     if (kbApplyingProfile) return;
     onWorkspaceProfileChange();
-    window.refreshKbDraftHint?.();
   });
   document.querySelector("#kbStrategy")?.addEventListener("change", event => {
     selectKbStrategy(event.target.value, { fromUser: true });

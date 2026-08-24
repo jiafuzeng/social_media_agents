@@ -86,7 +86,7 @@ def test_create_with_session_appends_turn(
         assert turns[0]["text"] == "为秋季上新写一条预热推文"
         assert turns[0]["task_id"] == created.json()["task_id"]
         assert turns[0]["task_url"] == created.json()["task_url"]
-        assert turns[0]["extra"]["embedding_profile_id"] == "bge-m3"
+        assert "embedding_profile_id" not in turns[0]["extra"]
         assert detail.json()["title"] == "为秋季上新写一条预热推文"[:28]
         missing_session = client.post("/api/create", json={"text": "无会话不可建任务"})
         assert missing_session.status_code == 422
@@ -101,22 +101,3 @@ def test_create_requires_login(tmp_path: Path, monkeypatch) -> None:
             json={"text": "为秋季上新写一条预热推文", "session_id": session["session_id"]},
         )
         assert rejected.status_code == 401
-
-
-def test_create_unknown_embedding_profile_is_422(
-    tmp_path: Path, monkeypatch
-) -> None:
-    with _client(tmp_path, monkeypatch) as client:
-        owner = _auth(client, "owner")
-        session = client.post("/api/sessions", headers=owner, json={}).json()
-        rejected = client.post(
-            "/api/create",
-            headers=owner,
-            json={
-                "text": "为秋季上新写一条预热推文",
-                "session_id": session["session_id"],
-                "embedding_profile_id": "no-such",
-            },
-        )
-        assert rejected.status_code == 422
-        assert rejected.json()["detail"] == "unknown embedding_profile_id"

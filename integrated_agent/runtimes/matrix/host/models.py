@@ -62,10 +62,6 @@ class MatrixTaskCreate(DomainModel):
         le=MAX_COMPOSE_POSTS,
         description="本次要出几条推文；仅 compose，范围 1–10。省略则由模型在平台上限内决定",
     )
-    force_intent: WriteIntent | None = Field(
-        default=None,
-        description="纠错强制支路；仅 compose。存在则跳过 route_intent",
-    )
     reply_count: int | None = Field(
         default=None,
         ge=MIN_COMPOSE_POSTS,
@@ -79,10 +75,6 @@ class MatrixTaskCreate(DomainModel):
     requester: str = Field(default="course-user", description="提交者，仅审计/日志，不参与拆解")
     channel: str = Field(default="web", description="来源通道 web 或 gateway，不改流程")
     session_id: str = Field(min_length=1, description="host 对话 id，与 Agently Session.id 相同")
-    embedding_profile_id: str | None = Field(
-        default=None,
-        description="写稿 RetrieveKb 所用 embedding；省略则 yaml default。不参与案例 RAG",
-    )
 
     @model_validator(mode="after")
     def bind_entry_invariants(self) -> "MatrixTaskCreate":
@@ -98,8 +90,6 @@ class MatrixTaskCreate(DomainModel):
         if self.scenario == "reply":
             if self.post_count is not None:
                 raise ValueError("reply must not include post_count")
-            if self.force_intent is not None:
-                raise ValueError("reply must not include force_intent")
             if self.account_key is not None:
                 raise ValueError("reply must not include account_key")
             if not self.interaction_key:
@@ -124,10 +114,6 @@ class ComposeTaskCreate(DomainModel):
     requester: str = Field(default="course-user", description="提交者，仅审计/日志")
     channel: str = Field(default="web", description="来源通道 web 或 gateway")
     session_id: str = Field(min_length=1, description="host 对话 id")
-    embedding_profile_id: str | None = Field(
-        default=None,
-        description="写稿 RetrieveKb 所用 embedding；省略则 yaml default",
-    )
 
     @model_validator(mode="after")
     def bind_defaults(self) -> "ComposeTaskCreate":
@@ -162,10 +148,6 @@ class ReplyTaskCreate(DomainModel):
     requester: str = Field(default="course-user", description="提交者，仅审计/日志")
     channel: str = Field(default="web", description="来源通道 web 或 gateway")
     session_id: str = Field(min_length=1, description="host 对话 id")
-    embedding_profile_id: str | None = Field(
-        default=None,
-        description="写稿 RetrieveKb 所用 embedding；省略则 yaml default",
-    )
 
     @model_validator(mode="after")
     def bind_defaults(self) -> "ReplyTaskCreate":

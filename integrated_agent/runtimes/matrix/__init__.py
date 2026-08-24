@@ -7,17 +7,15 @@ from .host.models import (
     TaskAccepted,
     TaskEvent,
 )
-from .host.service import MatrixTaskFailed, MatrixTaskService, ServiceBusyError
+from .host.service import MatrixTaskService
 
 __all__ = [
     "ComposeTaskCreate",
     "MatrixTaskCreate",
-    "MatrixTaskFailed",
     "MatrixTaskRequest",
     "MatrixTaskResult",
     "MatrixTaskService",
     "ReplyTaskCreate",
-    "ServiceBusyError",
     "TaskAccepted",
     "TaskEvent",
 ]

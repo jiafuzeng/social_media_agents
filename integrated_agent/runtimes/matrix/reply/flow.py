@@ -56,7 +56,6 @@ async def run_reply(
             "session_id": request.session_id,
             "knowledge": knowledge,
             "kb_user_id": request.user_id or "",
-            "kb_profile_id": request.embedding_profile_id or "",
             "events": events,
         },
         auto_close=False,

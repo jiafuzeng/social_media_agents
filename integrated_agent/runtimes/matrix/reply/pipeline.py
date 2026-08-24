@@ -23,7 +23,6 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     merged_forbidden_topics,
 )
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import emit_stage, publish_progress
 from integrated_agent.runtimes.matrix.host.models import (
     BriefOut,
     GatedDraft,
@@ -43,7 +42,9 @@ async def reply_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("drafts", [], emit=False)
     await data.async_set_state("evidence_cards", [], emit=False)
     trace = cast(TraceLog, data.require_resource("trace"))
-    await emit_stage(data, "snapshot", started=True)
+    events = data.get_resource("events")
+    if events is not None:
+        await events.publish(request.task_id, "stage.started", {"stage": "snapshot"})
     trace.log(
         layer="business",
         event_type="business.matrix.snapshot_bound",
@@ -54,13 +55,16 @@ async def reply_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             "comment_count": len(snapshot.comments),
         },
     )
-    await emit_stage(
-        data,
-        "snapshot",
-        started=False,
-        snapshot_id=snapshot.snapshot_id,
-        comment_count=len(snapshot.comments),
-    )
+    if events is not None:
+        await events.publish(
+            request.task_id,
+            "stage.completed",
+            {
+                "stage": "snapshot",
+                "snapshot_id": snapshot.snapshot_id,
+                "comment_count": len(snapshot.comments),
+            },
+        )
     return payload
 
 
@@ -101,7 +105,9 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     request = MatrixTaskRequest.model_validate(data.get_state("request"))
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
-    await emit_stage(data, "brief", started=True)
+    events = data.get_resource("events")
+    if events is not None:
+        await events.publish(request.task_id, "stage.started", {"stage": "brief"})
     max_items = _reply_item_limit(request, snapshot)
     single_comment = len(snapshot.comments) == 1
     if request.reply_count is not None and single_comment:
@@ -208,20 +214,18 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
         facts={"work_item_count": len(brief.work_items)},
     )
     for item in brief.work_items:
-        await publish_progress(
-            data,
-            "work_item.ready",
-            {
-                "work_item_id": item.work_item_id,
-                "kind": item.kind,
-            },
+        if events is not None:
+            await events.publish(
+                request.task_id,
+                "work_item.ready",
+                {"work_item_id": item.work_item_id, "kind": item.kind},
+            )
+    if events is not None:
+        await events.publish(
+            request.task_id,
+            "stage.completed",
+            {"stage": "brief", "work_item_count": len(brief.work_items)},
         )
-    await emit_stage(
-        data,
-        "brief",
-        started=False,
-        work_item_count=len(brief.work_items),
-    )
     return [item.model_dump(mode="json") for item in brief.work_items]
 
 
@@ -295,7 +299,6 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
             comment=comment,
             knowledge=data.require_resource("knowledge"),
             user_id=str(data.require_resource("kb_user_id") or "") or None,
-            embedding_profile_id=str(data.require_resource("kb_profile_id") or "") or None,
         )
     except Exception as exc:
         error_tag = f"reply_draft_error:{work_item.work_item_id}:{type(exc).__name__}"
@@ -333,22 +336,30 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
     await data.async_append_state("drafts", gated.model_dump(mode="json"), emit=False)
     for card in cards:
         await data.async_append_state("evidence_cards", card, emit=False)
-    await publish_progress(
-        data,
-        "draft.ready",
-        {
-            "draft_key": gated.draft_key,
-            "decision": gated.decision,
-            "degrade_op": gated.degrade_op,
-        },
-    )
+    events = data.get_resource("events")
+    request = data.get_state("request")
+    task_id = str(request.get("task_id") or "") if isinstance(request, dict) else ""
+    if events is not None and task_id:
+        await events.publish(
+            task_id,
+            "draft.ready",
+            {
+                "draft_key": gated.draft_key,
+                "decision": gated.decision,
+                "degrade_op": gated.degrade_op,
+            },
+        )
     return gated.model_dump(mode="json")
 
 
 async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
-    await emit_stage(data, "review", started=True)
+    request = cast(dict[str, Any], data.get_state("request") or {})
+    task_id = str(request.get("task_id") or "")
+    events = data.get_resource("events")
+    if events is not None and task_id:
+        await events.publish(task_id, "stage.started", {"stage": "review"})
     drafts = [
         GatedDraft.model_validate(item)
         for item in cast(list[dict[str, Any]], data.get_state("drafts") or [])
@@ -446,7 +457,6 @@ async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     }
     await data.async_set_state("package", package, emit=False)
     await data.async_set_state("final_failed", status == "failed", emit=False)
-    task_id = cast(dict[str, Any], data.get_state("request"))["task_id"]
     trace.log(
         layer="business",
         event_type="business.matrix.reviewed",
@@ -461,11 +471,10 @@ async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         subject_id=task_id,
         output=package,
     )
-    await emit_stage(
-        data,
-        "review",
-        started=False,
-        status=status,
-        draft_count=len(drafts),
-    )
+    if events is not None and task_id:
+        await events.publish(
+            task_id,
+            "stage.completed",
+            {"stage": "review", "status": status, "draft_count": len(drafts)},
+        )
     return package

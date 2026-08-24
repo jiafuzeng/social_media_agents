@@ -9,7 +9,6 @@ from agently import TriggerFlowRuntimeData
 from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import emit_stage
 
 
 async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -40,7 +39,9 @@ async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("brief", None, emit=False)
     await data.async_set_state("rewrite_plan_card", None, emit=False)
     trace = cast(TraceLog, data.require_resource("trace"))
-    await emit_stage(data, "snapshot", started=True)
+    events = data.get_resource("events")
+    if events is not None:
+        await events.publish(request.task_id, "stage.started", {"stage": "snapshot"})
     trace.log(
         layer="business",
         event_type="business.matrix.snapshot_bound",
@@ -48,12 +49,12 @@ async def compose_init(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         subject_id=request.task_id,
         facts={"snapshot_id": snapshot.snapshot_id, "need_trends": request.need_trends},
     )
-    await emit_stage(
-        data,
-        "snapshot",
-        started=False,
-        snapshot_id=snapshot.snapshot_id,
-    )
+    if events is not None:
+        await events.publish(
+            request.task_id,
+            "stage.completed",
+            {"stage": "snapshot", "snapshot_id": snapshot.snapshot_id},
+        )
     return payload
 
 

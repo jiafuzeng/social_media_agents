@@ -33,7 +33,6 @@ from integrated_agent.runtimes.matrix.compose.web_media import (
 from integrated_agent.runtimes.matrix.host.models import media_links_as_dicts
 from integrated_agent.runtimes.matrix.host.tikhubtools import compose_tools_list
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import emit_stage
 
 MAX_THOUGHTS = 8
 MAX_HTTP = 4
@@ -694,7 +693,9 @@ async def intel_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("need_trends", need_trends, emit=False)
     await data.async_set_state("limitations", limitations, emit=False)
     await data.async_set_state("tool_result_cleaned", [], emit=False)
-    await emit_stage(data, "intel", started=True)
+    events = data.get_resource("events")
+    if events is not None and task_id:
+        await events.publish(task_id, "stage.started", {"stage": "intel"})
 
     live = _has_url_or_handle_candidate(
         source_kind=source_kind,
@@ -1049,13 +1050,17 @@ async def _finalize_intel(
             "limitations": limitations,
         },
     )
-    await emit_stage(
-        data,
-        "intel",
-        started=False,
-        material_count=len(material_list),
-        trend_count=len(trend_cards),
-    )
+    events = data.get_resource("events")
+    if events is not None and task_id:
+        await events.publish(
+            task_id,
+            "stage.completed",
+            {
+                "stage": "intel",
+                "material_count": len(material_list),
+                "trend_count": len(trend_cards),
+            },
+        )
     return {
         "tweet_cards": tweet_cards,
         "trend_cards": trend_cards,

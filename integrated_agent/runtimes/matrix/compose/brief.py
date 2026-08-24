@@ -22,7 +22,6 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     merged_forbidden_topics,
 )
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import emit_stage, publish_progress
 
 
 def _offered_cta_urls(snapshot: Snapshot) -> list[str]:
@@ -147,7 +146,9 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     material_list = _collect_material_cards(data)
     account = snapshot.account
     platform_key = snapshot.platform.platform_key or TWITTER_PLATFORM_KEY
-    await emit_stage(data, "brief", started=True)
+    events = data.get_resource("events")
+    if events is not None and task_id:
+        await events.publish(task_id, "stage.started", {"stage": "brief"})
 
     info: dict[str, Any] = {
         "post_count": post_count,
@@ -258,20 +259,18 @@ async def compose_brief(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         facts={"work_item_count": len(brief.work_items)},
     )
     for item in brief.work_items:
-        await publish_progress(
-            data,
-            "work_item.ready",
-            {
-                "work_item_id": item.work_item_id,
-                "kind": item.kind,
-            },
+        if events is not None and task_id:
+            await events.publish(
+                task_id,
+                "work_item.ready",
+                {"work_item_id": item.work_item_id, "kind": item.kind},
+            )
+    if events is not None and task_id:
+        await events.publish(
+            task_id,
+            "stage.completed",
+            {"stage": "brief", "work_item_count": len(brief.work_items)},
         )
-    await emit_stage(
-        data,
-        "brief",
-        started=False,
-        work_item_count=len(brief.work_items),
-    )
     return brief.model_dump(mode="json")
 
 

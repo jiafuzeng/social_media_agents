@@ -51,7 +51,6 @@ from integrated_agent.runtimes.matrix.host.drafting import rollup_status
 from integrated_agent.runtimes.matrix.host.models import WorkItem
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import emit_stage, publish_progress
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -451,7 +450,10 @@ async def rewrite_tweet_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     request = cast(dict[str, Any], data.get_state("request") or {})
     limitations = list(cast(list[str], data.get_state("limitations") or []))
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
-    await emit_stage(data, "rewrite_tweet", started=True)
+    events = data.get_resource("events")
+    task_id = str(request.get("task_id") or "")
+    if events is not None and task_id:
+        await events.publish(task_id, "stage.started", {"stage": "rewrite_tweet"})
 
     upstream = _hydrate_rewrite_upstream(_collect_upstream(data))
     branch_context, evidence_cards = _normalize_branch_context(
@@ -655,15 +657,20 @@ async def plan_rewrite_drafts(data: TriggerFlowRuntimeData) -> list[dict[str, An
         item["reuse_media"] = reuse_media and bool(item.get("media_catalog"))
     await data.async_set_state("post_count", post_count, emit=False)
     await data.async_set_state("rewrite_draft_plan", work_items, emit=False)
+    events = data.get_resource("events")
+    task_id = str(request.get("task_id") or "")
     for item in work_items:
-        await publish_progress(
-            data,
-            "work_item.ready",
-            {
-                "work_item_id": str(item.get("work_item_id") or item.get("draft_key") or ""),
-                "kind": "compose_post",
-            },
-        )
+        if events is not None and task_id:
+            await events.publish(
+                task_id,
+                "work_item.ready",
+                {
+                    "work_item_id": str(
+                        item.get("work_item_id") or item.get("draft_key") or ""
+                    ),
+                    "kind": "compose_post",
+                },
+            )
     return work_items
 
 
@@ -970,7 +977,6 @@ REWRITE_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
         "data_root": "resources.data_root",
         "knowledge": "resources.knowledge",
         "kb_user_id": "resources.kb_user_id",
-        "kb_profile_id": "resources.kb_profile_id",
         "events": "resources.events",
     },
 }

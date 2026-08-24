@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 from pathlib import Path
-from typing import Protocol
+from typing import Any
 from uuid import uuid4
 
 from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
@@ -12,7 +12,6 @@ from .identity import IdentityStore
 from .models import (
     MatrixTaskCreate,
     MatrixTaskRequest,
-    MatrixTaskResult,
     TaskAccepted,
     TaskSnapshot,
 )
@@ -20,23 +19,11 @@ from .stores import InMemoryEventStore, InMemoryTaskStore
 from .task_persistence import load_task_snapshot, persist_task_snapshot
 
 
-class TaskWorker(Protocol):
-    async def execute_complex_task(self, request: MatrixTaskRequest) -> MatrixTaskResult: ...
-
-
-class ServiceBusyError(RuntimeError):
-    pass
-
-
-class MatrixTaskFailed(RuntimeError):
-    pass
-
-
 class MatrixTaskService:
     def __init__(
         self,
         *,
-        worker: TaskWorker,
+        worker: Any,
         tasks: InMemoryTaskStore,
         events: InMemoryEventStore,
         identity: IdentityStore,
@@ -102,11 +89,9 @@ class MatrixTaskService:
         await self.tasks.create(task_id)
         try:
             self._queue.put_nowait(request)
-        except asyncio.QueueFull as exc:
+        except asyncio.QueueFull:
             await self.tasks.delete(task_id)
-            raise ServiceBusyError(
-                f"task queue is full ({self.queue_capacity})"
-            ) from exc
+            raise
         await self.events.publish(
             task_id,
             "task.submitted",

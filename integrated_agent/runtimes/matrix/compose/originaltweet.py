@@ -31,7 +31,6 @@ from integrated_agent.runtimes.matrix.host.drafting import rollup_status
 from integrated_agent.runtimes.matrix.host.models import GatedDraft
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, TWITTER_PLATFORM_KEY
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
-from integrated_agent.runtimes.matrix.host.progress import emit_stage
 
 MAX_DRAFT_CONCURRENCY = 3
 MAX_DRAFT_REGEN_ATTEMPTS = 2
@@ -149,7 +148,9 @@ async def original_tweet_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]
     await data.async_set_state("user_instruction", ctx["user_instruction"], emit=False)
     await data.async_set_state("material_list", material_cards, emit=False)
     await data.async_set_state("limitations", limitations, emit=False)
-    await emit_stage(data, "original_tweet", started=True)
+    events = data.get_resource("events")
+    if events is not None and ctx["task_id"]:
+        await events.publish(ctx["task_id"], "stage.started", {"stage": "original_tweet"})
 
     account = snapshot.account
     return {
@@ -504,7 +505,6 @@ ORIGINAL_TWEET_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
         "data_root": "resources.data_root",
         "knowledge": "resources.knowledge",
         "kb_user_id": "resources.kb_user_id",
-        "kb_profile_id": "resources.kb_profile_id",
         "events": "resources.events",
     },
 }

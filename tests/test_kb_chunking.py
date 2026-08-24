@@ -483,7 +483,7 @@ def test_matrix_page_includes_kb_workspace(tmp_path: Path, monkeypatch) -> None:
         assert 'id="kbStrategy"' in page
         assert 'id="kbEmbedding"' in page
         assert page.count('id="kbEmbedding"') == 1
-        assert 'id="kbDraftProfile"' in page
+        assert 'id="kbDraftProfile"' not in page
         assert "/static/matrix-kb.js" in page
         js = (PROJECT_ROOT / "static" / "matrix-kb.js").read_text(encoding="utf-8")
         assert "resetKbWorkspaceState" in js

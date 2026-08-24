@@ -10,10 +10,7 @@ from integrated_agent.runtimes.matrix.host.stores import (
     InMemoryEventStore,
     InMemoryTaskStore,
 )
-from integrated_agent.runtimes.matrix.host.worker import (
-    MatrixWorkflowWorker,
-    WorkerDependencies,
-)
+from integrated_agent.runtimes.matrix.host.worker import MatrixWorkflowWorker
 from integrated_agent.runtimes.matrix.rag.knowledge import KnowledgeStore
 from integrated_agent.runtimes.matrix.reply.worker import make_analyze_reply
 
@@ -43,21 +40,19 @@ def build_matrix_service(
     matrix_logs_root = logs_root or (root / "logs" / "matrix")
     data_root = root / "data" / "matrix"
     worker = MatrixWorkflowWorker(
-        WorkerDependencies(
-            analyze_compose=make_analyze_compose(
-                logs_root=matrix_logs_root,
-                data_root=data_root,
-                knowledge=knowledge_store,
-                events=events,
-            ),
-            analyze_reply=make_analyze_reply(
-                logs_root=matrix_logs_root,
-                data_root=data_root,
-                knowledge=knowledge_store,
-                events=events,
-            ),
+        analyze_compose=make_analyze_compose(
+            logs_root=matrix_logs_root,
+            data_root=data_root,
+            knowledge=knowledge_store,
             events=events,
-        )
+        ),
+        analyze_reply=make_analyze_reply(
+            logs_root=matrix_logs_root,
+            data_root=data_root,
+            knowledge=knowledge_store,
+            events=events,
+        ),
+        events=events,
     )
     return MatrixTaskService(
         worker=worker,
