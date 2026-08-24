@@ -21,6 +21,7 @@ from integrated_agent.runtimes.matrix.host.models import (
 )
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.host.progress import publish_progress
 
 
 def _optional_resource(data: TriggerFlowRuntimeData, key: str) -> Any:
@@ -242,6 +243,15 @@ async def gate_compose_draft(
             "error": gated.issues[0] if gated.issues else "",
             "material_card": work.get("material_card") or {},
         }
+    )
+    await publish_progress(
+        data,
+        "draft.ready",
+        {
+            "draft_key": gated.draft_key,
+            "decision": gated.decision,
+            "degrade_op": gated.degrade_op,
+        },
     )
     return payload
 

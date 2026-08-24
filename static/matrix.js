@@ -22,6 +22,14 @@ const labels = {
 };
 
 const stageLabels = {
+  snapshot: "绑定人设",
+  route: "识别创作或改写",
+  intel: "搜集选题情报",
+  source: "定位原文",
+  original_tweet: "起草原创推文",
+  rewrite_tweet: "改写推文",
+  brief: "拆解工作项",
+  review: "评理复核",
   analyze_matrix: "分析与写稿",
   analyze_compose: "分析与写稿",
   analyze_reply: "分析与回评",

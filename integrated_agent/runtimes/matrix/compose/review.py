@@ -17,6 +17,7 @@ from integrated_agent.runtimes.matrix.host.drafting import apply_review, rollup_
 from integrated_agent.runtimes.matrix.host.models import GatedDraft, ReviewOut
 from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.host.progress import emit_stage
 
 
 def _coerce_gated_draft(item: dict[str, Any]) -> GatedDraft:
@@ -236,6 +237,7 @@ async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     ]
     drafts = [_coerce_gated_draft(item) for item in task_results]
     drafts.sort(key=lambda item: item.draft_key)
+    await emit_stage(data, "review", started=True)
 
     try:
         reviewed, extra, summary = await review_compose_drafts(
@@ -269,6 +271,13 @@ async def compose_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         status="completed",
         subject_id=task_id,
         output={"draft_count": len(reviewed), "intent": intent},
+    )
+    await emit_stage(
+        data,
+        "review",
+        started=False,
+        draft_count=len(reviewed),
+        intent=intent,
     )
     return {
         "drafts": [item.model_dump(mode="json") for item in reviewed],

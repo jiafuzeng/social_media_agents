@@ -23,6 +23,7 @@ from integrated_agent.runtimes.matrix.host.snapshots import (
     merged_forbidden_topics,
 )
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.host.progress import emit_stage, publish_progress
 from integrated_agent.runtimes.matrix.host.models import (
     BriefOut,
     GatedDraft,
@@ -42,6 +43,7 @@ async def reply_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("drafts", [], emit=False)
     await data.async_set_state("evidence_cards", [], emit=False)
     trace = cast(TraceLog, data.require_resource("trace"))
+    await emit_stage(data, "snapshot", started=True)
     trace.log(
         layer="business",
         event_type="business.matrix.snapshot_bound",
@@ -51,6 +53,13 @@ async def reply_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             "snapshot_id": snapshot.snapshot_id,
             "comment_count": len(snapshot.comments),
         },
+    )
+    await emit_stage(
+        data,
+        "snapshot",
+        started=False,
+        snapshot_id=snapshot.snapshot_id,
+        comment_count=len(snapshot.comments),
     )
     return payload
 
@@ -92,6 +101,7 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
     request = MatrixTaskRequest.model_validate(data.get_state("request"))
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
+    await emit_stage(data, "brief", started=True)
     max_items = _reply_item_limit(request, snapshot)
     single_comment = len(snapshot.comments) == 1
     if request.reply_count is not None and single_comment:
@@ -196,6 +206,21 @@ async def reply_brief(data: TriggerFlowRuntimeData) -> list[dict[str, Any]]:
         subject_id=request.task_id,
         output=brief.model_dump(mode="json"),
         facts={"work_item_count": len(brief.work_items)},
+    )
+    for item in brief.work_items:
+        await publish_progress(
+            data,
+            "work_item.ready",
+            {
+                "work_item_id": item.work_item_id,
+                "kind": item.kind,
+            },
+        )
+    await emit_stage(
+        data,
+        "brief",
+        started=False,
+        work_item_count=len(brief.work_items),
     )
     return [item.model_dump(mode="json") for item in brief.work_items]
 
@@ -308,12 +333,22 @@ async def retrieve_and_reply_draft(data: TriggerFlowRuntimeData) -> dict[str, An
     await data.async_append_state("drafts", gated.model_dump(mode="json"), emit=False)
     for card in cards:
         await data.async_append_state("evidence_cards", card, emit=False)
+    await publish_progress(
+        data,
+        "draft.ready",
+        {
+            "draft_key": gated.draft_key,
+            "decision": gated.decision,
+            "degrade_op": gated.degrade_op,
+        },
+    )
     return gated.model_dump(mode="json")
 
 
 async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     snapshot = cast(Snapshot, data.require_resource("snapshot"))
     trace = cast(TraceLog, data.require_resource("trace"))
+    await emit_stage(data, "review", started=True)
     drafts = [
         GatedDraft.model_validate(item)
         for item in cast(list[dict[str, Any]], data.get_state("drafts") or [])
@@ -425,5 +460,12 @@ async def reply_review(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         status="completed" if status != "failed" else "failed",
         subject_id=task_id,
         output=package,
+    )
+    await emit_stage(
+        data,
+        "review",
+        started=False,
+        status=status,
+        draft_count=len(drafts),
     )
     return package

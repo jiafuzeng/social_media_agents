@@ -9,6 +9,7 @@ from agently import Agently, TriggerFlowRuntimeData
 from integrated_agent.runtimes.matrix.compose.retrieval import normalize_route_intent
 from integrated_agent.runtimes.matrix.host.models import RouteIntentOut
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.host.progress import emit_stage
 
 
 async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
@@ -16,6 +17,7 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     text = str(request.get("text") or "")
     task_id = str(request.get("task_id") or "")
     trace = cast(TraceLog, data.require_resource("trace"))
+    await emit_stage(data, "route", started=True)
 
     try:
         result = await (
@@ -80,6 +82,7 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             subject_id=task_id,
             facts={"limitations": package["limitations"]},
         )
+        await emit_stage(data, "route", started=False, status="failed")
         await data.async_emit("PACKAGE", package)
         return package
 
@@ -104,6 +107,13 @@ async def compose_route(data: TriggerFlowRuntimeData) -> dict[str, Any]:
             "source_anchor": routed.source_anchor,
             "search_query": search_query,
         },
+    )
+    await emit_stage(
+        data,
+        "route",
+        started=False,
+        intent=routed.intent,
+        source_kind=routed.source_kind,
     )
     await data.async_emit(str(routed.intent), {"intent": routed.intent})
     return {

@@ -66,6 +66,7 @@ def test_t11_create_returns_202_and_one_package_ready(tmp_path: Path, monkeypatc
         assert stream.status_code == 200
         assert stream.text.count("event: package.ready") == 1
         assert "event: task.submitted" in stream.text
+        assert "event: stage.started" in stream.text
         assert "event: task.completed" in stream.text
 
 

@@ -15,6 +15,7 @@ def make_analyze_compose(
     logs_root: Path,
     data_root: Path,
     knowledge: Any | None = None,
+    events: Any | None = None,
 ):
     async def analyze_compose(request: MatrixTaskRequest) -> dict[str, Any]:
         if request.scenario != "compose":
@@ -25,6 +26,7 @@ def make_analyze_compose(
             data_root=data_root,
             output_directory=output_directory,
             knowledge=knowledge,
+            events=events,
         )
         run["trace_ref"] = (output_directory / "run.json").resolve().as_uri()
         return run

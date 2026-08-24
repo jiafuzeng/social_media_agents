@@ -27,6 +27,7 @@ from integrated_agent.runtimes.matrix.compose.retrieval import (
 )
 from integrated_agent.runtimes.matrix.host.tikhubtools import source_tools_list
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog
+from integrated_agent.runtimes.matrix.host.progress import emit_stage
 
 MAX_STEPS = 3
 # Reason：放大 session 窗口与输出额度，容纳累计 tool_result_cleaned
@@ -334,6 +335,7 @@ async def source_prelude(data: TriggerFlowRuntimeData) -> dict[str, Any]:
     await data.async_set_state("search_query", resolved_query, emit=False)
     await data.async_set_state("limitations", limitations, emit=False)
     await data.async_set_state("tool_result_cleaned", [], emit=False)
+    await emit_stage(data, "source", started=True)
 
     if source_kind == "paste" and source_text:
         await _finalize_source(
@@ -668,6 +670,12 @@ async def _finalize_source(
             "retrieval_relevance_score": relevance,
         },
     )
+    await emit_stage(
+        data,
+        "source",
+        started=False,
+        tweet_count=len(tweet_cards),
+    )
 
 
 def build_source_subflow() -> TriggerFlow:
@@ -693,6 +701,7 @@ SOURCE_SUBFLOW_CAPTURE: TriggerFlowSubFlowCapture = {
     "resources": {
         "trace": "resources.trace",
         "snapshot": "resources.snapshot",
+        "events": "resources.events",
     },
 }
 

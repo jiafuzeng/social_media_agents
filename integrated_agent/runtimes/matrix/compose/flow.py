@@ -97,6 +97,7 @@ async def run_compose(
     max_concurrency: int = 10,
     knowledge: Any | None = None,
     fetch_tweets: Any | None = None,
+    events: Any | None = None,
 ) -> dict[str, Any]:
     del fetch_tweets
     try:
@@ -123,6 +124,7 @@ async def run_compose(
             "knowledge": knowledge,
             "kb_user_id": request.user_id or "",
             "kb_profile_id": request.embedding_profile_id or "",
+            "events": events,
         },
         auto_close=False,
     )

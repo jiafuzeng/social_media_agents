@@ -40,6 +40,7 @@ async def run_reply(
     output_directory: Path,
     max_concurrency: int = 4,
     knowledge: Any | None = None,
+    events: Any | None = None,
 ) -> dict[str, Any]:
     snapshot = bind_snapshot(
         data_root=data_root,
@@ -56,6 +57,7 @@ async def run_reply(
             "knowledge": knowledge,
             "kb_user_id": request.user_id or "",
             "kb_profile_id": request.embedding_profile_id or "",
+            "events": events,
         },
         auto_close=False,
     )

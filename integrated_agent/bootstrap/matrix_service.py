@@ -48,11 +48,13 @@ def build_matrix_service(
                 logs_root=matrix_logs_root,
                 data_root=data_root,
                 knowledge=knowledge_store,
+                events=events,
             ),
             analyze_reply=make_analyze_reply(
                 logs_root=matrix_logs_root,
                 data_root=data_root,
                 knowledge=knowledge_store,
+                events=events,
             ),
             events=events,
         )
