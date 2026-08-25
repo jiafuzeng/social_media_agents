@@ -8,7 +8,6 @@ from integrated_agent.runtimes.matrix.host.models import (
     ReplyDraftOut,
     Requirement,
     ReviewItemVerdict,
-    ReviewOut,
     WorkItem,
 )
 
@@ -28,11 +27,14 @@ class ScriptedReplyModel:
         evidence_overrides: dict[str, list[str]] | None = None,
         review_lift_skip: bool = False,
         compose_work_item_count: int = 1,
+        review_revise_pass: bool = False,
     ) -> None:
         self.draft_text_overrides = draft_text_overrides or {}
         self.evidence_overrides = evidence_overrides or {}
         self.review_lift_skip = review_lift_skip
         self.compose_work_item_count = compose_work_item_count
+        self.review_revise_pass = review_revise_pass
+        self._revise_seen: set[str] = set()
 
     async def reply_brief(self, *, text: str, info: dict) -> BriefOut:
         comments = list(info.get("comments") or [])
@@ -89,9 +91,8 @@ class ScriptedReplyModel:
         repair: dict | None = None,
     ) -> ReplyDraftOut:
         work_item_id = str(work_item["work_item_id"])
-        comment = str((info.get("comment") or {}).get("text") or "")
+        comment = str(info.get("comment") or "")
         max_chars = int(info.get("max_chars") or 280)
-        offered = [str(card["ref_id"]) for card in info.get("offered_refs") or []]
         if _is_attack(comment):
             decision = "skip"
             text = self.draft_text_overrides.get(work_item_id, "")
@@ -105,9 +106,11 @@ class ScriptedReplyModel:
             rationale = "针对提问给出可核验指引，不承诺结果。"
         if repair and "over_limit" in (repair.get("issues") or []):
             text = text[:max_chars]
-        evidence_ids = self.evidence_overrides.get(work_item_id)
-        if evidence_ids is None:
-            evidence_ids = offered[:1]
+        if repair and decision != "skip" and (
+            repair.get("review_notes") or repair.get("regen_reason") == "review_not_compliant"
+        ):
+            text = "感谢提问，请以产品页成分说明为准，我们不承诺收益或疗效。"
+        evidence_ids = self.evidence_overrides.get(work_item_id) or []
         return ReplyDraftOut(
             work_item_id=work_item_id,
             stance_assessment="same-response",
@@ -120,30 +123,16 @@ class ScriptedReplyModel:
             proposed_degrade="skip" if decision == "skip" else None,
         )
 
-    async def reply_review(self, *, package: dict, info: dict) -> ReviewOut:
+    async def reply_review(self, *, draft: dict, info: dict | None = None) -> ReviewItemVerdict:
         del info
-        drafts = list(package.get("drafts") or [])
-        verdicts: list[ReviewItemVerdict] = []
-        for item in drafts:
-            if self.review_lift_skip and item.get("degrade_op") == "skip":
-                verdicts.append(
-                    ReviewItemVerdict(
-                        draft_key=str(item["draft_key"]),
-                        verdict="revise",
-                        revised_text="我们理解你的心情，欢迎继续交流。",
-                        notes="try lift skip",
-                    )
-                )
-            else:
-                verdicts.append(
-                    ReviewItemVerdict(
-                        draft_key=str(item["draft_key"]),
-                        verdict="accept",
-                        notes="keep",
-                    )
-                )
-        return ReviewOut(
-            item_verdicts=verdicts,
-            package_summary="评论回复包已过硬门，攻击项保持 skip。",
-            limitations=list(package.get("limitations") or []),
-        )
+        if not hasattr(self, "_revise_seen"):
+            self._revise_seen = set()
+        key = str(draft.get("work_item_id") or "")
+        if getattr(self, "review_revise_pass", False) and key not in self._revise_seen:
+            self._revise_seen.add(key)
+            return ReviewItemVerdict(
+                draft_key=key,
+                verdict="revise",
+                notes="语气再克制一些，去掉任何像承诺的措辞。",
+            )
+        return ReviewItemVerdict(draft_key=key, verdict="accept", notes="keep")

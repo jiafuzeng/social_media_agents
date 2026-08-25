@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from tests.scripted_compose import ScriptedComposeModel
+from tests.scripted_reply import ScriptedReplyModel
 from integrated_agent.runtimes.matrix.host.models import CommentIn
-from integrated_agent.runtimes.matrix.reply.scripted import ScriptedReplyModel
 
 
 class ScriptedMatrixModel(ScriptedComposeModel, ScriptedReplyModel):
@@ -172,7 +172,6 @@ async def _dispatch_compose_reply(
     if hasattr(model, "agent_sessions"):
         model.agent_sessions.append((name, session_id))
     snapshot = info.get("snapshot") if isinstance(info, dict) else info
-    context = info.get("context") if isinstance(info, dict) else info
     if name == "matrix-compose-route-intent":
         return await model.route_intent(text=input_data.get("text") or "", info=info)
     if name == "matrix-compose-intel-react":
@@ -361,13 +360,12 @@ async def _dispatch_compose_reply(
     if name == "matrix-reply-draft":
         return await model.reply_draft(
             work_item=input_data["work_item"],
-            info=context,
+            info=info if isinstance(info, dict) else {},
             repair=input_data.get("repair") or None,
         )
     if name == "matrix-reply-review":
-        return await model.reply_review(
-            package=input_data["package"], info=snapshot
-        )
+        draft = input_data.get("draft") if isinstance(input_data, dict) else input_data
+        return await model.reply_review(draft=draft)
     raise AssertionError(f"unexpected Agently agent name: {name}")
 
 

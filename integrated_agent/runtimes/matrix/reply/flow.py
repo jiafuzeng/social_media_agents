@@ -12,12 +12,12 @@ from integrated_agent.runtimes.matrix.host.models import MatrixTaskRequest
 
 from integrated_agent.runtimes.matrix.host.snapshots import bind_snapshot
 from integrated_agent.runtimes.matrix.host.trace_log import TraceLog, save_run
-from .pipeline import (
-    reply_brief,
-    reply_prelude,
-    reply_review,
-    retrieve_and_reply_draft,
+from .item import (
+    REPLY_ITEM_CAPTURE,
+    REPLY_ITEM_WRITE_BACK,
+    build_reply_item_flow,
 )
+from .pipeline import reply_brief, reply_package, reply_prelude
 
 
 PIPELINE_VERSION = "matrix-reply-v1"
@@ -27,9 +27,13 @@ REPLY_FLOW = TriggerFlow(name="matrix-reply-v1")
     REPLY_FLOW.to(reply_prelude)
     .to(reply_brief)
     .for_each(concurrency=4)
-    .to(retrieve_and_reply_draft)
+    .to_sub_flow(
+        build_reply_item_flow(),
+        capture=REPLY_ITEM_CAPTURE,
+        write_back=REPLY_ITEM_WRITE_BACK,
+    )
     .end_for_each()
-    .to(reply_review)
+    .to(reply_package)
 )
 
 
@@ -39,7 +43,6 @@ async def run_reply(
     data_root: Path,
     output_directory: Path,
     max_concurrency: int = 4,
-    knowledge: Any | None = None,
     events: Any | None = None,
 ) -> dict[str, Any]:
     snapshot = bind_snapshot(
@@ -52,10 +55,7 @@ async def run_reply(
         concurrency=max_concurrency,
         runtime_resources={
             "snapshot": snapshot,
-            "data_root": data_root,
             "session_id": request.session_id,
-            "knowledge": knowledge,
-            "kb_user_id": request.user_id or "",
             "events": events,
         },
         auto_close=False,
@@ -85,23 +85,11 @@ async def run_reply(
         "drafts": package["drafts"],
         "summary": package["summary"],
         "limitations": package.get("limitations") or [],
-        "evidence": _unique_cards(state.get("evidence_cards") or []),
+        "evidence": [],
         "events": trace.events,
     }
     save_run(run, output_directory)
     return run
-
-
-def _unique_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[str] = set()
-    unique: list[dict[str, Any]] = []
-    for card in cards:
-        ref_id = str(card.get("ref_id") or "")
-        if not ref_id or ref_id in seen:
-            continue
-        seen.add(ref_id)
-        unique.append(card)
-    return unique
 
 
 __all__ = ["PIPELINE_VERSION", "REPLY_FLOW", "run_reply"]

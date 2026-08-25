@@ -14,7 +14,6 @@ def make_analyze_reply(
     *,
     logs_root: Path,
     data_root: Path,
-    knowledge: Any | None = None,
     events: Any | None = None,
 ):
     async def analyze_reply(request: MatrixTaskRequest) -> dict[str, Any]:
@@ -25,7 +24,6 @@ def make_analyze_reply(
             request,
             data_root=data_root,
             output_directory=output_directory,
-            knowledge=knowledge,
             events=events,
         )
         run["trace_ref"] = (output_directory / "run.json").resolve().as_uri()

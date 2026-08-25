@@ -69,6 +69,8 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> Non
     assert len(run["drafts"]) == 3
     assert skipped
     assert all(item["text"] == "" for item in skipped)
+    assert all(item.get("kb_ids") == [] for item in run["drafts"])
+    assert run["evidence"] == []
     assert run["task_type"] == "reply_comment"
 
 
@@ -172,3 +174,23 @@ async def test_t10_review_cannot_lift_skip(tmp_path, monkeypatch) -> None:
     assert skipped
     assert all(item["text"] == "" for item in skipped)
     assert all(item["degrade_op"] == "skip" for item in skipped)
+
+
+@pytest.mark.asyncio
+async def test_reply_review_rewrites_noncompliant_draft(tmp_path, monkeypatch) -> None:
+    install_scripted_ask(
+        monkeypatch, ScriptedMatrixModel(review_revise_pass=True)
+    )
+    run = await run_reply(
+        MatrixTaskRequest(
+            task_id="t10-rewrite",
+            text="成分表在哪看？有没有官方说明？",
+            session_id="flow-session",
+            scenario="reply",
+        ),
+        data_root=DATA_ROOT,
+        output_directory=tmp_path / "t10-rewrite",
+    )
+    assert run["drafts"]
+    assert run["drafts"][0]["degrade_op"] != "skip"
+    assert "产品页成分说明" in run["drafts"][0]["text"]
