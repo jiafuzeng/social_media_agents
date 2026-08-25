@@ -31,10 +31,11 @@ def _extend(target: list[str], notes: list[str]) -> None:
 def _as_gated(item: dict[str, Any]) -> GatedDraft:
     work = item["work_item"] if isinstance(item.get("work_item"), dict) else {}
     draft = item["draft"] if isinstance(item.get("draft"), dict) else item
-    skip = (
-        str(draft.get("reply_decision") or "") == "skip"
-        or not str(draft.get("draft_text") or "").strip()
-    )
+    text = str(draft.get("draft_text") or "").strip()
+    decision = str(draft.get("reply_decision") or "reply")
+    if decision == "skip" and text:
+        decision = "acknowledge"
+    empty = not text
     work_item_id = str(work.get("work_item_id") or draft.get("work_item_id") or "")
     return GatedDraft.model_validate(
         {
@@ -42,12 +43,12 @@ def _as_gated(item: dict[str, Any]) -> GatedDraft:
             "kind": "reply_comment",
             "platform_key": work.get("platform_key") or "",
             "source_comment_key": work.get("source_comment_key"),
-            "degrade_op": "skip" if skip else "pass",
-            "text": "" if skip else draft.get("draft_text") or "",
+            "degrade_op": "skip" if empty else "pass",
+            "text": text,
             "rationale": draft.get("rationale") or "",
-            "decision": "skip" if skip else draft.get("reply_decision") or "reply",
+            "decision": "skip" if empty else decision,
             "risk_flags": list(draft.get("risk_flags") or []),
-            "status": "skipped" if skip else "ready",
+            "status": "skipped" if empty else "ready",
             "issues": [],
         }
     )

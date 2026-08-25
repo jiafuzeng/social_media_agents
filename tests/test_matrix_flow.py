@@ -52,7 +52,7 @@ async def test_compose_handle_calls_route_intent(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> None:
+async def test_t08_attack_comment_still_has_text(tmp_path, monkeypatch) -> None:
     install_scripted_ask(monkeypatch, ScriptedMatrixModel())
     run = await run_reply(
         MatrixTaskRequest(
@@ -65,10 +65,9 @@ async def test_t08_attack_comment_is_skipped_empty(tmp_path, monkeypatch) -> Non
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t08",
     )
-    skipped = [item for item in run["drafts"] if item["degrade_op"] == "skip"]
     assert len(run["drafts"]) == 3
-    assert skipped
-    assert all(item["text"] == "" for item in skipped)
+    assert all(str(item.get("text") or "").strip() for item in run["drafts"])
+    assert all(item.get("degrade_op") != "skip" for item in run["drafts"])
     assert all(item.get("kb_ids") == [] for item in run["drafts"])
     assert run["evidence"] == []
     assert run["task_type"] == "reply_comment"
@@ -148,10 +147,10 @@ async def test_t09_one_gate_failure_keeps_successful_item(tmp_path, monkeypatch)
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t09",
     )
-    assert run["status"] == "partial"
+    assert run["status"] == "completed"
+    assert all(str(item.get("text") or "").strip() for item in run["drafts"])
     statuses = {item["status"] for item in run["drafts"]}
-    assert "ready" in statuses or "degraded" in statuses
-    assert "failed" in statuses or "skipped" in statuses
+    assert "ready" in statuses
 
 
 @pytest.mark.asyncio
@@ -170,10 +169,10 @@ async def test_t10_review_cannot_lift_skip(tmp_path, monkeypatch) -> None:
         data_root=DATA_ROOT,
         output_directory=tmp_path / "t10",
     )
-    skipped = [item for item in run["drafts"] if item["decision"] == "skip"]
-    assert skipped
-    assert all(item["text"] == "" for item in skipped)
-    assert all(item["degrade_op"] == "skip" for item in skipped)
+    assert run["drafts"]
+    assert all(str(item.get("text") or "").strip() for item in run["drafts"])
+    assert all(item["degrade_op"] != "skip" for item in run["drafts"])
+    assert all("欢迎继续交流" not in (item.get("text") or "") for item in run["drafts"])
 
 
 @pytest.mark.asyncio

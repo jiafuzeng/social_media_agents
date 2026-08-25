@@ -94,9 +94,12 @@ class ScriptedReplyModel:
         comment = str(info.get("comment") or "")
         max_chars = int(info.get("max_chars") or 280)
         if _is_attack(comment):
-            decision = "skip"
-            text = self.draft_text_overrides.get(work_item_id, "")
-            rationale = "人身攻击不扩大冲突，跳过回复。"
+            decision = "acknowledge"
+            text = self.draft_text_overrides.get(
+                work_item_id,
+                "这条我们不在评论区展开，有问题请走官方渠道。",
+            )
+            rationale = "人身攻击不扩大冲突，公开收口。"
         else:
             decision = "reply"
             text = self.draft_text_overrides.get(
@@ -116,11 +119,11 @@ class ScriptedReplyModel:
             stance_assessment="same-response",
             reply_decision=decision,  # type: ignore[arg-type]
             claim_types=list(work_item.get("claim_types") or []),
-            risk_flags=["attack"] if decision == "skip" else [],
+            risk_flags=["attack"] if decision == "acknowledge" and _is_attack(comment) else [],
             draft_text=text,
             rationale=rationale,
-            evidence_ids=evidence_ids if decision != "skip" else [],
-            proposed_degrade="skip" if decision == "skip" else None,
+            evidence_ids=evidence_ids,
+            proposed_degrade=None,
         )
 
     async def reply_review(self, *, draft: dict, info: dict | None = None) -> ReviewItemVerdict:

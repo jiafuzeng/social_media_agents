@@ -15,7 +15,7 @@ from integrated_agent.runtimes.matrix.host.models import (
     ReviewItemVerdict,
     WorkItem,
 )
-from integrated_agent.runtimes.matrix.host.snapshots import Snapshot
+from integrated_agent.runtimes.matrix.host.snapshots import Snapshot, merged_forbidden_topics
 
 MAX_REPLY_REWRITES = 3
 
@@ -61,23 +61,27 @@ async def write_reply(data: TriggerFlowRuntimeData) -> dict[str, Any]:
         .input({"work_item": work, "repair": incoming.get("repair") or {}})
         .info(
             {
-                "max_chars": snapshot.platform.max_chars,
                 "comment": comment,
+                "max_chars": snapshot.platform.max_chars,
                 "interaction": (
                     snapshot.interaction.model_dump(mode="json")
                     if snapshot.interaction
                     else {}
                 ),
+                "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
+                "forbidden_terms": list(snapshot.policy.terms),
             }
         )
         .instruct(
             [
-                "只为 info.comment 写一条回复，不要拆解任务，不要评审。",
-                "遵守 info.interaction 的 voice_summary、must_do、must_not 与 skip_guidance。",
-                "先裁 reply、acknowledge 或 skip，再写 draft_text。",
-                "人身攻击、仇恨或无法核实的诱导：skip，且 draft_text 必须为空。",
-                "用互动口吻回复，不要导关注或报名，不要换成别的身份。",
-                "不得承诺稳赚、翻倍或疗效。正文不得超过 info.max_chars。",
+                "这是评论区回复，不是发帖写稿。对着 info.comment 说话，短、具体、答完即止。",
+                "不要写钩子、系列预热、关注 CTA 或种草长文。",
+                "遵守 info.interaction 的 voice_summary、goals、must_do、must_not 与 skip_guidance。",
+                "不要使用 info.forbidden_terms 中的禁词，不要谈 info.forbidden_topics。",
+                "先裁 reply 或 acknowledge，再写 draft_text。draft_text 必须非空。",
+                "人身攻击、仇恨或无法核实的诱导：acknowledge，写一句克制收口，不要空正文。",
+                "不要导关注或报名，不要换成别的身份。",
+                "正文不得超过 info.max_chars。",
                 "work_item_id 必须等于 input.work_item.work_item_id。",
                 "若 input.repair 非空：按 repair.review_notes 重写，不要复读 repair.previous_text。",
             ]
@@ -101,11 +105,47 @@ async def review_reply(data: TriggerFlowRuntimeData) -> dict[str, Any] | None:
         "draft": draft.model_dump(mode="json"),
         "rewrites": int(incoming.get("rewrites") or 0),
     }
-    if draft.reply_decision != "skip" and draft.draft_text.strip():
+    if not draft.draft_text.strip():
+        if dumped["rewrites"] < MAX_REPLY_REWRITES:
+            await data.async_emit(
+                "revise",
+                {
+                    "work_item": dumped["work_item"],
+                    "rewrites": dumped["rewrites"] + 1,
+                    "repair": {
+                        "review_notes": "回复正文不能为空，写一句对着原评论的收口。",
+                        "previous_text": "",
+                    },
+                },
+            )
+            return None
+        draft = draft.model_copy(
+            update={
+                "draft_text": "这条我们不在评论区展开，有问题请走官方渠道。",
+                "reply_decision": "acknowledge",
+            }
+        )
+        dumped["draft"] = draft.model_dump(mode="json")
+    else:
+        snapshot = cast(Snapshot, data.require_resource("snapshot"))
         result = await (
             Agently.create_agent(name="matrix-reply-review")
             .input({"draft": dumped["draft"]})
-            .instruct("判断这条回复是否满足要求。不合格则 revise，并在 notes 写明原因。")
+            .info(
+                {
+                    "forbidden_topics": merged_forbidden_topics(snapshot.guardrails),
+                    "forbidden_terms": list(snapshot.policy.terms),
+                }
+            )
+            .instruct(
+                [
+                    "只按法规与禁词评审这条评论回复，不要改写成推文，也不要按获客写稿口径抬稿。",
+                    "不得出现 info.forbidden_terms 中的用语。",
+                    "不得触碰 info.forbidden_topics。",
+                    "不得承诺收益、保本、疗效或绝对化效果。",
+                    "正文必须非空。不合格则 revise，notes 写明违反哪条。",
+                ]
+            )
             .output(ReviewItemVerdict, format="json")
             .async_start()
         )
