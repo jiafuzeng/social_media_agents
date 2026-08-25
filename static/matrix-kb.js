@@ -27,7 +27,7 @@ const FALLBACK_STRATEGIES = [
 ];
 
 const FALLBACK_PROFILES = {
-  default: "bge-m3",
+  default: "text-embedding-v3",
   profiles: ["text-embedding-v3", "bge-m3", "qwen3"]
 };
 
@@ -1037,7 +1037,9 @@ function applyKbSessionPreferences() {
     if (remembered && allowed.includes(remembered)) {
       select.value = remembered;
     } else {
-      select.value = allowed.includes("bge-m3") ? "bge-m3" : allowed[0] || "";
+      select.value = allowed.includes(FALLBACK_PROFILES.default)
+        ? FALLBACK_PROFILES.default
+        : allowed[0] || "";
     }
   }
   const workspace = currentKbProfile();

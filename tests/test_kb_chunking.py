@@ -462,7 +462,7 @@ def test_http_embedding_profiles_are_public_labels(tmp_path: Path, monkeypatch) 
         payload = client.get("/api/kb/embedding-profiles", headers=headers)
         assert payload.status_code == 200
         body = payload.json()
-        assert body["default"] == "bge-m3"
+        assert body["default"] == "text-embedding-v3"
         assert body["profiles"] == [
             "text-embedding-v3",
             "bge-m3",

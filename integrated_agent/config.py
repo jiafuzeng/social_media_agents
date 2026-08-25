@@ -86,7 +86,7 @@ KB_EMBEDDING_PROFILE_IDS: Final[tuple[str, ...]] = (
     "bge-m3",
     "qwen3",
 )
-KB_DEFAULT_EMBEDDING_PROFILE: Final[str] = "bge-m3"
+KB_DEFAULT_EMBEDDING_PROFILE: Final[str] = "text-embedding-v3"
 KB_EMBEDDING_AGENTS = {
     profile_id: _kb_embedding_agent(profile_id) for profile_id in KB_EMBEDDING_PROFILE_IDS
 }
